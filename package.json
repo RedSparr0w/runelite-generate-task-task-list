@@ -1,0 +1,7 @@
+{
+  "devDependencies": {
+    "@biomejs/biome": "2.0.6",
+    "lefthook": "^1.12.1",
+    "ultracite": "5.0.32"
+  }
+}
