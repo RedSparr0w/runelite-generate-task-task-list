@@ -6,6 +6,7 @@
 			"**",
 			// we'll use FracturedJson to format the tasks files
 			"!tasks/*.json",
+			"!ext/",
 			"!package-lock.json"
 		],
 		"indentStyle": "tab",
