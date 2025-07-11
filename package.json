@@ -1,8 +1,19 @@
 {
+	"scripts": {
+		"format:ultracite": "ultracite format",
+		"format:tasks": "tsx bin/frac.mts tasks/*.json",
+		"format": "npm run format:ultracite && npm run format:tasks",
+		"lint:ultracite": "ultracite lint",
+		"lint:tasks": "tsx bin/frac.mts --lint tasks/*.json",
+		"lint": "npm run lint:ultracite && npm run lint:tasks"
+	},
 	"devDependencies": {
 		"@biomejs/biome": "2.0.6",
 		"@tsconfig/node-ts": "^23.6.1",
 		"@tsconfig/node22": "^22.0.2",
+		"@types/node": "^24.0.13",
+		"fracturedjsonjs": "^4.1.0",
+		"glob": "^11.0.3",
 		"lefthook": "^1.12.1",
 		"tsx": "^4.20.3",
 		"typescript": "^5.8.3",

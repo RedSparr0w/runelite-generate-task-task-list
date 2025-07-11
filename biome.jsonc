@@ -2,9 +2,14 @@
 	"$schema": "https://biomejs.dev/schemas/2.0.6/schema.json",
 	"extends": ["ultracite"],
 	"formatter": {
+		"includes": [
+			"**",
+			// we'll use FracturedJson to format the tasks files
+			"!tasks/*.json",
+			"!package-lock.json"
+		],
 		"indentStyle": "tab",
-		"lineWidth": 100,
-		"includes": ["**", "!package-lock.json"]
+		"lineWidth": 100
 	},
 	"json": {
 		"formatter": {
