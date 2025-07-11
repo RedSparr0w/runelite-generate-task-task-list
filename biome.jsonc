@@ -1,4 +1,22 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.0.6/schema.json",
-  "extends": ["ultracite"]
+	"$schema": "https://biomejs.dev/schemas/2.0.6/schema.json",
+	"extends": ["ultracite"],
+	"formatter": {
+		"indentStyle": "tab",
+		"lineWidth": 100,
+		"includes": ["**", "!package-lock.json"]
+	},
+	"json": {
+		"formatter": {
+			"indentStyle": "tab",
+			"lineWidth": 100
+		}
+	},
+	"linter": {
+		"rules": {
+			"suspicious": {
+				"noConsole": "off"
+			}
+		}
+	}
 }

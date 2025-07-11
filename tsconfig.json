@@ -1,5 +1,7 @@
 {
-  "compilerOptions": {
-    "strictNullChecks": true
-  }
+	"extends": ["@tsconfig/node22/tsconfig.json", "@tsconfig/node-ts/tsconfig.json"],
+	"compilerOptions": {
+		"strictNullChecks": true,
+		"lib": ["es2024", "ESNext.Array", "ESNext.Collection", "ESNext.Iterator", "DOM"]
+	}
 }

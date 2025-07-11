@@ -1,7 +1,11 @@
 {
-  "devDependencies": {
-    "@biomejs/biome": "2.0.6",
-    "lefthook": "^1.12.1",
-    "ultracite": "5.0.32"
-  }
+	"devDependencies": {
+		"@biomejs/biome": "2.0.6",
+		"@tsconfig/node-ts": "^23.6.1",
+		"@tsconfig/node22": "^22.0.2",
+		"lefthook": "^1.12.1",
+		"tsx": "^4.20.3",
+		"typescript": "^5.8.3",
+		"ultracite": "5.0.32"
+	}
 }
