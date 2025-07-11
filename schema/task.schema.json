@@ -1,0 +1,53 @@
+{
+	"$schema": "https://json-schema.org/draft-07/schema",
+	"type": "object",
+	"required": ["id", "name", "wikiLink", "imageLink", "displayItemId"],
+	"properties": {
+		"id": {
+			"type": "string",
+			"format": "uuid"
+		},
+		"name": {
+			"type": "string",
+			"maxLength": 255
+		},
+		"tip": {
+			"type": "string"
+		},
+		"wikiLink": {
+			"type": "string",
+			"format": "uri",
+			"pattern": "^https://"
+		},
+		"imageLink": {
+			"type": "string",
+			"format": "uri",
+			"pattern": "^https://"
+		},
+		"displayItemId": {
+			"type": "integer",
+			"minimum": 0
+		},
+		"verification": {
+			"type": "object",
+			"required": ["method", "itemIds", "count"],
+			"properties": {
+				"method": {
+					"type": "string",
+					"const": "collection-log"
+				},
+				"itemIds": {
+					"type": "array",
+					"items": {
+						"type": "integer",
+						"minimum": 0
+					}
+				},
+				"count": {
+					"type": "integer",
+					"minimum": 1
+				}
+			}
+		}
+	}
+}
