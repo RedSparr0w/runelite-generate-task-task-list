@@ -1,5 +1,6 @@
 {
 	"scripts": {
+		"convert:web": "tsx bin/convert-web.mts",
 		"format:ultracite": "ultracite format",
 		"format:tasks": "tsx bin/frac.mts tasks/*.json",
 		"format": "npm run format:ultracite && npm run format:tasks",
@@ -15,6 +16,7 @@
 		"fracturedjsonjs": "^4.1.0",
 		"glob": "^11.0.3",
 		"lefthook": "^1.12.1",
+		"radash": "^12.1.1",
 		"tsx": "^4.20.3",
 		"typescript": "^5.8.3",
 		"ultracite": "5.0.32"
