@@ -7,7 +7,8 @@
 			// we'll use FracturedJson to format the tasks files
 			"!tasks/*.json",
 			"!ext/",
-			"!package-lock.json"
+			"!package-lock.json",
+			"!types.d.ts"
 		],
 		"indentStyle": "tab",
 		"lineWidth": 100
@@ -22,6 +23,9 @@
 		"rules": {
 			"suspicious": {
 				"noConsole": "off"
+			},
+			"nursery": {
+				"noUselessUndefined": "off"
 			}
 		}
 	}

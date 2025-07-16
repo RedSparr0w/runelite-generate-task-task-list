@@ -6,7 +6,8 @@
 		"format": "npm run format:ultracite && npm run format:tasks",
 		"lint:ultracite": "ultracite lint",
 		"lint:tasks": "tsx bin/frac.mts --lint tiers/*.json",
-		"lint": "npm run lint:ultracite && npm run lint:tasks"
+		"lint": "npm run lint:ultracite && npm run lint:tasks",
+		"gen:types": "tsx bin/gen-types.mts"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.0.6",
@@ -15,6 +16,7 @@
 		"@types/node": "^24.0.13",
 		"fracturedjsonjs": "^4.1.0",
 		"glob": "^11.0.3",
+		"json-schema-to-typescript": "^15.0.4",
 		"lefthook": "^1.12.1",
 		"radash": "^12.1.1",
 		"tsx": "^4.20.3",
