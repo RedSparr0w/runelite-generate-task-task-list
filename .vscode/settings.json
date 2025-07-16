@@ -19,5 +19,15 @@
 	"editor.codeActionsOnSave": {
 		"source.fixAll.biome": "explicit",
 		"source.organizeImports.biome": "explicit"
-	}
+	},
+	"json.schemas": [
+		{
+			"fileMatch": ["tiers/*.json"],
+			"url": "./schema/task-tier.schema.json"
+		},
+		{
+			"fileMatch": ["lists/*.json"],
+			"url": "./schema/task-list.schema.json"
+		}
+	]
 }
