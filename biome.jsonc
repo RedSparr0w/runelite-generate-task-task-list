@@ -1,15 +1,18 @@
 {
 	"$schema": "https://biomejs.dev/schemas/2.0.6/schema.json",
 	"extends": ["ultracite"],
-	"formatter": {
+	"files": {
 		"includes": [
 			"**",
 			// we'll use FracturedJson to format the tasks files
-			"!tasks/*.json",
-			"!ext/",
+			"!tiers/*.json",
+			"!lists/*.json",
+			"!ext/**",
 			"!package-lock.json",
 			"!types.d.ts"
-		],
+		]
+	},
+	"formatter": {
 		"indentStyle": "tab",
 		"lineWidth": 100
 	},
@@ -25,7 +28,8 @@
 				"noConsole": "off"
 			},
 			"nursery": {
-				"noUselessUndefined": "off"
+				"noUselessUndefined": "off",
+				"noAwaitInLoop": "off"
 			}
 		}
 	}

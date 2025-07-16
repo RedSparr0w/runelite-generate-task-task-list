@@ -7,13 +7,19 @@
 		"lint:ultracite": "ultracite lint",
 		"lint:tasks": "tsx bin/frac.mts --lint tiers/*.json",
 		"lint": "npm run lint:ultracite && npm run lint:tasks",
-		"gen:types": "tsx bin/gen-types.mts"
+		"gen:types": "tsx bin/gen-types.mts",
+		"gen:lists:official": "tsx bin/gen-list.mts official easy,medium,hard,elite,master",
+		"gen:lists:tedious": "tsx bin/gen-list.mts tedious easy,medium,hard,elite,master-tedious",
+		"gen:lists": "npm run gen:lists:official && npm run gen:lists:tedious"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.0.6",
 		"@tsconfig/node-ts": "^23.6.1",
 		"@tsconfig/node22": "^22.0.2",
+		"@types/ajv": "^0.0.5",
 		"@types/node": "^24.0.13",
+		"ajv-formats": "^3.0.1",
+		"ajv": "^8.17.1",
 		"fracturedjsonjs": "^4.1.0",
 		"glob": "^11.0.3",
 		"json-schema-to-typescript": "^15.0.4",

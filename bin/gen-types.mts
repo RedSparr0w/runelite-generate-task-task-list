@@ -3,7 +3,7 @@ import { basename } from 'node:path';
 import { compileFromFile } from 'json-schema-to-typescript';
 import { pascal } from 'radash';
 
-const file = './schema/task-tier.schema.json';
+const file = './schema/root.schema.json';
 const typeContent = await compileFromFile(file, {
 	customName: (type) => (type?.$id ? pascal(basename(type.$id, '.schema.json')) : undefined),
 	style: {
