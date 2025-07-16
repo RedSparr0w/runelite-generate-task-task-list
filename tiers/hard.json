@@ -1,5 +1,4 @@
 {
-	"$schema": "../schema/tier-task-list.schema.json",
 	"name": "hard",
 	"tasks": [
 		{
