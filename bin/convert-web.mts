@@ -65,7 +65,6 @@ function shiftTask(taskName: string): PluginTask | null {
 }
 
 const newData = {
-	$schema: '../schema/tier-task-list.schema.json',
 	name: inFile.replace('.json', '').replace(/^.+(\/|\\)/, ''),
 	// biome-ignore lint: because
 	// @ts-ignore
