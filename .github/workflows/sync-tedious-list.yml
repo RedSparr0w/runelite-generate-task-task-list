@@ -59,7 +59,7 @@ jobs:
         id: create-pr
         working-directory: target-repo
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ secrets.SYNC_TOKEN || github.token }}
         run: |
           # Configure git
           git config --local user.email "action@github.com"
@@ -92,21 +92,28 @@ jobs:
               
               # Force push to update the branch
               git push origin "$BRANCH_NAME" --force
+              BRANCH_UPDATED=true
             else
               echo "No changes detected after file copy. Branch is already up to date."
+              BRANCH_UPDATED=false
             fi
             
-            # Check if PR exists for this branch
+            # Check if PR exists for this branch (regardless of whether branch was updated)
             EXISTING_PR=$(gh pr list --head "$BRANCH_NAME" --state open --json number --jq '.[0].number // empty' || echo "")
             
             if [ -n "$EXISTING_PR" ]; then
-              echo "PR #$EXISTING_PR exists. Adding update comment."
-              gh pr comment "$EXISTING_PR" --body "🔄 **Updated with latest changes**
-              
-              Updated from ${{ github.repository }}@${{ github.sha }}
-              
-              ---
-              *Updated automatically by GitHub Actions*"
+              echo "PR #$EXISTING_PR exists."
+              if [ "$BRANCH_UPDATED" = true ]; then
+                echo "Adding update comment since branch was updated."
+                gh pr comment "$EXISTING_PR" --body "🔄 **Updated with latest changes**
+                
+                Updated from ${{ github.repository }}@${{ github.sha }}
+                
+                ---
+                *Updated automatically by GitHub Actions*"
+              else
+                echo "No comment added since branch was already up to date."
+              fi
               
               PR_URL=$(gh pr view "$EXISTING_PR" --json url --jq '.url')
               echo "action=updated" >> $GITHUB_OUTPUT
