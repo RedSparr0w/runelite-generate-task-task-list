@@ -41,133 +41,31 @@ jobs:
           mkdir -p target-repo/$(dirname "${{ steps.set-target.outputs.target_path }}")
           cp lists/tedious.json "target-repo/${{ steps.set-target.outputs.target_path }}"
 
-      - name: Check for changes in target repository
-        id: verify-changed-files
-        working-directory: target-repo
-        run: |
-          if [ -n "$(git status --porcelain)" ]; then
-            echo "changed=true" >> $GITHUB_OUTPUT
-            echo "Files changed:"
-            git status --porcelain
-          else
-            echo "changed=false" >> $GITHUB_OUTPUT
-            echo "No changes detected"
-          fi
-
       - name: Create Pull Request
-        if: steps.verify-changed-files.outputs.changed == 'true'
         id: create-pr
-        working-directory: target-repo
-        env:
-          GITHUB_TOKEN: ${{ secrets.SYNC_TOKEN || github.token }}
-        run: |
-          # Configure git
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action Sync"
+        uses: peter-evans/create-pull-request@v5
+        with:
+          path: target-repo
+          token: ${{ github.token }}
+          commit-message: |
+            Auto-sync: Update tedious task list
 
-          # Set branch name
-          BRANCH_NAME="auto-sync/tedious"
-
-          # Check if branch exists remotely
-          if git ls-remote --exit-code --heads origin "$BRANCH_NAME" > /dev/null 2>&1; then
-            echo "Branch $BRANCH_NAME exists. Updating it."
-            
-            # Reset working directory to clean state
-            git reset --hard HEAD
-            git clean -fd
-            
-            git fetch origin "$BRANCH_NAME"
-            git checkout "$BRANCH_NAME"
-            
-            # Copy updated file and check if there are changes
-            cp ../lists/tedious.json "${{ steps.set-target.outputs.target_path }}"
-            
-            # Check if there are actually changes to commit
-            if [ -n "$(git status --porcelain)" ]; then
-              echo "Changes detected. Committing and pushing."
-              git add "${{ steps.set-target.outputs.target_path }}"
-              git commit -m "Auto-sync: Update tedious task list
-
-              Updated from ${{ github.repository }}@${{ github.sha }}"
-              
-              # Force push to update the branch
-              git push origin "$BRANCH_NAME" --force
-              BRANCH_UPDATED=true
-            else
-              echo "No changes detected after file copy. Branch is already up to date."
-              BRANCH_UPDATED=false
-            fi
-            
-            # Check if PR exists for this branch (regardless of whether branch was updated)
-            EXISTING_PR=$(gh pr list --head "$BRANCH_NAME" --state open --json number --jq '.[0].number // empty' || echo "")
-            
-            if [ -n "$EXISTING_PR" ]; then
-              echo "PR #$EXISTING_PR exists."
-              if [ "$BRANCH_UPDATED" = true ]; then
-                echo "Adding update comment since branch was updated."
-                gh pr comment "$EXISTING_PR" --body "🔄 **Updated with latest changes**
-                
-                Updated from ${{ github.repository }}@${{ github.sha }}
-                
-                ---
-                *Updated automatically by GitHub Actions*"
-              else
-                echo "No comment added since branch was already up to date."
-              fi
-              
-              PR_URL=$(gh pr view "$EXISTING_PR" --json url --jq '.url')
-              echo "action=updated" >> $GITHUB_OUTPUT
-            else
-              echo "No PR found. Creating new one."
-              PR_URL=$(gh pr create \
-                --title "🤖 Auto-sync: Update tedious task list" \
-                --body "## Automated Task List Update
-
-              **Source:** ${{ github.repository }}@${{ github.sha }}
-              **Updated:** \`${{ steps.set-target.outputs.target_path }}\`
-
-              Please review and merge when ready.
-
-              ---
-              *Created automatically by GitHub Actions*" \
-                --head "$BRANCH_NAME" \
-                --base main)
-              
-              echo "action=created" >> $GITHUB_OUTPUT
-            fi
-          else
-            echo "Branch $BRANCH_NAME doesn't exist. Creating new branch and PR."
-            
-            # Create new branch
-            git checkout -b "$BRANCH_NAME"
-            git add "${{ steps.set-target.outputs.target_path }}"
-            git commit -m "Auto-sync: Update tedious task list
-
-            Updated from ${{ github.repository }}@${{ github.sha }}"
-            
-            # Push new branch
-            git push origin "$BRANCH_NAME"
-            
-            # Create PR
-            PR_URL=$(gh pr create \
-              --title "🤖 Auto-sync: Update tedious task list" \
-              --body "## Automated Task List Update
+            Updated from ${{ github.repository }}@${{ github.sha }}
+          title: "🤖 Auto-sync: Update tedious task list"
+          body: |
+            ## Automated Task List Update
 
             **Source:** ${{ github.repository }}@${{ github.sha }}
-            **Updated:** \`${{ steps.set-target.outputs.target_path }}\`
+            **Updated:** `${{ steps.set-target.outputs.target_path }}`
 
             Please review and merge when ready.
 
             ---
-            *Created automatically by GitHub Actions*" \
-              --head "$BRANCH_NAME" \
-              --base main)
-            
-            echo "action=created" >> $GITHUB_OUTPUT
-          fi
-
-          echo "pr_url=$PR_URL" >> $GITHUB_OUTPUT
-          echo "PR: $PR_URL"
+            *Created automatically by GitHub Actions*
+          branch: auto-sync/tedious
+          delete-branch: true
+          author: "GitHub Action <action@github.com>"
+          committer: "GitHub Action <action@github.com>"
 
       - name: Create summary
         run: |
@@ -175,15 +73,12 @@ jobs:
           echo "- **Source file**: \`lists/tedious.json\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Target repository**: \`${{ steps.set-target.outputs.target_repo }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Target path**: \`${{ steps.set-target.outputs.target_path }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Changes detected**: \`${{ steps.verify-changed-files.outputs.changed }}\`" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ steps.verify-changed-files.outputs.changed }}" == "true" ]; then
-            if [ "${{ steps.create-pr.outputs.action }}" == "updated" ]; then
-              echo "- **Status**: ✅ Existing pull request updated successfully" >> $GITHUB_STEP_SUMMARY
-            else
-              echo "- **Status**: ✅ New pull request created successfully" >> $GITHUB_STEP_SUMMARY
-            fi
-            echo "- **PR URL**: ${{ steps.create-pr.outputs.pr_url }}" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.create-pr.outputs.pull-request-number }}" != "" ]; then
+            echo "- **Status**: ✅ Pull request created/updated successfully" >> $GITHUB_STEP_SUMMARY
+            echo "- **PR Number**: #${{ steps.create-pr.outputs.pull-request-number }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **PR URL**: ${{ steps.create-pr.outputs.pull-request-url }}" >> $GITHUB_STEP_SUMMARY
             echo "- **Action**: Please review and merge the PR in the target repository" >> $GITHUB_STEP_SUMMARY
           else
-            echo "- **Status**: ℹ️ No changes needed" >> $GITHUB_STEP_SUMMARY
+            echo "- **Status**: ℹ️ No changes detected, no PR needed" >> $GITHUB_STEP_SUMMARY
           fi
