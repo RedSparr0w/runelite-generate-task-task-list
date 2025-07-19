@@ -46,5 +46,5 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add lists/
-          git commit -m "Auto-update task lists [skip ci]"
+          git commit -m "[auto-commit] Update joined task lists"
           git push
