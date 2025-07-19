@@ -71,6 +71,11 @@ jobs:
           # Check if branch exists remotely
           if git ls-remote --exit-code --heads origin "$BRANCH_NAME" > /dev/null 2>&1; then
             echo "Branch $BRANCH_NAME exists. Updating it."
+            
+            # Reset working directory to clean state
+            git reset --hard HEAD
+            git clean -fd
+            
             git fetch origin "$BRANCH_NAME"
             git checkout "$BRANCH_NAME"
             
