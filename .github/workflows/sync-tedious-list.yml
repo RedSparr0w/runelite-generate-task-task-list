@@ -54,15 +54,110 @@ jobs:
             echo "No changes detected"
           fi
 
-      - name: Commit and push to target repository
+      - name: Create Pull Request
         if: steps.verify-changed-files.outputs.changed == 'true'
+        id: create-pr
         working-directory: target-repo
+        env:
+          GITHUB_TOKEN: ${{ secrets.SYNC_TOKEN }}
         run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action Sync"
-          git add "${{ steps.set-target.outputs.target_path }}"
-          git commit -m "[auto-sync] Update tedious task list"
-          git push
+          # Check for existing PRs from auto-sync
+          EXISTING_PR=$(gh pr list --head "auto-sync/tedious" --state open --json number,headRefName --jq '.[0].number // empty' || echo "")
+          EXISTING_BRANCH=$(gh pr list --head "auto-sync/tedious" --state open --json number,headRefName --jq '.[0].headRefName // empty' || echo "")
+
+          if [ -n "$EXISTING_PR" ]; then
+            echo "Found existing auto-sync PR #$EXISTING_PR with branch: $EXISTING_BRANCH"
+            
+            # Switch to existing branch and update it
+            git fetch origin "$EXISTING_BRANCH"
+            git checkout "$EXISTING_BRANCH"
+            
+            # Configure git
+            git config --local user.email "action@github.com"
+            git config --local user.name "GitHub Action Sync"
+            
+            # Update the file and commit changes
+            git add "${{ steps.set-target.outputs.target_path }}"
+            git commit -m "Auto-sync: Update tedious task list
+
+            Updated from ${{ github.repository }}@${{ github.sha }}
+
+            This is an automated update of the tedious task list from the source repository."
+            
+            # Force push the updated branch
+            git push origin "$EXISTING_BRANCH" --force
+            
+            # Add a comment to the existing PR
+            gh pr comment "$EXISTING_PR" --body "🔄 **Updated with latest changes**
+
+            This PR has been automatically updated with the latest task list changes.
+            
+            **New source commit:** ${{ github.repository }}@${{ github.sha }}
+            **Triggered by:** ${{ github.actor }}
+            
+            Please review the updated changes.
+            
+            ---
+            *Updated automatically by GitHub Actions*"
+            
+            # Get PR URL
+            PR_URL=$(gh pr view "$EXISTING_PR" --json url --jq '.url')
+            echo "Updated existing PR: $PR_URL"
+            echo "pr_url=$PR_URL" >> $GITHUB_OUTPUT
+            echo "action=updated" >> $GITHUB_OUTPUT
+            
+          else
+            echo "No existing auto-sync PR found. Creating new one."
+            
+            # Create a new branch name
+            BRANCH_NAME="auto-sync/tedious"
+
+            # Configure git
+            git config --local user.email "action@github.com"
+            git config --local user.name "GitHub Action Sync"
+
+            # Create and switch to new branch
+            git checkout -b "$BRANCH_NAME"
+
+            # Add and commit changes
+            git add "${{ steps.set-target.outputs.target_path }}"
+            git commit -m "Auto-sync: Update tedious task list
+
+            Updated from ${{ github.repository }}@${{ github.sha }}
+
+            This is an automated update of the tedious task list from the source repository."
+
+            # Push the branch
+            git push origin "$BRANCH_NAME"
+
+            # Create pull request using GitHub CLI
+            PR_URL=$(gh pr create \
+              --title "🤖 Auto-sync: Update tedious task list" \
+              --body "## Automated Task List Update
+
+            This PR contains an automated update of the tedious task list.
+
+            **Source Information:**
+            - Repository: \`${{ github.repository }}\`
+            - Commit: \`${{ github.sha }}\`
+            - Triggered by: ${{ github.actor }}
+
+            **Changes:**
+            - Updated \`${{ steps.set-target.outputs.target_path }}\`
+
+            **Review Notes:**
+            Please review the changes to ensure they look correct before merging.
+
+            ---
+            *This PR was created automatically by GitHub Actions.*" \
+              --head "$BRANCH_NAME" \
+              --base main \
+              --repo "${{ steps.set-target.outputs.target_repo }}")
+
+            echo "Created new PR: $PR_URL"
+            echo "pr_url=$PR_URL" >> $GITHUB_OUTPUT
+            echo "action=created" >> $GITHUB_OUTPUT
+          fi
 
       - name: Create summary
         run: |
@@ -72,7 +167,13 @@ jobs:
           echo "- **Target path**: \`${{ steps.set-target.outputs.target_path }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Changes detected**: \`${{ steps.verify-changed-files.outputs.changed }}\`" >> $GITHUB_STEP_SUMMARY
           if [ "${{ steps.verify-changed-files.outputs.changed }}" == "true" ]; then
-            echo "- **Status**: ✅ Successfully synced" >> $GITHUB_STEP_SUMMARY
+            if [ "${{ steps.create-pr.outputs.action }}" == "updated" ]; then
+              echo "- **Status**: ✅ Existing pull request updated successfully" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- **Status**: ✅ New pull request created successfully" >> $GITHUB_STEP_SUMMARY
+            fi
+            echo "- **PR URL**: ${{ steps.create-pr.outputs.pr_url }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Action**: Please review and merge the PR in the target repository" >> $GITHUB_STEP_SUMMARY
           else
             echo "- **Status**: ℹ️ No changes needed" >> $GITHUB_STEP_SUMMARY
           fi
