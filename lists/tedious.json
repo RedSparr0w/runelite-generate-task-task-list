@@ -1808,7 +1808,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Ardougne_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
-			"verification": { "method": "achievement-diary", "varbit": 2582 }
+			"verification": { "method": "achievement-diary", "varbit": 4458 }
 		},
 		{
 			"id": "1c486d16-4538-424d-986a-efb457de0a8a",
@@ -1817,7 +1817,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Desert_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
-			"verification": { "method": "achievement-diary", "varbit": 2586 }
+			"verification": { "method": "achievement-diary", "varbit": 4483 }
 		},
 		{
 			"id": "c82332c7-d026-4d53-a8cc-50ed31e2b182",
@@ -1826,7 +1826,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Falador_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
-			"verification": { "method": "achievement-diary", "varbit": 2570 }
+			"verification": { "method": "achievement-diary", "varbit": 4462 }
 		},
 		{
 			"id": "82f153a8-37e7-40df-bb02-03a520ec3439",
@@ -1835,7 +1835,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Fremennik_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
-			"verification": { "method": "achievement-diary", "varbit": 2590 }
+			"verification": { "method": "achievement-diary", "varbit": 4491 }
 		},
 		{
 			"id": "740deabc-99c8-42ff-8d15-e6442796368d",
@@ -1844,7 +1844,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Kandarin_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
-			"verification": { "method": "achievement-diary", "varbit": 2594 }
+			"verification": { "method": "achievement-diary", "varbit": 4475 }
 		},
 		{
 			"id": "fb3e6897-aa5e-4ea4-a6e0-1e6e6dc4347c",
@@ -1853,7 +1853,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Karamja_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
-			"verification": { "method": "achievement-diary", "varbit": 2574 }
+			"verification": { "method": "achievement-diary", "varbit": 3578 }
 		},
 		{
 			"id": "753aa85c-d122-4551-b9ab-a34fbe403526",
@@ -1871,7 +1871,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Lumbridge_%26_Draynor_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
-			"verification": { "method": "achievement-diary", "varbit": 2566 }
+			"verification": { "method": "achievement-diary", "varbit": 4495 }
 		},
 		{
 			"id": "309d3dbb-6b68-4697-8562-c72e6c48e8e5",
@@ -1880,7 +1880,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Morytania_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
-			"verification": { "method": "achievement-diary", "varbit": 2578 }
+			"verification": { "method": "achievement-diary", "varbit": 4487 }
 		},
 		{
 			"id": "cf8660d4-cf64-4448-a4fd-e9b622293e53",
@@ -1889,7 +1889,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Varrock_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
-			"verification": { "method": "achievement-diary", "varbit": 2598 }
+			"verification": { "method": "achievement-diary", "varbit": 4479 }
 		},
 		{
 			"id": "3f4958dd-c0f7-4315-90c6-710ee0db254a",
@@ -1898,7 +1898,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Western_Provinces_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
-			"verification": { "method": "achievement-diary", "varbit": 2602 }
+			"verification": { "method": "achievement-diary", "varbit": 4471 }
 		},
 		{
 			"id": "e4efcd63-f488-4a91-9307-c6662e9f612f",
@@ -1907,7 +1907,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Wilderness_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
-			"verification": { "method": "achievement-diary", "varbit": 2606 }
+			"verification": { "method": "achievement-diary", "varbit": 4466 }
 		},
 		{
 			"id": "d6f7fda8-e5fb-48fd-addd-2f23e9f5fc01",
@@ -3832,7 +3832,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Ardougne_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
-			"verification": { "method": "achievement-diary", "varbit": 2583 }
+			"verification": { "method": "achievement-diary", "varbit": 4459 }
 		},
 		{
 			"id": "5d2d9461-00bc-431b-b943-0693bb8b0fb6",
@@ -3841,7 +3841,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Desert_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
-			"verification": { "method": "achievement-diary", "varbit": 2587 }
+			"verification": { "method": "achievement-diary", "varbit": 4484 }
 		},
 		{
 			"id": "a455bbf7-a570-494f-9753-643aeb83aca9",
@@ -3850,7 +3850,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Falador_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
-			"verification": { "method": "achievement-diary", "varbit": 2571 }
+			"verification": { "method": "achievement-diary", "varbit": 4463 }
 		},
 		{
 			"id": "958d1774-5ddb-4cb3-abdf-2772de4d024f",
@@ -3859,7 +3859,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Fremennik_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
-			"verification": { "method": "achievement-diary", "varbit": 2591 }
+			"verification": { "method": "achievement-diary", "varbit": 4492 }
 		},
 		{
 			"id": "f638ebcb-aebf-4c53-bd07-c0e683bc1072",
@@ -3868,7 +3868,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Kandarin_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
-			"verification": { "method": "achievement-diary", "varbit": 2595 }
+			"verification": { "method": "achievement-diary", "varbit": 4476 }
 		},
 		{
 			"id": "306c11a3-241a-49b8-8083-ea05124d72e9",
@@ -3877,7 +3877,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Karamja_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
-			"verification": { "method": "achievement-diary", "varbit": 2575 }
+			"verification": { "method": "achievement-diary", "varbit": 3599 }
 		},
 		{
 			"id": "19708dd7-fb75-4ebc-ad65-60697a0d6401",
@@ -3895,7 +3895,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Lumbridge_%26_Draynor_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
-			"verification": { "method": "achievement-diary", "varbit": 2567 }
+			"verification": { "method": "achievement-diary", "varbit": 4496 }
 		},
 		{
 			"id": "31e5ccaa-dd74-42d7-8749-2efdaaf01e4e",
@@ -3904,7 +3904,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Morytania_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
-			"verification": { "method": "achievement-diary", "varbit": 2579 }
+			"verification": { "method": "achievement-diary", "varbit": 4488 }
 		},
 		{
 			"id": "f59758a3-122e-4d8a-b2ed-5b908fc60a8c",
@@ -3913,7 +3913,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Varrock_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
-			"verification": { "method": "achievement-diary", "varbit": 2599 }
+			"verification": { "method": "achievement-diary", "varbit": 4480 }
 		},
 		{
 			"id": "993eb6f8-e30a-4f0a-977d-148b45e0f7f7",
@@ -3922,7 +3922,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Western_Provinces_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
-			"verification": { "method": "achievement-diary", "varbit": 2603 }
+			"verification": { "method": "achievement-diary", "varbit": 4472 }
 		},
 		{
 			"id": "59e36673-6808-4371-ba70-fd8d8003e5ef",
@@ -3931,7 +3931,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Wilderness_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
-			"verification": { "method": "achievement-diary", "varbit": 2607 }
+			"verification": { "method": "achievement-diary", "varbit": 4467 }
 		},
 		{
 			"id": "5052c1dc-d89e-4309-b978-8dbc79fa28b6",
@@ -6662,7 +6662,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Ardougne_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
-			"verification": { "method": "achievement-diary", "varbit": 2584 }
+			"verification": { "method": "achievement-diary", "varbit": 4460 }
 		},
 		{
 			"id": "6d862500-e957-438a-91d7-73afd64cbc94",
@@ -6671,7 +6671,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Desert_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
-			"verification": { "method": "achievement-diary", "varbit": 2588 }
+			"verification": { "method": "achievement-diary", "varbit": 4485 }
 		},
 		{
 			"id": "ac81b972-e058-4f1c-9a6d-6b584152018e",
@@ -6680,7 +6680,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Falador_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
-			"verification": { "method": "achievement-diary", "varbit": 2572 }
+			"verification": { "method": "achievement-diary", "varbit": 4464 }
 		},
 		{
 			"id": "ecf10542-a7dc-46a5-a104-1c2565775a0a",
@@ -6689,7 +6689,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Fremennik_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
-			"verification": { "method": "achievement-diary", "varbit": 2592 }
+			"verification": { "method": "achievement-diary", "varbit": 4493 }
 		},
 		{
 			"id": "8eadf6a7-db23-4837-af73-353b46e7f154",
@@ -6698,7 +6698,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Kandarin_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
-			"verification": { "method": "achievement-diary", "varbit": 2596 }
+			"verification": { "method": "achievement-diary", "varbit": 4477 }
 		},
 		{
 			"id": "efb50bb9-4fca-4c74-b17a-2411f462c798",
@@ -6707,7 +6707,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Karamja_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
-			"verification": { "method": "achievement-diary", "varbit": 2576 }
+			"verification": { "method": "achievement-diary", "varbit": 3611 }
 		},
 		{
 			"id": "cf47e5f2-f8b7-4e8f-94c9-578c405ad7ba",
@@ -6725,7 +6725,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Lumbridge_%26_Draynor_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
-			"verification": { "method": "achievement-diary", "varbit": 2568 }
+			"verification": { "method": "achievement-diary", "varbit": 4497 }
 		},
 		{
 			"id": "ab6d1763-824a-42b5-b4f5-41b0e30f618a",
@@ -6734,7 +6734,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Morytania_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
-			"verification": { "method": "achievement-diary", "varbit": 2580 }
+			"verification": { "method": "achievement-diary", "varbit": 4489 }
 		},
 		{
 			"id": "376f87f1-88c5-4180-abca-505cdaa542e4",
@@ -6743,7 +6743,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Varrock_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
-			"verification": { "method": "achievement-diary", "varbit": 2600 }
+			"verification": { "method": "achievement-diary", "varbit": 4481 }
 		},
 		{
 			"id": "6cad11a7-d40c-4a5e-962d-0387c9eb256b",
@@ -6752,7 +6752,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Western_Provinces_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
-			"verification": { "method": "achievement-diary", "varbit": 2604 }
+			"verification": { "method": "achievement-diary", "varbit": 4473 }
 		},
 		{
 			"id": "4a1632cf-a847-43d9-884a-a43e135fdb76",
@@ -6761,7 +6761,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Wilderness_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
-			"verification": { "method": "achievement-diary", "varbit": 2608 }
+			"verification": { "method": "achievement-diary", "varbit": 4468 }
 		},
 		{
 			"id": "e105c01f-2269-4dcc-8043-04b62a7f5d8e",
@@ -9975,7 +9975,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Ardougne_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
-			"verification": { "method": "achievement-diary", "varbit": 2585 }
+			"verification": { "method": "achievement-diary", "varbit": 4461 }
 		},
 		{
 			"id": "7ec18760-279b-403f-a871-8f0bb99d3387",
@@ -9984,7 +9984,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Desert_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
-			"verification": { "method": "achievement-diary", "varbit": 2589 }
+			"verification": { "method": "achievement-diary", "varbit": 4486 }
 		},
 		{
 			"id": "ab7fc232-2f2d-4497-8ea8-c7073d02539b",
@@ -9993,7 +9993,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Falador_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
-			"verification": { "method": "achievement-diary", "varbit": 2573 }
+			"verification": { "method": "achievement-diary", "varbit": 4465 }
 		},
 		{
 			"id": "3d193ab7-67da-409b-8c21-fa79761e9693",
@@ -10002,7 +10002,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Fremennik_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
-			"verification": { "method": "achievement-diary", "varbit": 2593 }
+			"verification": { "method": "achievement-diary", "varbit": 4494 }
 		},
 		{
 			"id": "1cb67d59-85dc-4377-a348-30b87d54bbfe",
@@ -10011,7 +10011,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Kandarin_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
-			"verification": { "method": "achievement-diary", "varbit": 2597 }
+			"verification": { "method": "achievement-diary", "varbit": 4478 }
 		},
 		{
 			"id": "26fe2217-b7f0-496e-a081-5ab11d8fe7b1",
@@ -10020,7 +10020,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Karamja_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
-			"verification": { "method": "achievement-diary", "varbit": 2577 }
+			"verification": { "method": "achievement-diary", "varbit": 4566 }
 		},
 		{
 			"id": "308e1019-6b20-45ce-9725-13df969c6f49",
@@ -10038,7 +10038,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Lumbridge_%26_Draynor_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
-			"verification": { "method": "achievement-diary", "varbit": 2569 }
+			"verification": { "method": "achievement-diary", "varbit": 4498 }
 		},
 		{
 			"id": "d2ac7997-c8f8-420a-80c2-ab8e0a686e48",
@@ -10047,7 +10047,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Morytania_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
-			"verification": { "method": "achievement-diary", "varbit": 2581 }
+			"verification": { "method": "achievement-diary", "varbit": 4490 }
 		},
 		{
 			"id": "63efc541-8946-45e1-b633-c9a56796c655",
@@ -10056,7 +10056,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Varrock_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
-			"verification": { "method": "achievement-diary", "varbit": 2601 }
+			"verification": { "method": "achievement-diary", "varbit": 4482 }
 		},
 		{
 			"id": "0709860d-771d-4173-8160-fdbeccfa54e0",
@@ -10065,7 +10065,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Western_Provinces_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
-			"verification": { "method": "achievement-diary", "varbit": 2605 }
+			"verification": { "method": "achievement-diary", "varbit": 4474 }
 		},
 		{
 			"id": "2b10f0dd-ed73-48e9-8ee7-1bb8744f2005",
@@ -10074,7 +10074,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Wilderness_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
-			"verification": { "method": "achievement-diary", "varbit": 2609 }
+			"verification": { "method": "achievement-diary", "varbit": 4469 }
 		},
 		{
 			"id": "ed99af32-87fc-4ef0-a0f7-9c9ffc2f877c",
