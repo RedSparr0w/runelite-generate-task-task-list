@@ -26,27 +26,44 @@ jobs:
       - name: Set target repository
         id: set-target
         run: |
-          echo "target_repo=${{ github.event.inputs.target_repo }}" >> $GITHUB_OUTPUT
-          echo "target_path=${{ github.event.inputs.target_path }}" >> $GITHUB_OUTPUT
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "target_repo=${{ github.event.inputs.target_repo }}" >> $GITHUB_OUTPUT
+            echo "target_path=${{ github.event.inputs.target_path }}" >> $GITHUB_OUTPUT
+          else
+            echo "target_repo=RedSparr0w/runelite-generate-task" >> $GITHUB_OUTPUT
+            echo "target_path=src/main/resources/com/logmaster/domain/tedious.json" >> $GITHUB_OUTPUT
+          fi
 
-      - name: Checkout target repository
+          # Extract repo name from owner/repo format
+          repo_name=$(echo "${{ github.event.inputs.target_repo || 'RedSparr0w/runelite-generate-task' }}" | cut -d'/' -f2)
+          echo "repo_name=$repo_name" >> $GITHUB_OUTPUT
+
+      - name: Fork target repository
+        run: |
+          # Fork the target repository if it doesn't exist
+          gh repo fork ${{ steps.set-target.outputs.target_repo }} --clone=false || echo "Fork already exists or failed"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Checkout forked repository
         uses: actions/checkout@v4
         with:
-          repository: ${{ steps.set-target.outputs.target_repo }}
-          token: ${{ secrets.SYNC_TOKEN }}
-          path: target-repo
+          repository: ${{ github.actor }}/${{ steps.set-target.outputs.repo_name }}
+          token: ${{ github.token }}
+          path: forked-repo
 
-      - name: Copy tedious.json to target repository
+      - name: Copy tedious.json to forked repository
         run: |
-          mkdir -p target-repo/$(dirname "${{ steps.set-target.outputs.target_path }}")
-          cp lists/tedious.json "target-repo/${{ steps.set-target.outputs.target_path }}"
+          mkdir -p forked-repo/$(dirname "${{ steps.set-target.outputs.target_path }}")
+          cp lists/tedious.json "forked-repo/${{ steps.set-target.outputs.target_path }}"
 
-      - name: Create Pull Request
+      - name: Create Pull Request from fork
         id: create-pr
         uses: peter-evans/create-pull-request@v5
         with:
-          path: target-repo
+          path: forked-repo
           token: ${{ github.token }}
+          push-to-fork: ${{ github.actor }}/${{ steps.set-target.outputs.repo_name }}
           commit-message: |
             Auto-sync: Update tedious task list
 
@@ -64,8 +81,6 @@ jobs:
             *Created automatically by GitHub Actions*
           branch: auto-sync/tedious
           delete-branch: true
-          author: "GitHub Action <action@github.com>"
-          committer: "GitHub Action <action@github.com>"
 
       - name: Create summary
         run: |
