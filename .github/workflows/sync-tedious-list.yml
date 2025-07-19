@@ -68,6 +68,10 @@ jobs:
           # Also check if the branch exists remotely (even without PR)
           REMOTE_BRANCH_EXISTS=$(git ls-remote --heads origin auto-sync/tedious | wc -l)
 
+          # Configure git first
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action Sync"
+
           if [ -n "$EXISTING_PR" ]; then
             echo "Found existing auto-sync PR #$EXISTING_PR with branch: $EXISTING_BRANCH"
             
@@ -75,9 +79,8 @@ jobs:
             git fetch origin "$EXISTING_BRANCH"
             git checkout "$EXISTING_BRANCH"
             
-            # Configure git
-            git config --local user.email "action@github.com"
-            git config --local user.name "GitHub Action Sync"
+            # Copy the updated file again (since we switched branches)
+            cp ../lists/tedious.json "${{ steps.set-target.outputs.target_path }}"
             
             # Update the file and commit changes
             git add "${{ steps.set-target.outputs.target_path }}"
@@ -116,9 +119,8 @@ jobs:
             git fetch origin auto-sync/tedious
             git checkout auto-sync/tedious
             
-            # Configure git
-            git config --local user.email "action@github.com"
-            git config --local user.name "GitHub Action Sync"
+            # Copy the updated file again (since we switched branches)
+            cp ../lists/tedious.json "${{ steps.set-target.outputs.target_path }}"
             
             # Update the file and commit changes
             git add "${{ steps.set-target.outputs.target_path }}"
