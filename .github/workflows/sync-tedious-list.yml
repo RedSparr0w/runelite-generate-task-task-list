@@ -59,7 +59,7 @@ jobs:
         id: create-pr
         working-directory: target-repo
         env:
-          GITHUB_TOKEN: ${{ secrets.SYNC_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           # Check for existing PRs from auto-sync
           EXISTING_PR=$(gh pr list --head "auto-sync/tedious" --state open --json number,headRefName --jq '.[0].number // empty' || echo "")
