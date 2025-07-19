@@ -61,7 +61,7 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action Sync"
           git add "${{ steps.set-target.outputs.target_path }}"
-          git commit -m "Auto-sync: Update tedious task list"
+          git commit -m "[auto-sync] Update tedious task list"
           git push
 
       - name: Create summary
