@@ -70,7 +70,7 @@
 					}
 				},
 				"then": {
-					"required": ["method", "varbit"]
+					"required": ["method", "varbit", "count"]
 				}
 			}
 		}
