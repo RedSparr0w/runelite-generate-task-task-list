@@ -3,13 +3,16 @@ name: Build Task Lists
 on:
   push:
     branches: ["main"]
-    paths: ["tiers/**"]
+    # we include package.json in case the list definitions change
+    paths: ["tiers/**", "package.json"]
 
 jobs:
   build:
     runs-on: ubuntu-latest
     outputs:
       changed: ${{ steps.verify-changed-files.outputs.changed }}
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout repository
@@ -44,12 +47,9 @@ jobs:
 
       - name: Commit and push changes
         if: steps.verify-changed-files.outputs.changed == 'true' && github.event_name == 'push'
-        env:
-          GITHUB_TOKEN: ${{ secrets.WORKFLOW_TOKEN || github.token }}
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git
           git add lists/
           git commit -m "[auto-commit] Update joined task lists"
           git push
