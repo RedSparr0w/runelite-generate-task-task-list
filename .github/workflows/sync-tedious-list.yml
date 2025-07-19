@@ -38,32 +38,58 @@ jobs:
           repo_name=$(echo "${{ github.event.inputs.target_repo || 'RedSparr0w/runelite-generate-task' }}" | cut -d'/' -f2)
           echo "repo_name=$repo_name" >> $GITHUB_OUTPUT
 
-      - name: Fork target repository
+      - name: Fork and clone target repository
         run: |
-          # Fork the target repository if it doesn't exist
-          gh repo fork ${{ steps.set-target.outputs.target_repo }} --clone=false || echo "Fork already exists or failed"
+          # Fork the target repository
+          gh repo fork ${{ steps.set-target.outputs.target_repo }} --clone=true --remote=true
+
+          # Change to the cloned directory
+          cd $(echo "${{ steps.set-target.outputs.repo_name }}")
+
+          # Configure git
+          git config user.name "GitHub Action"
+          git config user.email "action@github.com"
+
+          # Create and switch to sync branch
+          git checkout -b auto-sync/tedious
+
+          # Copy the file
+          mkdir -p $(dirname "${{ steps.set-target.outputs.target_path }}")
+          cp ../lists/tedious.json "${{ steps.set-target.outputs.target_path }}"
+
+          # Check if there are changes
+          if [ -n "$(git status --porcelain)" ]; then
+            # Commit and push changes
+            git add .
+            git commit -m "Auto-sync: Update tedious task list
+
+            Updated from ${{ github.repository }}@${{ github.sha }}"
+            
+            git push origin auto-sync/tedious
+            
+            # Create PR using GitHub CLI
+            gh pr create \
+              --repo ${{ steps.set-target.outputs.target_repo }} \
+              --title "🤖 Auto-sync: Update tedious task list" \
+              --body "## Automated Task List Update
+
+            **Source:** ${{ github.repository }}@${{ github.sha }}
+            **Updated:** \`${{ steps.set-target.outputs.target_path }}\`
+
+            Please review and merge when ready.
+
+            ---
+            *Created automatically by GitHub Actions*" \
+              --head ${{ github.actor }}:auto-sync/tedious \
+              --base main || echo "PR might already exist"
+              
+            echo "pr_created=true" >> $GITHUB_ENV
+          else
+            echo "No changes detected"
+            echo "pr_created=false" >> $GITHUB_ENV
+          fi
         env:
           GH_TOKEN: ${{ github.token }}
-
-      - name: Checkout forked repository
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ github.actor }}/${{ steps.set-target.outputs.repo_name }}
-          token: ${{ github.token }}
-          path: forked-repo
-
-      - name: Copy tedious.json to forked repository
-        run: |
-          mkdir -p forked-repo/$(dirname "${{ steps.set-target.outputs.target_path }}")
-          cp lists/tedious.json "forked-repo/${{ steps.set-target.outputs.target_path }}"
-
-      - name: Create Pull Request from fork
-        id: create-pr
-        uses: peter-evans/create-pull-request@v5
-        with:
-          path: forked-repo
-          token: ${{ github.token }}
-          push-to-fork: ${{ github.actor }}/${{ steps.set-target.outputs.repo_name }}
           commit-message: |
             Auto-sync: Update tedious task list
 
@@ -89,10 +115,9 @@ jobs:
           echo "- **Target repository**: \`${{ steps.set-target.outputs.target_repo }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Target path**: \`${{ steps.set-target.outputs.target_path }}\`" >> $GITHUB_STEP_SUMMARY
 
-          if [ "${{ steps.create-pr.outputs.pull-request-number }}" != "" ]; then
+          if [ "${{ env.pr_created }}" == "true" ]; then
             echo "- **Status**: ✅ Pull request created/updated successfully" >> $GITHUB_STEP_SUMMARY
-            echo "- **PR Number**: #${{ steps.create-pr.outputs.pull-request-number }}" >> $GITHUB_STEP_SUMMARY
-            echo "- **PR URL**: ${{ steps.create-pr.outputs.pull-request-url }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Fork**: \`${{ github.actor }}/${{ steps.set-target.outputs.repo_name }}\`" >> $GITHUB_STEP_SUMMARY
             echo "- **Action**: Please review and merge the PR in the target repository" >> $GITHUB_STEP_SUMMARY
           else
             echo "- **Status**: ℹ️ No changes detected, no PR needed" >> $GITHUB_STEP_SUMMARY
