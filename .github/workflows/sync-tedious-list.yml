@@ -33,7 +33,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: ${{ steps.set-target.outputs.target_repo }}
-          token: ${{ secrets.SYNC_TOKEN }}
+          token: ${{ secrets.PR_TOKEN || github.token }}
           path: target-repo
 
       - name: Copy tedious.json to target repository
