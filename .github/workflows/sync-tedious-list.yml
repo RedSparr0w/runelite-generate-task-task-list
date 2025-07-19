@@ -46,7 +46,7 @@ jobs:
         uses: peter-evans/create-pull-request@v5
         with:
           path: target-repo
-          token: ${{ github.token }}
+          token: ${{ secrets.PR_TOKEN || github.token }}
           commit-message: |
             Auto-sync: Update tedious task list
 
