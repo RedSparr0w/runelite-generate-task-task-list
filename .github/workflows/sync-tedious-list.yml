@@ -79,15 +79,22 @@ jobs:
             git fetch origin "$BRANCH_NAME"
             git checkout "$BRANCH_NAME"
             
-            # Copy updated file and commit
+            # Copy updated file and check if there are changes
             cp ../lists/tedious.json "${{ steps.set-target.outputs.target_path }}"
-            git add "${{ steps.set-target.outputs.target_path }}"
-            git commit -m "Auto-sync: Update tedious task list
-
-            Updated from ${{ github.repository }}@${{ github.sha }}"
             
-            # Force push to update the branch
-            git push origin "$BRANCH_NAME" --force
+            # Check if there are actually changes to commit
+            if [ -n "$(git status --porcelain)" ]; then
+              echo "Changes detected. Committing and pushing."
+              git add "${{ steps.set-target.outputs.target_path }}"
+              git commit -m "Auto-sync: Update tedious task list
+
+              Updated from ${{ github.repository }}@${{ github.sha }}"
+              
+              # Force push to update the branch
+              git push origin "$BRANCH_NAME" --force
+            else
+              echo "No changes detected after file copy. Branch is already up to date."
+            fi
             
             # Check if PR exists for this branch
             EXISTING_PR=$(gh pr list --head "$BRANCH_NAME" --state open --json number --jq '.[0].number // empty' || echo "")
