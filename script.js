@@ -223,16 +223,8 @@ async function loadTaskList() {
 const username = document.getElementById("username").value.trim();
 const listType = document.getElementById("listType").value;
 
-if (!username) {
-    showError("Please enter a username");
-    return;
-}
-
-// Save the username and list type for future use
-saveUsername(username);
+// Save the list type for future use
 saveListType(listType);
-
-currentUsername = username.replace(/\s+/g, "_");
 
 showLoading();
 hideError();
@@ -255,23 +247,37 @@ try {
     }
     currentTaskList = await taskListResponse.json();
 
-    // Update loading text
-    document.getElementById("loadingText").textContent =
-    "Loading player data...";
+    if (username) {
+        // Save the username for future use
+        saveUsername(username);
+        currentUsername = username.replace(/\s+/g, "_");
 
-    // Load player data
-    const playerResponse = await fetch(
-    `https://sync.runescape.wiki/runelite/player/${currentUsername}/STANDARD`
-    );
-    if (!playerResponse.ok) {
-    throw new Error(
-        "Failed to load player data. Please check the username is correct."
-    );
+        // Update loading text
+        document.getElementById("loadingText").textContent =
+        "Loading player data...";
+
+        // Load player data
+        const playerResponse = await fetch(
+        `https://sync.runescape.wiki/runelite/player/${currentUsername}/STANDARD`
+        );
+        if (!playerResponse.ok) {
+        throw new Error(
+            "Failed to load player data. Please check the username is correct."
+        );
+        }
+        playerData = await playerResponse.json();
+
+        // Save player data to cache
+        if (currentUsername) {
+            savePlayerData(currentUsername, playerData);
+        }
+    } else {
+        // No username provided - create dummy player data with empty collection log
+        currentUsername = "";
+        playerData = {
+            collection_log: []
+        };
     }
-    playerData = await playerResponse.json();
-
-    // Save player data to cache
-    savePlayerData(currentUsername, playerData);
 
     // Update loading text
     document.getElementById("loadingText").textContent =
@@ -415,6 +421,16 @@ tiers.forEach((tier) => {
 setTimeout(() => {
     updateTierSelection();
 }, 100);
+
+// Update the dashboard info text based on whether a username was provided
+const dashboardInfoText = document.querySelector('.dashboard .text-dark');
+if (dashboardInfoText) {
+    if (currentUsername) {
+        dashboardInfoText.innerHTML = 'ℹ️ Progress tracking includes only tasks with collection log verification';
+    } else {
+        dashboardInfoText.innerHTML = 'ℹ️ No username provided - all tasks shown as incomplete. Enter a username to track progress.';
+    }
+}
 }
 
 function updateProgressCircle(elementId, percentage, animateFromZero = true) {
