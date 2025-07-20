@@ -754,36 +754,35 @@ return itemsHtml;
 }
 
 function isTaskCompleted(task) {
-if (!playerData || !task.verification) {
-    // Special handling for achievement diary tasks that don't have verification
+    if (!playerData) return false;
+
+    // Prefer verification method if present
+    if (task.verification) {
+        const verification = task.verification;
+        if (verification.method === "collection-log") {
+            let obtainedCount = 0;
+            if (
+                playerData.collection_log &&
+                Array.isArray(playerData.collection_log)
+            ) {
+                verification.itemIds.forEach((itemId) => {
+                    if (playerData.collection_log.includes(parseInt(itemId))) {
+                        obtainedCount++;
+                    }
+                });
+            }
+            return obtainedCount >= verification.count;
+        } else if (verification.method === "achievement-diary") {
+            // Use area/tier from verification if available
+            return isAchievementDiaryCompleted(task, verification.area, verification.tier);
+        }
+    }
+
+    // Fallback: handle achievement diary tasks by name
     if (!task.verification && task.name && task.name.includes("Diary")) {
         return isAchievementDiaryCompleted(task);
     }
     return false;
-}
-
-const verification = task.verification;
-if (verification.method === "collection-log") {
-    let obtainedCount = 0;
-
-    // Check if collection_log exists in playerData
-    if (
-    playerData.collection_log &&
-    Array.isArray(playerData.collection_log)
-    ) {
-    verification.itemIds.forEach((itemId) => {
-        // Check if the item ID exists in the collection log array
-        if (playerData.collection_log.includes(parseInt(itemId))) {
-        obtainedCount++;
-        }
-    });
-    }
-
-    return obtainedCount >= verification.count;
-} else if (verification.method === "achievement-diary") {
-    return isAchievementDiaryCompleted(task);
-}
-return false;
 }
 
 // Helper function to determine if a task is trackable
@@ -812,64 +811,56 @@ return false;
 }
 
 // Helper function to check achievement diary completion
-function isAchievementDiaryCompleted(task) {
-if (!playerData.achievement_diaries || !task.name) return false;
+// If area/tier are provided, use them directly. Otherwise, parse from name.
+function isAchievementDiaryCompleted(task, areaOverride, tierOverride) {
+    if (!playerData.achievement_diaries) return false;
 
-// Parse the task name to extract area and difficulty
-// Example: "Complete the Ardougne Easy Diary" -> area: "Ardougne", difficulty: "Easy"
-const nameMatch = task.name.match(/Complete the (.+?) (\w+) Diary/i);
-if (!nameMatch) return false;
+    let area = areaOverride;
+    let difficulty = tierOverride;
 
-let area = nameMatch[1].trim();
-const difficulty = nameMatch[2];
-
-// Get available diary areas from the actual API response
-const availableAreas = Object.keys(playerData.achievement_diaries);
-
-// If no areas available, return false
-if (availableAreas.length === 0) return false;
-
-// Function to calculate similarity score between two strings
-function getSimilarityScore(str1, str2) {
-    // Normalize strings - remove spaces, convert to lowercase
-    const normalize = (s) => s.toLowerCase().replace(/\s+/g, '').replace(/&/g, '');
-    const norm1 = normalize(str1);
-    const norm2 = normalize(str2);
-    
-    // If exact match after normalization, return perfect score
-    if (norm1 === norm2) return 1;
-    
-    // Check if one contains the other
-    if (norm1.includes(norm2) || norm2.includes(norm1)) return 0.8;
-    
-    // Simple character overlap scoring
-    const chars1 = new Set(norm1);
-    const chars2 = new Set(norm2);
-    const intersection = new Set([...chars1].filter(x => chars2.has(x)));
-    const union = new Set([...chars1, ...chars2]);
-    
-    return intersection.size / union.size;
-}
-
-// Find the best matching area
-let bestMatch = area;
-let bestScore = 0;
-
-for (const apiArea of availableAreas) {
-    const score = getSimilarityScore(area, apiArea);
-    if (score > bestScore) {
-        bestScore = score;
-        bestMatch = apiArea;
+    // If not provided, parse from name
+    if (!area || !difficulty) {
+        if (!task.name) return false;
+        const nameMatch = task.name.match(/Complete the (.+?) (\w+) Diary/i);
+        if (!nameMatch) return false;
+        area = nameMatch[1].trim();
+        difficulty = nameMatch[2];
     }
-}
 
-// Use the best match if the score is reasonable (> 0.5), otherwise use original
-const mappedArea = bestScore > 0.5 ? bestMatch : area;
+    // Get available diary areas from the actual API response
+    const availableAreas = Object.keys(playerData.achievement_diaries);
+    if (availableAreas.length === 0) return false;
 
-// Check if the diary is completed
-return playerData.achievement_diaries[mappedArea] && 
-       playerData.achievement_diaries[mappedArea][difficulty] && 
-       playerData.achievement_diaries[mappedArea][difficulty].complete === true;
+    // Function to calculate similarity score between two strings
+    function getSimilarityScore(str1, str2) {
+        const normalize = (s) => s.toLowerCase().replace(/\s+/g, '').replace(/&/g, '');
+        const norm1 = normalize(str1);
+        const norm2 = normalize(str2);
+        if (norm1 === norm2) return 1;
+        if (norm1.includes(norm2) || norm2.includes(norm1)) return 0.8;
+        const chars1 = new Set(norm1);
+        const chars2 = new Set(norm2);
+        const intersection = new Set([...chars1].filter(x => chars2.has(x)));
+        const union = new Set([...chars1, ...chars2]);
+        return intersection.size / union.size;
+    }
+
+    // Find the best matching area
+    let bestMatch = area;
+    let bestScore = 0;
+    for (const apiArea of availableAreas) {
+        const score = getSimilarityScore(area, apiArea);
+        if (score > bestScore) {
+            bestScore = score;
+            bestMatch = apiArea;
+        }
+    }
+    const mappedArea = bestScore > 0.5 ? bestMatch : area;
+
+    // Check if the diary is completed
+    return playerData.achievement_diaries[mappedArea] &&
+        playerData.achievement_diaries[mappedArea][difficulty] &&
+        playerData.achievement_diaries[mappedArea][difficulty].complete === true;
 }
 
 function getTaskRequirements(task) {
