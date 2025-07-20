@@ -20,11 +20,16 @@
       <div class="controls">
         <div class="control-group">
           <div class="form-group">
-            <label for="username">RuneScape Username</label>
+            <label for="rsUsername">RuneScape Username</label>
             <input
               type="text"
-              id="username"
+              id="rsUsername"
+              name="rsUsername"
               placeholder="Enter your username (optional)"
+              autocomplete="off"
+              data-lpignore="true"
+              data-1p-ignore="true"
+              spellcheck="false"
             />
           </div>
           <div class="form-group">
@@ -34,14 +39,7 @@
               <option value="tedious">Tedious List</option>
             </select>
           </div>
-          <div class="form-group">
-            <label for="taskFilter">Filter Tasks</label>
-            <select id="taskFilter">
-              <option value="all">All Tasks</option>
-              <option value="completed">Completed Only</option>
-              <option value="incomplete">Incomplete Only</option>
-            </select>
-          </div>
+
           <button class="btn" onclick="loadTaskList()">Load Tasks</button>
         </div>
       </div>
