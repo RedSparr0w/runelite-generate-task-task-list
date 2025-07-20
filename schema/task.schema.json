@@ -50,11 +50,11 @@
 					"type": "integer",
 					"minimum": 1
 				},
-				"area": {
+				"region": {
 					"type": "string",
 					"minLength": 1
 				},
-				"tier": {
+				"difficulty": {
 					"type": "string",
 					"minLength": 1
 				}
@@ -74,7 +74,7 @@
 					}
 				},
 				"then": {
-					"required": ["method", "area", "tier"]
+					"required": ["method", "region", "difficulty"]
 				}
 			}
 		}

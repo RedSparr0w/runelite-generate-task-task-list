@@ -1557,8 +1557,8 @@
 			"displayItemId": 19476,
 			"verification": {
 			  "method": "achievement-diary",
-			  "area": "ardougne",
-			  "tier": "medium"
+			  "region": "ardougne",
+			  "difficulty": "medium"
 			}
 		},
 		{
@@ -1570,8 +1570,8 @@
 			"displayItemId": 19476,
 			"verification": {
 			  "method": "achievement-diary",
-			  "area": "desert",
-			  "tier": "medium"
+			  "region": "desert",
+			  "difficulty": "medium"
 			}
 		},
 		{
@@ -1583,8 +1583,8 @@
 			"displayItemId": 19476,
 			"verification": {
 			  "method": "achievement-diary",
-			  "area": "falador",
-			  "tier": "medium"
+			  "region": "falador",
+			  "difficulty": "medium"
 			}
 		},
 		{
@@ -1596,8 +1596,8 @@
 			"displayItemId": 19476,
 			"verification": {
 			  "method": "achievement-diary",
-			  "area": "fremennik",
-			  "tier": "medium"
+			  "region": "fremennik",
+			  "difficulty": "medium"
 			}
 		},
 		{
@@ -1609,8 +1609,8 @@
 			"displayItemId": 19476,
 			"verification": {
 			  "method": "achievement-diary",
-			  "area": "kandarin",
-			  "tier": "medium"
+			  "region": "kandarin",
+			  "difficulty": "medium"
 			}
 		},
 		{
@@ -1622,8 +1622,8 @@
 			"displayItemId": 19476,
 			"verification": {
 			  "method": "achievement-diary",
-			  "area": "karamja",
-			  "tier": "medium"
+			  "region": "karamja",
+			  "difficulty": "medium"
 			}
 		},
 		{
@@ -1635,8 +1635,8 @@
 			"displayItemId": 19476,
 			"verification": {
 			  "method": "achievement-diary",
-			  "area": "kourend & kebos",
-			  "tier": "medium"
+			  "region": "kourend & kebos",
+			  "difficulty": "medium"
 			}
 		},
 		{
@@ -1648,8 +1648,8 @@
 			"displayItemId": 19476,
 			"verification": {
 			  "method": "achievement-diary",
-			  "area": "lumbridge & draynor",
-			  "tier": "medium"
+			  "region": "lumbridge & draynor",
+			  "difficulty": "medium"
 			}
 		},
 		{
@@ -1661,8 +1661,8 @@
 			"displayItemId": 19476,
 			"verification": {
 			  "method": "achievement-diary",
-			  "area": "morytania",
-			  "tier": "medium"
+			  "region": "morytania",
+			  "difficulty": "medium"
 			}
 		},
 		{
@@ -1674,8 +1674,8 @@
 			"displayItemId": 19476,
 			"verification": {
 			  "method": "achievement-diary",
-			  "area": "varrock",
-			  "tier": "medium"
+			  "region": "varrock",
+			  "difficulty": "medium"
 			}
 		},
 		{
@@ -1687,8 +1687,8 @@
 			"displayItemId": 19476,
 			"verification": {
 			  "method": "achievement-diary",
-			  "area": "western provinces",
-			  "tier": "medium"
+			  "region": "western provinces",
+			  "difficulty": "medium"
 			}
 		},
 		{
@@ -1700,8 +1700,8 @@
 			"displayItemId": 19476,
 			"verification": {
 			  "method": "achievement-diary",
-			  "area": "wilderness",
-			  "tier": "medium"
+			  "region": "wilderness",
+			  "difficulty": "medium"
 			}
 		},
 		{

@@ -2148,8 +2148,8 @@
 			"displayItemId": 19476,
 			"verification": {
 			  "method": "achievement-diary",
-			  "area": "ardougne",
-			  "tier": "elite"
+			  "region": "ardougne",
+			  "difficulty": "elite"
 			}
 		},
 		{
@@ -2161,8 +2161,8 @@
 			"displayItemId": 19476,
 			"verification": {
 			  "method": "achievement-diary",
-			  "area": "desert",
-			  "tier": "elite"
+			  "region": "desert",
+			  "difficulty": "elite"
 			}
 		},
 		{
@@ -2174,8 +2174,8 @@
 			"displayItemId": 19476,
 			"verification": {
 			  "method": "achievement-diary",
-			  "area": "falador",
-			  "tier": "elite"
+			  "region": "falador",
+			  "difficulty": "elite"
 			}
 		},
 		{
@@ -2187,8 +2187,8 @@
 			"displayItemId": 19476,
 			"verification": {
 			  "method": "achievement-diary",
-			  "area": "fremennik",
-			  "tier": "elite"
+			  "region": "fremennik",
+			  "difficulty": "elite"
 			}
 		},
 		{
@@ -2200,8 +2200,8 @@
 			"displayItemId": 19476,
 			"verification": {
 			  "method": "achievement-diary",
-			  "area": "kandarin",
-			  "tier": "elite"
+			  "region": "kandarin",
+			  "difficulty": "elite"
 			}
 		},
 		{
@@ -2213,8 +2213,8 @@
 			"displayItemId": 19476,
 			"verification": {
 			  "method": "achievement-diary",
-			  "area": "karamja",
-			  "tier": "elite"
+			  "region": "karamja",
+			  "difficulty": "elite"
 			}
 		},
 		{
@@ -2226,8 +2226,8 @@
 			"displayItemId": 19476,
 			"verification": {
 			  "method": "achievement-diary",
-			  "area": "kourend & kebos",
-			  "tier": "elite"
+			  "region": "kourend & kebos",
+			  "difficulty": "elite"
 			}
 		},
 		{
@@ -2239,8 +2239,8 @@
 			"displayItemId": 19476,
 			"verification": {
 			  "method": "achievement-diary",
-			  "area": "lumbridge & draynor",
-			  "tier": "elite"
+			  "region": "lumbridge & draynor",
+			  "difficulty": "elite"
 			}
 		},
 		{
@@ -2252,8 +2252,8 @@
 			"displayItemId": 19476,
 			"verification": {
 			  "method": "achievement-diary",
-			  "area": "morytania",
-			  "tier": "elite"
+			  "region": "morytania",
+			  "difficulty": "elite"
 			}
 		},
 		{
@@ -2265,8 +2265,8 @@
 			"displayItemId": 19476,
 			"verification": {
 			  "method": "achievement-diary",
-			  "area": "varrock",
-			  "tier": "elite"
+			  "region": "varrock",
+			  "difficulty": "elite"
 			}
 		},
 		{
@@ -2278,8 +2278,8 @@
 			"displayItemId": 19476,
 			"verification": {
 			  "method": "achievement-diary",
-			  "area": "western provinces",
-			  "tier": "elite"
+			  "region": "western provinces",
+			  "difficulty": "elite"
 			}
 		},
 		{
@@ -2291,8 +2291,8 @@
 			"displayItemId": 19476,
 			"verification": {
 			  "method": "achievement-diary",
-			  "area": "wilderness",
-			  "tier": "elite"
+			  "region": "wilderness",
+			  "difficulty": "elite"
 			}
 		},
 		{

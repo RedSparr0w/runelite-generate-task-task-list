@@ -1811,8 +1811,8 @@
 			"displayItemId": 19476,
 			"verification": {
 			  "method": "achievement-diary",
-			  "area": "ardougne",
-			  "tier": "easy"
+			  "region": "ardougne",
+			  "difficulty": "easy"
 			}
 		},
 		{
@@ -1824,8 +1824,8 @@
 			"displayItemId": 19476,
 			"verification": {
 			  "method": "achievement-diary",
-			  "area": "desert",
-			  "tier": "easy"
+			  "region": "desert",
+			  "difficulty": "easy"
 			}
 		},
 		{
@@ -1837,8 +1837,8 @@
 			"displayItemId": 19476,
 			"verification": {
 			  "method": "achievement-diary",
-			  "area": "falador",
-			  "tier": "easy"
+			  "region": "falador",
+			  "difficulty": "easy"
 			}
 		},
 		{
@@ -1850,8 +1850,8 @@
 			"displayItemId": 19476,
 			"verification": {
 			  "method": "achievement-diary",
-			  "area": "fremennik",
-			  "tier": "easy"
+			  "region": "fremennik",
+			  "difficulty": "easy"
 			}
 		},
 		{
@@ -1863,8 +1863,8 @@
 			"displayItemId": 19476,
 			"verification": {
 			  "method": "achievement-diary",
-			  "area": "kandarin",
-			  "tier": "easy"
+			  "region": "kandarin",
+			  "difficulty": "easy"
 			}
 		},
 		{
@@ -1876,8 +1876,8 @@
 			"displayItemId": 19476,
 			"verification": {
 			  "method": "achievement-diary",
-			  "area": "karamja",
-			  "tier": "easy"
+			  "region": "karamja",
+			  "difficulty": "easy"
 			}
 		},
 		{
@@ -1889,8 +1889,8 @@
 			"displayItemId": 19476,
 			"verification": {
 			  "method": "achievement-diary",
-			  "area": "kourend & kebos",
-			  "tier": "easy"
+			  "region": "kourend & kebos",
+			  "difficulty": "easy"
 			}
 		},
 		{
@@ -1902,8 +1902,8 @@
 			"displayItemId": 19476,
 			"verification": {
 			  "method": "achievement-diary",
-			  "area": "lumbridge & draynor",
-			  "tier": "easy"
+			  "region": "lumbridge & draynor",
+			  "difficulty": "easy"
 			}
 		},
 		{
@@ -1915,8 +1915,8 @@
 			"displayItemId": 19476,
 			"verification": {
 			  "method": "achievement-diary",
-			  "area": "morytania",
-			  "tier": "easy"
+			  "region": "morytania",
+			  "difficulty": "easy"
 			}
 		},
 		{
@@ -1928,8 +1928,8 @@
 			"displayItemId": 19476,
 			"verification": {
 			  "method": "achievement-diary",
-			  "area": "varrock",
-			  "tier": "easy"
+			  "region": "varrock",
+			  "difficulty": "easy"
 			}
 		},
 		{
@@ -1941,8 +1941,8 @@
 			"displayItemId": 19476,
 			"verification": {
 			  "method": "achievement-diary",
-			  "area": "western provinces",
-			  "tier": "easy"
+			  "region": "western provinces",
+			  "difficulty": "easy"
 			}
 		},
 		{
@@ -1954,8 +1954,8 @@
 			"displayItemId": 19476,
 			"verification": {
 			  "method": "achievement-diary",
-			  "area": "wilderness",
-			  "tier": "easy"
+			  "region": "wilderness",
+			  "difficulty": "easy"
 			}
 		},
 		{
