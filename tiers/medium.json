@@ -1556,9 +1556,9 @@
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
 			"verification": {
-				"method": "achievement-diary",
-				"varbit": 4459,
-				"count": 1
+			  "method": "achievement-diary",
+			  "area": "ardougne",
+			  "tier": "medium"
 			}
 		},
 		{
@@ -1569,9 +1569,9 @@
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
 			"verification": {
-				"method": "achievement-diary",
-				"varbit": 4484,
-				"count": 1
+			  "method": "achievement-diary",
+			  "area": "desert",
+			  "tier": "medium"
 			}
 		},
 		{
@@ -1582,9 +1582,9 @@
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
 			"verification": {
-				"method": "achievement-diary",
-				"varbit": 4463,
-				"count": 1
+			  "method": "achievement-diary",
+			  "area": "falador",
+			  "tier": "medium"
 			}
 		},
 		{
@@ -1595,9 +1595,9 @@
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
 			"verification": {
-				"method": "achievement-diary",
-				"varbit": 4492,
-				"count": 1
+			  "method": "achievement-diary",
+			  "area": "fremennik",
+			  "tier": "medium"
 			}
 		},
 		{
@@ -1608,9 +1608,9 @@
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
 			"verification": {
-				"method": "achievement-diary",
-				"varbit": 4476,
-				"count": 1
+			  "method": "achievement-diary",
+			  "area": "kandarin",
+			  "tier": "medium"
 			}
 		},
 		{
@@ -1621,35 +1621,35 @@
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
 			"verification": {
-				"method": "achievement-diary",
-				"varbit": 3599,
-				"count": 2
+			  "method": "achievement-diary",
+			  "area": "karamja",
+			  "tier": "medium"
 			}
 		},
 		{
 			"id": "19708dd7-fb75-4ebc-ad65-60697a0d6401",
-			"name": "Complete the Kourend&Kebos Medium Diary",
+			"name": "Complete the Kourend & Kebos Medium Diary",
 			"tip": "Complete all the diary tasks. Don't really have much else to tell you.",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Kourend_%26_Kebos_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
 			"verification": {
-				"method": "achievement-diary",
-				"varbit": 7926,
-				"count": 1
+			  "method": "achievement-diary",
+			  "area": "kourend & kebos",
+			  "tier": "medium"
 			}
 		},
 		{
 			"id": "57b5ba2a-b2b0-4442-b767-1a8b35e3be0d",
-			"name": "Complete the Lumbridge&Draynor Medium Diary",
+			"name": "Complete the Lumbridge & Draynor Medium Diary",
 			"tip": "Complete all the diary tasks. FINALLY AVA'S DEVICE!",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Lumbridge_%26_Draynor_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
 			"verification": {
-				"method": "achievement-diary",
-				"varbit": 4496,
-				"count": 1
+			  "method": "achievement-diary",
+			  "area": "lumbridge & draynor",
+			  "tier": "medium"
 			}
 		},
 		{
@@ -1660,9 +1660,9 @@
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
 			"verification": {
-				"method": "achievement-diary",
-				"varbit": 4488,
-				"count": 1
+			  "method": "achievement-diary",
+			  "area": "morytania",
+			  "tier": "medium"
 			}
 		},
 		{
@@ -1673,9 +1673,9 @@
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
 			"verification": {
-				"method": "achievement-diary",
-				"varbit": 4480,
-				"count": 1
+			  "method": "achievement-diary",
+			  "area": "varrock",
+			  "tier": "medium"
 			}
 		},
 		{
@@ -1686,9 +1686,9 @@
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
 			"verification": {
-				"method": "achievement-diary",
-				"varbit": 4472,
-				"count": 1
+			  "method": "achievement-diary",
+			  "area": "western provinces",
+			  "tier": "medium"
 			}
 		},
 		{
@@ -1699,9 +1699,9 @@
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
 			"verification": {
-				"method": "achievement-diary",
-				"varbit": 4467,
-				"count": 1
+			  "method": "achievement-diary",
+			  "area": "wilderness",
+			  "tier": "medium"
 			}
 		},
 		{

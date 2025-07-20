@@ -2147,9 +2147,9 @@
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
 			"verification": {
-				"method": "achievement-diary",
-				"varbit": 4461,
-				"count": 1
+			  "method": "achievement-diary",
+			  "area": "ardougne",
+			  "tier": "elite"
 			}
 		},
 		{
@@ -2160,9 +2160,9 @@
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
 			"verification": {
-				"method": "achievement-diary",
-				"varbit": 4486,
-				"count": 1
+			  "method": "achievement-diary",
+			  "area": "desert",
+			  "tier": "elite"
 			}
 		},
 		{
@@ -2173,9 +2173,9 @@
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
 			"verification": {
-				"method": "achievement-diary",
-				"varbit": 4465,
-				"count": 1
+			  "method": "achievement-diary",
+			  "area": "falador",
+			  "tier": "elite"
 			}
 		},
 		{
@@ -2186,9 +2186,9 @@
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
 			"verification": {
-				"method": "achievement-diary",
-				"varbit": 4494,
-				"count": 1
+			  "method": "achievement-diary",
+			  "area": "fremennik",
+			  "tier": "elite"
 			}
 		},
 		{
@@ -2199,9 +2199,9 @@
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
 			"verification": {
-				"method": "achievement-diary",
-				"varbit": 4478,
-				"count": 1
+			  "method": "achievement-diary",
+			  "area": "kandarin",
+			  "tier": "elite"
 			}
 		},
 		{
@@ -2212,35 +2212,35 @@
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
 			"verification": {
-				"method": "achievement-diary",
-				"varbit": 4566,
-				"count": 1
+			  "method": "achievement-diary",
+			  "area": "karamja",
+			  "tier": "elite"
 			}
 		},
 		{
 			"id": "308e1019-6b20-45ce-9725-13df969c6f49",
-			"name": "Complete the Kourend&Kebos Elite Diary",
+			"name": "Complete the Kourend & Kebos Elite Diary",
 			"tip": "Complete all the diary tasks.",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Kourend_%26_Kebos_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
 			"verification": {
-				"method": "achievement-diary",
-				"varbit": 7928,
-				"count": 1
+			  "method": "achievement-diary",
+			  "area": "kourend & kebos",
+			  "tier": "elite"
 			}
 		},
 		{
 			"id": "b9e0a625-a86f-43ed-9e51-49e2b562ffa8",
-			"name": "Complete the Lumbridge&Draynor Elite Diary",
+			"name": "Complete the Lumbridge & Draynor Elite Diary",
 			"tip": "Complete all the diary tasks.",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Lumbridge_%26_Draynor_Diary",
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
 			"verification": {
-				"method": "achievement-diary",
-				"varbit": 4498,
-				"count": 1
+			  "method": "achievement-diary",
+			  "area": "lumbridge & draynor",
+			  "tier": "elite"
 			}
 		},
 		{
@@ -2251,9 +2251,9 @@
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
 			"verification": {
-				"method": "achievement-diary",
-				"varbit": 4490,
-				"count": 1
+			  "method": "achievement-diary",
+			  "area": "morytania",
+			  "tier": "elite"
 			}
 		},
 		{
@@ -2264,9 +2264,9 @@
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
 			"verification": {
-				"method": "achievement-diary",
-				"varbit": 4482,
-				"count": 1
+			  "method": "achievement-diary",
+			  "area": "varrock",
+			  "tier": "elite"
 			}
 		},
 		{
@@ -2277,9 +2277,9 @@
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
 			"verification": {
-				"method": "achievement-diary",
-				"varbit": 4474,
-				"count": 1
+			  "method": "achievement-diary",
+			  "area": "western provinces",
+			  "tier": "elite"
 			}
 		},
 		{
@@ -2290,9 +2290,9 @@
 			"imageLink": "https://oldschool.runescape.wiki/images/1/1b/Achievement_Diaries_icon.png",
 			"displayItemId": 19476,
 			"verification": {
-				"method": "achievement-diary",
-				"varbit": 4469,
-				"count": 1
+			  "method": "achievement-diary",
+			  "area": "wilderness",
+			  "tier": "elite"
 			}
 		},
 		{
