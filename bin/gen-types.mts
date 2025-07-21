@@ -6,6 +6,7 @@ import { pascal } from 'radash';
 const file = './schema/root.schema.json';
 const typeContent = await compileFromFile(file, {
 	customName: (type) => (type?.$id ? pascal(basename(type.$id, '.schema.json')) : undefined),
+	unreachableDefinitions: true,
 	style: {
 		useTabs: true,
 		singleQuote: true,
