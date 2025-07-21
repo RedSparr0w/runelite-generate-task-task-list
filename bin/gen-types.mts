@@ -5,7 +5,15 @@ import { pascal } from 'radash';
 
 const file = './schema/root.schema.json';
 const typeContent = await compileFromFile(file, {
-	customName: (type) => (type?.$id ? pascal(basename(type.$id, '.schema.json')) : undefined),
+	customName: (type) => {
+		if (type.tsEnumNames) {
+			type.tsEnumNames = type.tsEnumNames.map((v) => pascal(v));
+		}
+
+		return type?.$id ? pascal(basename(type.$id, '.schema.json')) : undefined;
+	},
+	inferStringEnumKeysFromValues: true,
+	unreachableDefinitions: true,
 	style: {
 		useTabs: true,
 		singleQuote: true,

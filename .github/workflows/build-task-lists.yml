@@ -3,8 +3,7 @@ name: Build Task Lists
 on:
   push:
     branches: ["main"]
-    # we include package.json in case the list definitions change
-    paths: ["tiers/**", "package.json"]
+    paths: ["tiers/**", "bin/gen-list.mts", "package.json"]
 
 jobs:
   build:
