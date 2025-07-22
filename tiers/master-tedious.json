@@ -1213,12 +1213,7 @@
 			"tip": "1 Miscellaneous log slot",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Collection_log",
 			"imageLink": "https://oldschool.runescape.wiki/images/2/2e/Collection_log.png",
-			"displayItemId": 11335,
-			"verification": {
-				"method": "collection-log",
-				"itemIds": [ 21509 ],
-				"count": 1
-			}
+			"displayItemId": 11335
 		},
 		{
 			"id": "7a109368-c716-4b5e-8683-888a01298b16",

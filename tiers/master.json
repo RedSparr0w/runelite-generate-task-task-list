@@ -1235,7 +1235,12 @@
 			"tip": "Step1: Pick a Skill Step2: ??? Step3: Profit",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Pet#Skilling_pets",
 			"imageLink": "https://oldschool.runescape.wiki/images/Rocky_%28follower%29.png",
-			"displayItemId": 20663
+			"displayItemId": 20663,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 13320, 13321, 13322, 13324, 20659, 20661, 20663, 20665 ],
+				"count": 1
+			}
 		},
 		{
 			"id": "856d125d-f008-4a7e-a247-0a0bd1df9f6e",
@@ -1243,7 +1248,12 @@
 			"tip": "Step1: Pick a Skill Step2: ??? Step3: Profit",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Pet#Skilling_pets",
 			"imageLink": "https://oldschool.runescape.wiki/images/Rocky_%28follower%29.png",
-			"displayItemId": 20663
+			"displayItemId": 20663,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 13320, 13321, 13322, 13324, 20659, 20661, 20663, 20665 ],
+				"count": 2
+			}
 		},
 		{
 			"id": "abdde0f6-9bbc-4e64-9a7d-c608e360fb0e",
@@ -1251,7 +1261,12 @@
 			"tip": "Step1: Pick a Skill Step2: ??? Step3: Profit",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Pet#Skilling_pets",
 			"imageLink": "https://oldschool.runescape.wiki/images/Rocky_%28follower%29.png",
-			"displayItemId": 20663
+			"displayItemId": 20663,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 13320, 13321, 13322, 13324, 20659, 20661, 20663, 20665 ],
+				"count": 3
+			}
 		},
 		{
 			"id": "86c3fd33-3503-4da3-b9e4-bec35f2fe77f",
@@ -1259,7 +1274,12 @@
 			"tip": "Step1: Pick a Skill Step2: ??? Step3: Profit",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Pet#Skilling_pets",
 			"imageLink": "https://oldschool.runescape.wiki/images/Rocky_%28follower%29.png",
-			"displayItemId": 20663
+			"displayItemId": 20663,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 13320, 13321, 13322, 13324, 20659, 20661, 20663, 20665 ],
+				"count": 4
+			}
 		},
 		{
 			"id": "05e816a3-215d-4b4c-b002-e09d82d88b34",
@@ -1435,7 +1455,12 @@
 			"tip": "It's a giant chicken!",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Corporeal_Beast",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Elysian_sigil_detail.png/211px-Elysian_sigil_detail.png",
-			"displayItemId": 12819
+			"displayItemId": 12819,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 12827, 12823, 12819 ],
+				"count": 1
+			}
 		},
 		{
 			"id": "b429e686-604c-4f51-bc98-bbf31fea80c8",
@@ -1443,7 +1468,12 @@
 			"tip": "Why'd it have to be snakes.",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Zulrah",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Magma_mutagen_detail.png/126px-Magma_mutagen_detail.png",
-			"displayItemId": 13201
+			"displayItemId": 13201,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 13200, 13201 ],
+				"count": 1
+			}
 		},
 		{
 			"id": "bd487967-d274-4fb1-96c3-37eca55e96bb",
@@ -1507,7 +1537,12 @@
 			"tip": "The ice prison",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Nex",
 			"imageLink": "https://oldschool.runescape.wiki/images/Nihil_horn_detail.png",
-			"displayItemId": 26372
+			"displayItemId": 26372,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 26370, 26372, 26376, 26378, 26380, 26235 ],
+				"count": 3
+			}
 		},
 		{
 			"id": "602d34e7-08e1-4fc5-8894-13fbca7c8cfd",
@@ -1515,7 +1550,12 @@
 			"tip": "The ice prison",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Nex",
 			"imageLink": "https://oldschool.runescape.wiki/images/Nihil_horn_detail.png",
-			"displayItemId": 26372
+			"displayItemId": 26372,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 26370, 26372, 26376, 26378, 26380, 26235 ],
+				"count": 4
+			}
 		},
 		{
 			"id": "4208f430-8b5d-4e4e-8c70-46d95a9ade14",
@@ -1523,7 +1563,12 @@
 			"tip": "The ice prison",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Nex",
 			"imageLink": "https://oldschool.runescape.wiki/images/Nihil_horn_detail.png",
-			"displayItemId": 26372
+			"displayItemId": 26372,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 26370, 26372, 26376, 26378, 26380, 26235 ],
+				"count": 5
+			}
 		},
 		{
 			"id": "2da5eabc-1155-465f-975e-e4e755fc425c",
@@ -1867,7 +1912,15 @@
 			"tip": "Can be received as drop from any of the four DT2 bosses",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Desert_Treasure_II_-_The_Fallen_Empire",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Soulreaper_axe_detail.png/232px-Soulreaper_axe_detail.png",
-			"displayItemId": 28338
+			"displayItemId": 28338,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					26241, 26243, 26245, 28319, 28321, 28323, 28325, 28330, 28331, 28332, 28333,
+					28334, 28268, 28270, 28272, 28274, 28276, 28279, 28281, 28283, 28285
+				],
+				"count": 12
+			}
 		},
 		{
 			"id": "12754820-2319-461b-9182-221b4cee251f",
@@ -1875,7 +1928,15 @@
 			"tip": "Can be received as drop from any of the four DT2 bosses",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Desert_Treasure_II_-_The_Fallen_Empire",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Soulreaper_axe_detail.png/232px-Soulreaper_axe_detail.png",
-			"displayItemId": 28338
+			"displayItemId": 28338,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					26241, 26243, 26245, 28319, 28321, 28323, 28325, 28330, 28331, 28332, 28333,
+					28334, 28268, 28270, 28272, 28274, 28276, 28279, 28281, 28283, 28285
+				],
+				"count": 13
+			}
 		},
 		{
 			"id": "10c785e4-3e47-4566-a4e8-2670794c327b",
@@ -1883,7 +1944,15 @@
 			"tip": "Can be received as drop from any of the four DT2 bosses",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Desert_Treasure_II_-_The_Fallen_Empire",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Soulreaper_axe_detail.png/232px-Soulreaper_axe_detail.png",
-			"displayItemId": 28338
+			"displayItemId": 28338,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					26241, 26243, 26245, 28319, 28321, 28323, 28325, 28330, 28331, 28332, 28333,
+					28334, 28268, 28270, 28272, 28274, 28276, 28279, 28281, 28283, 28285
+				],
+				"count": 14
+			}
 		},
 		{
 			"id": "e627267f-9cbf-4b5a-9528-924f70625ae6",
@@ -1891,7 +1960,15 @@
 			"tip": "Can be received as drop from any of the four DT2 bosses",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Desert_Treasure_II_-_The_Fallen_Empire",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Soulreaper_axe_detail.png/232px-Soulreaper_axe_detail.png",
-			"displayItemId": 28338
+			"displayItemId": 28338,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					26241, 26243, 26245, 28319, 28321, 28323, 28325, 28330, 28331, 28332, 28333,
+					28334, 28268, 28270, 28272, 28274, 28276, 28279, 28281, 28283, 28285
+				],
+				"count": 15
+			}
 		},
 		{
 			"id": "47f6de1b-4603-4a3c-9e8f-1034922c3912",
@@ -1899,7 +1976,15 @@
 			"tip": "Can be received as drop from any of the four DT2 bosses",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Desert_Treasure_II_-_The_Fallen_Empire",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Soulreaper_axe_detail.png/232px-Soulreaper_axe_detail.png",
-			"displayItemId": 28338
+			"displayItemId": 28338,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					26241, 26243, 26245, 28319, 28321, 28323, 28325, 28330, 28331, 28332, 28333,
+					28334, 28268, 28270, 28272, 28274, 28276, 28279, 28281, 28283, 28285
+				],
+				"count": 16
+			}
 		},
 		{
 			"id": "77281d30-4230-4488-9341-33f9ffe03e01",
@@ -1907,7 +1992,15 @@
 			"tip": "Can be received as drop from any of the four DT2 bosses",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Desert_Treasure_II_-_The_Fallen_Empire",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Soulreaper_axe_detail.png/232px-Soulreaper_axe_detail.png",
-			"displayItemId": 28338
+			"displayItemId": 28338,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					26241, 26243, 26245, 28319, 28321, 28323, 28325, 28330, 28331, 28332, 28333,
+					28334, 28268, 28270, 28272, 28274, 28276, 28279, 28281, 28283, 28285
+				],
+				"count": 17
+			}
 		},
 		{
 			"id": "e3b1aaa0-2a3d-47d0-b667-44163ab9263a",
@@ -1915,7 +2008,15 @@
 			"tip": "Can be received as drop from any of the four DT2 bosses",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Desert_Treasure_II_-_The_Fallen_Empire",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Soulreaper_axe_detail.png/232px-Soulreaper_axe_detail.png",
-			"displayItemId": 28338
+			"displayItemId": 28338,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					26241, 26243, 26245, 28319, 28321, 28323, 28325, 28330, 28331, 28332, 28333,
+					28334, 28268, 28270, 28272, 28274, 28276, 28279, 28281, 28283, 28285
+				],
+				"count": 18
+			}
 		},
 		{
 			"id": "38164b07-e6d8-4597-8274-7cca79374e4f",
@@ -1923,7 +2024,15 @@
 			"tip": "Can be received as drop from any of the four DT2 bosses",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Desert_Treasure_II_-_The_Fallen_Empire",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Soulreaper_axe_detail.png/232px-Soulreaper_axe_detail.png",
-			"displayItemId": 28338
+			"displayItemId": 28338,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					26241, 26243, 26245, 28319, 28321, 28323, 28325, 28330, 28331, 28332, 28333,
+					28334, 28268, 28270, 28272, 28274, 28276, 28279, 28281, 28283, 28285
+				],
+				"count": 19
+			}
 		},
 		{
 			"id": "44acda6d-0e1e-46c9-8f31-ed43648a772b",
@@ -1931,7 +2040,15 @@
 			"tip": "Can be received as drop from any of the four DT2 bosses",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Desert_Treasure_II_-_The_Fallen_Empire",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Soulreaper_axe_detail.png/232px-Soulreaper_axe_detail.png",
-			"displayItemId": 28338
+			"displayItemId": 28338,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					26241, 26243, 26245, 28319, 28321, 28323, 28325, 28330, 28331, 28332, 28333,
+					28334, 28268, 28270, 28272, 28274, 28276, 28279, 28281, 28283, 28285
+				],
+				"count": 20
+			}
 		},
 		{
 			"id": "a48c1295-2c9c-42df-a128-da21fc486624",
@@ -1939,7 +2056,15 @@
 			"tip": "Can be received as drop from any of the four DT2 bosses",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Desert_Treasure_II_-_The_Fallen_Empire",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Soulreaper_axe_detail.png/232px-Soulreaper_axe_detail.png",
-			"displayItemId": 28338
+			"displayItemId": 28338,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					26241, 26243, 26245, 28319, 28321, 28323, 28325, 28330, 28331, 28332, 28333,
+					28334, 28268, 28270, 28272, 28274, 28276, 28279, 28281, 28283, 28285
+				],
+				"count": 21
+			}
 		},
 		{
 			"id": "085562fd-c369-4b72-8923-1a0498b5db82",
