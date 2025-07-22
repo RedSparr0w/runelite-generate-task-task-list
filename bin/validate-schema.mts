@@ -1,10 +1,9 @@
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { exit } from 'node:process';
 import type { DefinedError, ValidateFunction } from 'ajv';
 import { Glob } from 'glob';
 import type { TaskList, TaskTier } from '@/types.js';
 import ajv from '@/util/ajv.mjs';
-import fmt from '@/util/formatter.mjs';
 
 // type "casting" is required here for type guards to work
 const validateTier = ajv.getSchema(
