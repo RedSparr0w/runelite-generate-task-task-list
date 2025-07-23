@@ -93,6 +93,31 @@
 							"$ref": "#/definitions/diary-difficulty"
 						}
 					}
+				},
+				{
+					"type": "object",
+					"required": ["method", "experience", "count"],
+					"additionalProperties": false,
+					"properties": {
+						"method": {
+							"type": "string",
+							"const": "skill"
+						},
+						"experience": {
+							"type": "object",
+							"properties": {
+								"skill": {
+									"type": "integer",
+									"minimum": 0,
+									"maximum": 200000000
+								}
+							}
+						},
+						"count": {
+							"type": "integer",
+							"minimum": 1
+						}
+					}
 				}
 			]
 		}
