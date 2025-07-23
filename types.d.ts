@@ -29,6 +29,14 @@ export interface Task {
 				method: Method1;
 				region: Region;
 				difficulty: Difficulty;
+		  }
+		| {
+				method: Method2;
+				experience: {
+					skill?: number;
+					[k: string]: unknown;
+				};
+				count: number;
 		  };
 }
 /**
@@ -80,4 +88,7 @@ export const enum Difficulty {
 	Medium = 'medium',
 	Hard = 'hard',
 	Elite = 'elite'
+}
+export const enum Method2 {
+	Skill = 'skill'
 }
