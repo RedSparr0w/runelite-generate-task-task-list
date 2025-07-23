@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Task vs Collection Log Comparison</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>Task vs Collection Log Comparison</h1>
+        <p>
+          Check which collection log items are missing from your chosen task
+          list
+        </p>
+      </div>
+      <div class="controls">
+        <div class="control-group">
+          <div class="form-group">
+            <label for="taskList">Task List</label>
+            <select id="taskList">
+              <option value="lists/official.json">Official</option>
+              <option value="lists/tedious.json">Tedious</option>
+            </select>
+          </div>
+          <button class="btn" id="compareBtn">Compare</button>
+        </div>
+      </div>
+      <div class="text-dark" style="margin-top: 2em; text-align: center">
+        <b>Instructions:</b><br />
+        This page auto-loads <code>lists/collection_log.json</code> and your
+        chosen task list (<code>lists/official.json</code> or
+        <code>lists/tedious.json</code>) from your repo.<br />
+        Switch between lists using the dropdown.<br />
+        Click Compare to refresh.<br />
+      </div>
+      <div class="results-card" style="margin-top: 2em">
+        <h2 class="dashboard-title">Missing Items</h2>
+        <div id="results" class="task-grid"></div>
+      </div>
+    </div>
+    <script>
+      async function loadJSON(url) {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("Failed to load " + url);
+        return await response.json();
+      }
+
+      let collectionLog = {};
+      let tasks = [];
+
+      async function autoLoadAndCompare() {
+        const taskListFile = document.getElementById("taskList").value;
+        try {
+          const collectionLogData = await loadJSON("lists/collection_log.json");
+          // Only use the 'items' object from collection_log.json
+          collectionLog = collectionLogData.items || {};
+          const taskData = await loadJSON(taskListFile);
+          // Collect all tasks from all tiers (easy, medium, hard, elite, master)
+          tasks = [];
+          ["easy", "medium", "hard", "elite", "master"].forEach((tier) => {
+            if (Array.isArray(taskData[tier])) {
+              tasks = tasks.concat(taskData[tier]);
+            }
+          });
+          compare();
+        } catch (e) {
+          document.getElementById("results").innerHTML =
+            '<span class="missing">Error loading files: ' +
+            e.message +
+            "</span>";
+        }
+      }
+
+      function compare() {
+        // Gather all itemIds from tasks (only valid numbers)
+        const taskItemIds = new Set();
+        tasks.forEach((task) => {
+          if (task.verification && Array.isArray(task.verification.itemIds)) {
+            task.verification.itemIds.forEach((id) => {
+              const numId = Number(id);
+              if (!isNaN(numId)) taskItemIds.add(numId);
+            });
+          }
+        });
+
+        // Gather all collection log item ids from the id property
+        const collectionLogItemIds = new Set();
+        Object.values(collectionLog).forEach((data) => {
+          const numId = Number(data.id);
+          if (!isNaN(numId)) collectionLogItemIds.add(numId);
+        });
+
+        // Debug: Show counts
+        const debugInfo = `<b>Task itemIds found:</b> ${taskItemIds.size}<br><b>Collection log items:</b> ${collectionLogItemIds.size}`;
+
+        // Find missing items (those in collectionLogItemIds not in taskItemIds)
+        const missing = [];
+        Object.values(collectionLog).forEach((data) => {
+          const numId = Number(data.id);
+          if (!isNaN(numId) && !taskItemIds.has(numId)) {
+            missing.push({
+              id: numId,
+              name: data.name || "",
+              sources: Array.isArray(data.sources) ? data.sources : ["Unknown"],
+            });
+          }
+        });
+
+        // Group missing items by each source in sources array
+        const grouped = {};
+        missing.forEach((item) => {
+          item.sources.forEach((source) => {
+            if (!grouped[source]) grouped[source] = [];
+            grouped[source].push(item);
+          });
+        });
+
+        // Display results
+        const results = document.getElementById("results");
+        if (missing.length === 0) {
+          results.innerHTML =
+            debugInfo +
+            '<br><span class="found">No missing items! All collection log items are covered by tasks.</span>';
+        } else {
+          let html =
+            debugInfo +
+            `<br><span class="missing">${missing.length} missing items:</span>`;
+          Object.entries(grouped).forEach(([source, items]) => {
+            html += `<div class="task-card">
+              <div class="header" style="padding:0.7em 1em; border-bottom:2px solid var(--color-primary-dark); display:flex; align-items:center; gap:0.7em;">
+                <h3 style="margin:0; font-family:'Cinzel',serif; font-size:1.15em; color:var(--color-info);">${source}</h3>
+                <span style="font-size:0.95em; color:var(--color-text-muted); font-weight:600;">(${items.length})</span>
+              </div>
+              <ul style="list-style:none; padding-left:0; margin:0;">
+                ${items
+                  .map(
+                    (
+                      item
+                    ) => `<li style="display:flex; align-items:center; gap:0.7em; padding:0.5em 0; border-bottom:1px solid var(--color-background-light);">
+                  <span class="task-id">${item.id}</span>
+                  <span class="task-name">${item.name}</span>
+                </li>`
+                  )
+                  .join("")}
+              </ul>
+            </div>`;
+          });
+          results.innerHTML = html;
+        }
+      }
+
+      document.getElementById("compareBtn").onclick = autoLoadAndCompare;
+      document.getElementById("taskList").onchange = autoLoadAndCompare;
+
+      // Auto-load on page load
+      window.onload = autoLoadAndCompare;
+    </script>
+  </body>
+</html>
