@@ -33,8 +33,126 @@ export interface Task {
 		| {
 				method: Method2;
 				experience: {
-					skill?: number;
-					[k: string]: unknown;
+					/**
+					 * This interface was referenced by `Task`'s JSON-Schema
+					 * via the `definition` "skill-experience".
+					 */
+					attack?: number;
+					/**
+					 * This interface was referenced by `Task`'s JSON-Schema
+					 * via the `definition` "skill-experience".
+					 */
+					strength?: number;
+					/**
+					 * This interface was referenced by `Task`'s JSON-Schema
+					 * via the `definition` "skill-experience".
+					 */
+					defence?: number;
+					/**
+					 * This interface was referenced by `Task`'s JSON-Schema
+					 * via the `definition` "skill-experience".
+					 */
+					ranged?: number;
+					/**
+					 * This interface was referenced by `Task`'s JSON-Schema
+					 * via the `definition` "skill-experience".
+					 */
+					prayer?: number;
+					/**
+					 * This interface was referenced by `Task`'s JSON-Schema
+					 * via the `definition` "skill-experience".
+					 */
+					magic?: number;
+					/**
+					 * This interface was referenced by `Task`'s JSON-Schema
+					 * via the `definition` "skill-experience".
+					 */
+					runecraft?: number;
+					/**
+					 * This interface was referenced by `Task`'s JSON-Schema
+					 * via the `definition` "skill-experience".
+					 */
+					hitpoints?: number;
+					/**
+					 * This interface was referenced by `Task`'s JSON-Schema
+					 * via the `definition` "skill-experience".
+					 */
+					crafting?: number;
+					/**
+					 * This interface was referenced by `Task`'s JSON-Schema
+					 * via the `definition` "skill-experience".
+					 */
+					mining?: number;
+					/**
+					 * This interface was referenced by `Task`'s JSON-Schema
+					 * via the `definition` "skill-experience".
+					 */
+					smithing?: number;
+					/**
+					 * This interface was referenced by `Task`'s JSON-Schema
+					 * via the `definition` "skill-experience".
+					 */
+					fishing?: number;
+					/**
+					 * This interface was referenced by `Task`'s JSON-Schema
+					 * via the `definition` "skill-experience".
+					 */
+					cooking?: number;
+					/**
+					 * This interface was referenced by `Task`'s JSON-Schema
+					 * via the `definition` "skill-experience".
+					 */
+					firemaking?: number;
+					/**
+					 * This interface was referenced by `Task`'s JSON-Schema
+					 * via the `definition` "skill-experience".
+					 */
+					woodcutting?: number;
+					/**
+					 * This interface was referenced by `Task`'s JSON-Schema
+					 * via the `definition` "skill-experience".
+					 */
+					agility?: number;
+					/**
+					 * This interface was referenced by `Task`'s JSON-Schema
+					 * via the `definition` "skill-experience".
+					 */
+					herblore?: number;
+					/**
+					 * This interface was referenced by `Task`'s JSON-Schema
+					 * via the `definition` "skill-experience".
+					 */
+					thieving?: number;
+					/**
+					 * This interface was referenced by `Task`'s JSON-Schema
+					 * via the `definition` "skill-experience".
+					 */
+					fletching?: number;
+					/**
+					 * This interface was referenced by `Task`'s JSON-Schema
+					 * via the `definition` "skill-experience".
+					 */
+					slayer?: number;
+					/**
+					 * This interface was referenced by `Task`'s JSON-Schema
+					 * via the `definition` "skill-experience".
+					 */
+					farming?: number;
+					/**
+					 * This interface was referenced by `Task`'s JSON-Schema
+					 * via the `definition` "skill-experience".
+					 */
+					construction?: number;
+					/**
+					 * This interface was referenced by `Task`'s JSON-Schema
+					 * via the `definition` "skill-experience".
+					 */
+					hunter?: number;
+					/**
+					 * This interface was referenced by `Task`'s JSON-Schema
+					 * via the `definition` "skill-experience".
+					 */
+					sailing?: number;
 				};
 				count: number;
 		  };
