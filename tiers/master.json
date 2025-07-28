@@ -1415,7 +1415,15 @@
 			"tip": "May the bird gods bless you with evil chicken pieces",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Collection_log#Miscellaneous",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Dragon_full_helm_detail.png/277px-Dragon_full_helm_detail.png",
-			"displayItemId": 11335
+			"displayItemId": 11335,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					21509, 19707, 11335, 22103, 22100, 20439, 20436, 20442, 20433, 24034, 24037,
+					24040, 24043, 24046
+				],
+				"count": 1
+			}
 		},
 		{
 			"id": "b8f55499-8c32-4b15-9a70-c80cefb297c1",
@@ -1423,7 +1431,15 @@
 			"tip": "May the bird gods bless you with evil chicken pieces",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Collection_log#Miscellaneous",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Dragon_full_helm_detail.png/277px-Dragon_full_helm_detail.png",
-			"displayItemId": 11335
+			"displayItemId": 11335,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					21509, 19707, 11335, 22103, 22100, 20439, 20436, 20442, 20433, 24034, 24037,
+					24040, 24043, 24046
+				],
+				"count": 2
+			}
 		},
 		{
 			"id": "a1b4d9cc-8e86-45fe-af4b-61d844a5b078",
@@ -1431,7 +1447,15 @@
 			"tip": "May the bird gods bless you with evil chicken pieces",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Collection_log#Miscellaneous",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Dragon_full_helm_detail.png/277px-Dragon_full_helm_detail.png",
-			"displayItemId": 11335
+			"displayItemId": 11335,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					21509, 19707, 11335, 22103, 22100, 20439, 20436, 20442, 20433, 24034, 24037,
+					24040, 24043, 24046
+				],
+				"count": 3
+			}
 		},
 		{
 			"id": "89d777ac-5d60-4720-ba28-e23594ee06c1",
@@ -1439,7 +1463,15 @@
 			"tip": "May the bird gods bless you with evil chicken pieces",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Collection_log#Miscellaneous",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Dragon_full_helm_detail.png/277px-Dragon_full_helm_detail.png",
-			"displayItemId": 11335
+			"displayItemId": 11335,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					21509, 19707, 11335, 22103, 22100, 20439, 20436, 20442, 20433, 24034, 24037,
+					24040, 24043, 24046
+				],
+				"count": 4
+			}
 		},
 		{
 			"id": "1a25f42e-1202-40f3-b001-d2de28f6b530",
@@ -1447,7 +1479,15 @@
 			"tip": "May the bird gods bless you with evil chicken pieces",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Collection_log#Miscellaneous",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Dragon_full_helm_detail.png/277px-Dragon_full_helm_detail.png",
-			"displayItemId": 11335
+			"displayItemId": 11335,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					21509, 19707, 11335, 22103, 22100, 20439, 20436, 20442, 20433, 24034, 24037,
+					24040, 24043, 24046
+				],
+				"count": 5
+			}
 		},
 		{
 			"id": "bd9208a5-8c14-4fc9-b13f-b5323d036391",
@@ -1481,7 +1521,12 @@
 			"tip": "Boss or Minigame?",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Zalcano",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Zalcano_shard_detail.png/221px-Zalcano_shard_detail.png",
-			"displayItemId": 23908
+			"displayItemId": 23908,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 23953, 23908 ],
+				"count": 1
+			}
 		},
 		{
 			"id": "08a9dd78-a0d5-4497-9277-4b66097dba4b",
@@ -1489,7 +1534,12 @@
 			"tip": "Money Dragon",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Vorkath",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Dragonbone_necklace_detail.png/147px-Dragonbone_necklace_detail.png",
-			"displayItemId": 22111
+			"displayItemId": 22111,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 22111, 11286, 22006 ],
+				"count": 1
+			}
 		},
 		{
 			"id": "b759ce53-4312-4a54-8b5d-48a7ec52bd34",
@@ -1497,7 +1547,14 @@
 			"tip": "Ironman retirement home",
 			"wikiLink": "https://oldschool.runescape.wiki/w/The_Nightmare",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Inquisitor%27s_mace_detail.png/234px-Inquisitor%27s_mace_detail.png",
-			"displayItemId": 24417
+			"displayItemId": 24417,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					24422, 24517, 24511, 24514, 24419, 24420, 24421, 24417, 25837, 25838
+				],
+				"count": 1
+			}
 		},
 		{
 			"id": "37a77af7-505f-440b-bb3f-5fe03bd1c1a9",
@@ -1505,7 +1562,14 @@
 			"tip": "Ironman retirement home",
 			"wikiLink": "https://oldschool.runescape.wiki/w/The_Nightmare",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Inquisitor%27s_mace_detail.png/234px-Inquisitor%27s_mace_detail.png",
-			"displayItemId": 24417
+			"displayItemId": 24417,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					24422, 24517, 24511, 24514, 24419, 24420, 24421, 24417, 25837, 25838
+				],
+				"count": 2
+			}
 		},
 		{
 			"id": "d7f94c27-684f-4f4b-8069-fa8263999a44",
@@ -1513,7 +1577,14 @@
 			"tip": "Ironman retirement home",
 			"wikiLink": "https://oldschool.runescape.wiki/w/The_Nightmare",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Inquisitor%27s_mace_detail.png/234px-Inquisitor%27s_mace_detail.png",
-			"displayItemId": 24417
+			"displayItemId": 24417,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					24422, 24517, 24511, 24514, 24419, 24420, 24421, 24417, 25837, 25838
+				],
+				"count": 3
+			}
 		},
 		{
 			"id": "8fa63977-c114-4733-ac89-5b4299e086a2",
@@ -1521,7 +1592,14 @@
 			"tip": "Ironman retirement home",
 			"wikiLink": "https://oldschool.runescape.wiki/w/The_Nightmare",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Inquisitor%27s_mace_detail.png/234px-Inquisitor%27s_mace_detail.png",
-			"displayItemId": 24417
+			"displayItemId": 24417,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					24422, 24517, 24511, 24514, 24419, 24420, 24421, 24417, 25837, 25838
+				],
+				"count": 4
+			}
 		},
 		{
 			"id": "384deb72-3c32-4646-ac51-30c661ebcab2",
@@ -1529,7 +1607,14 @@
 			"tip": "Ironman retirement home",
 			"wikiLink": "https://oldschool.runescape.wiki/w/The_Nightmare",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Inquisitor%27s_mace_detail.png/234px-Inquisitor%27s_mace_detail.png",
-			"displayItemId": 24417
+			"displayItemId": 24417,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					24422, 24517, 24511, 24514, 24419, 24420, 24421, 24417, 25837, 25838
+				],
+				"count": 5
+			}
 		},
 		{
 			"id": "ae31a0d7-1dfa-496a-bcd1-aa0703172b65",

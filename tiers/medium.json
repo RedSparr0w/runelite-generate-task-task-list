@@ -1128,8 +1128,8 @@
 			"displayItemId": 12954,
 			"verification": {
 				"method": "collection-log",
-				"itemIds": [ 12954 ],
-				"count": 1
+				"itemIds": [ 8844, 8845, 8846, 8847, 8848, 8849, 8850, 12954 ],
+				"count": 8
 			}
 		},
 		{
