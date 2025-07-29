@@ -1217,43 +1217,68 @@
 		},
 		{
 			"id": "4817bd39-5f12-43fa-a99f-83cff074c4f3",
-			"name": "1 Slayer log slot",
-			"tip": "1 Slayer log slot",
+			"name": "Get 1 slayer log slot",
+			"tip": "Good Luck on Imbued Heart!",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Slayer",
 			"imageLink": "https://oldschool.runescape.wiki/images/8/87/Slayer_icon.png",
-			"displayItemId": 20724
+			"displayItemId": 20724,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 20724, 21270, 23047, 23050, 23053, 23056, 23059, 22963 ],
+				"count": 1
+			}
 		},
 		{
 			"id": "59c59736-7679-463a-baf6-c11912fcbf25",
-			"name": "1 Slayer log slot",
-			"tip": "1 Slayer log slot",
+			"name": "Get 1 slayer log slot",
+			"tip": "Good Luck on Imbued Heart!",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Slayer",
 			"imageLink": "https://oldschool.runescape.wiki/images/8/87/Slayer_icon.png",
-			"displayItemId": 20724
+			"displayItemId": 20724,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 20724, 21270, 23047, 23050, 23053, 23056, 23059, 22963 ],
+				"count": 2
+			}
 		},
 		{
 			"id": "8fb553c8-d0ef-410d-b73c-ecac4329e512",
-			"name": "1 Slayer log slot",
-			"tip": "1 Slayer log slot",
+			"name": "Get 1 slayer log slot",
+			"tip": "Good Luck on Imbued Heart!",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Slayer",
 			"imageLink": "https://oldschool.runescape.wiki/images/8/87/Slayer_icon.png",
-			"displayItemId": 20724
+			"displayItemId": 20724,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 20724, 21270, 23047, 23050, 23053, 23056, 23059, 22963 ],
+				"count": 3
+			}
 		},
 		{
 			"id": "a312f33a-f44e-45d2-ba87-67ab32400529",
-			"name": "1 Slayer log slot",
-			"tip": "1 Slayer log slot",
+			"name": "Get 1 slayer log slot",
+			"tip": "Good Luck on Imbued Heart!",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Slayer",
 			"imageLink": "https://oldschool.runescape.wiki/images/8/87/Slayer_icon.png",
-			"displayItemId": 20724
+			"displayItemId": 20724,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 20724, 21270, 23047, 23050, 23053, 23056, 23059, 22963 ],
+				"count": 4
+			}
 		},
 		{
 			"id": "42d0c365-5910-49c4-bacd-d950585d5c8a",
-			"name": "1 Slayer log slot",
-			"tip": "1 Slayer log slot",
+			"name": "Get 1 slayer log slot",
+			"tip": "Good Luck on Imbued Heart!",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Slayer",
 			"imageLink": "https://oldschool.runescape.wiki/images/8/87/Slayer_icon.png",
-			"displayItemId": 20724
+			"displayItemId": 20724,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 20724, 21270, 23047, 23050, 23053, 23056, 23059, 22963 ],
+				"count": 5
+			}
 		},
 		{
 			"id": "7066afad-e3ca-427d-b482-f2fc09576f06",

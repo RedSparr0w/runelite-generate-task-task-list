@@ -1423,7 +1423,12 @@
 			"tip": "Good Luck on Imbued Heart!",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Collection_log#Slayer",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Imbued_heart_detail.png/320px-Imbued_heart_detail.png",
-			"displayItemId": 20724
+			"displayItemId": 20724,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 20724, 21270, 23047, 23050, 23053, 23056, 23059, 22963 ],
+				"count": 1
+			}
 		},
 		{
 			"id": "4f45620b-6307-442b-b573-ab3f52748c83",
@@ -1431,7 +1436,12 @@
 			"tip": "Good Luck on Imbued Heart!",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Collection_log#Slayer",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Imbued_heart_detail.png/320px-Imbued_heart_detail.png",
-			"displayItemId": 20724
+			"displayItemId": 20724,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 20724, 21270, 23047, 23050, 23053, 23056, 23059, 22963 ],
+				"count": 2
+			}
 		},
 		{
 			"id": "ce335909-da99-4075-ab4f-2b3be4f2e37a",
@@ -1439,7 +1449,12 @@
 			"tip": "Good Luck on Imbued Heart!",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Collection_log#Slayer",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Imbued_heart_detail.png/320px-Imbued_heart_detail.png",
-			"displayItemId": 20724
+			"displayItemId": 20724,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 20724, 21270, 23047, 23050, 23053, 23056, 23059, 22963 ],
+				"count": 3
+			}
 		},
 		{
 			"id": "1dfb4f79-ed56-4ba3-88d3-bbe56b92e822",
@@ -1447,7 +1462,12 @@
 			"tip": "Good Luck on Imbued Heart!",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Collection_log#Slayer",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Imbued_heart_detail.png/320px-Imbued_heart_detail.png",
-			"displayItemId": 20724
+			"displayItemId": 20724,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 20724, 21270, 23047, 23050, 23053, 23056, 23059, 22963 ],
+				"count": 4
+			}
 		},
 		{
 			"id": "57fa8a7f-1065-4375-8ae7-1ecbae1187ad",
@@ -1455,7 +1475,12 @@
 			"tip": "Good Luck on Imbued Heart!",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Collection_log#Slayer",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Imbued_heart_detail.png/320px-Imbued_heart_detail.png",
-			"displayItemId": 20724
+			"displayItemId": 20724,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 20724, 21270, 23047, 23050, 23053, 23056, 23059, 22963 ],
+				"count": 5
+			}
 		},
 		{
 			"id": "f2ea24c2-547f-4d95-a05b-ead9b7c9a0e0",
@@ -1463,7 +1488,12 @@
 			"tip": "Good Luck on Imbued Heart!",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Collection_log#Slayer",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Imbued_heart_detail.png/320px-Imbued_heart_detail.png",
-			"displayItemId": 20724
+			"displayItemId": 20724,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 20724, 21270, 23047, 23050, 23053, 23056, 23059, 22963 ],
+				"count": 6
+			}
 		},
 		{
 			"id": "dca0e9f0-c7eb-4d32-a4d4-e1568e51da06",
@@ -2942,7 +2972,12 @@
 			"tip": "Reward from hunters loot sacks",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Quetzin",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Quetzin_%28follower%29.png/320px-Quetzin_%28follower%29.png",
-			"displayItemId": 28962
+			"displayItemId": 28962,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 28962 ],
+				"count": 1
+			}
 		},
 		{
 			"id": "a0940720-7203-4c7e-885b-8eade0702edf",
