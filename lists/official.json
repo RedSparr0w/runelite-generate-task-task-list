@@ -11840,7 +11840,15 @@
 			"tip": "Can be purchased as a reward from the Last Man Standing PVP Minigame.",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Last_Man_Standing",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Victor%27s_cape_%28500%29_detail.png/208px-Victor%27s_cape_%28500%29_detail.png",
-			"displayItemId": 24213
+			"displayItemId": 24213,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					24219, 24201, 24192, 24195, 24204, 24198, 24189, 24190, 24191, 24217, 24207,
+					24209, 24211, 24213, 24215, 24520
+				],
+				"count": 2
+			}
 		},
 		{
 			"id": "347d5712-ebc3-4b74-8aba-ba909c39013e",
@@ -11848,7 +11856,15 @@
 			"tip": "Can be purchased as a reward from the Last Man Standing PVP Minigame.",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Last_Man_Standing",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Victor%27s_cape_%28500%29_detail.png/208px-Victor%27s_cape_%28500%29_detail.png",
-			"displayItemId": 24213
+			"displayItemId": 24213,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					24219, 24201, 24192, 24195, 24204, 24198, 24189, 24190, 24191, 24217, 24207,
+					24209, 24211, 24213, 24215, 24520
+				],
+				"count": 4
+			}
 		},
 		{
 			"id": "2eb6623e-a326-4b63-9cae-8fa0823c5d49",
@@ -11856,7 +11872,15 @@
 			"tip": "Can be purchased as a reward from the Last Man Standing PVP Minigame.",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Last_Man_Standing",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Victor%27s_cape_%28500%29_detail.png/208px-Victor%27s_cape_%28500%29_detail.png",
-			"displayItemId": 24213
+			"displayItemId": 24213,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					24219, 24201, 24192, 24195, 24204, 24198, 24189, 24190, 24191, 24217, 24207,
+					24209, 24211, 24213, 24215, 24520
+				],
+				"count": 6
+			}
 		},
 		{
 			"id": "50b61b0e-70d0-40a9-bf42-c1b8ac917717",
@@ -11864,7 +11888,15 @@
 			"tip": "Can be purchased as a reward from the Last Man Standing PVP Minigame.",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Last_Man_Standing",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Victor%27s_cape_%28500%29_detail.png/208px-Victor%27s_cape_%28500%29_detail.png",
-			"displayItemId": 24213
+			"displayItemId": 24213,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					24219, 24201, 24192, 24195, 24204, 24198, 24189, 24190, 24191, 24217, 24207,
+					24209, 24211, 24213, 24215, 24520
+				],
+				"count": 8
+			}
 		},
 		{
 			"id": "917b912c-2716-4b12-a020-a758ee467e72",
@@ -11872,7 +11904,15 @@
 			"tip": "Can be purchased as a reward from the Last Man Standing PVP Minigame.",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Last_Man_Standing",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Victor%27s_cape_%28500%29_detail.png/208px-Victor%27s_cape_%28500%29_detail.png",
-			"displayItemId": 24213
+			"displayItemId": 24213,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					24219, 24201, 24192, 24195, 24204, 24198, 24189, 24190, 24191, 24217, 24207,
+					24209, 24211, 24213, 24215, 24520
+				],
+				"count": 10
+			}
 		},
 		{
 			"id": "5cbcc790-10d1-4c17-8b39-cad7b48dadf8",
@@ -11880,7 +11920,15 @@
 			"tip": "Can be purchased as a reward from the Last Man Standing PVP Minigame.",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Last_Man_Standing",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Victor%27s_cape_%28500%29_detail.png/208px-Victor%27s_cape_%28500%29_detail.png",
-			"displayItemId": 24213
+			"displayItemId": 24213,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					24219, 24201, 24192, 24195, 24204, 24198, 24189, 24190, 24191, 24217, 24207,
+					24209, 24211, 24213, 24215, 24520
+				],
+				"count": 12
+			}
 		},
 		{
 			"id": "4a387bb0-dfc3-4374-aa35-9bacfc2fc92d",
@@ -11888,7 +11936,15 @@
 			"tip": "Can be purchased as a reward from the Last Man Standing PVP Minigame.",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Last_Man_Standing",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Victor%27s_cape_%28500%29_detail.png/208px-Victor%27s_cape_%28500%29_detail.png",
-			"displayItemId": 24213
+			"displayItemId": 24213,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					24219, 24201, 24192, 24195, 24204, 24198, 24189, 24190, 24191, 24217, 24207,
+					24209, 24211, 24213, 24215, 24520
+				],
+				"count": 14
+			}
 		},
 		{
 			"id": "57672680-b11b-44a8-80f6-cb93510612f6",

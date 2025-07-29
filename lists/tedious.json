@@ -11823,51 +11823,99 @@
 		},
 		{
 			"id": "1eef324f-5560-4c3a-aa0a-71c2c432aa32",
-			"name": "2 LMS log slots",
-			"tip": "2 LMS log slots",
+			"name": "Get 2 LMS slots",
+			"tip": "Can be purchased as a reward from the Last Man Standing PVP Minigame.",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Last_Man_Standing",
 			"imageLink": "https://oldschool.runescape.wiki/images/a/a9/Last_Man_Standing_shop_icon.png",
-			"displayItemId": 24213
+			"displayItemId": 24213,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					24219, 24201, 24192, 24195, 24204, 24198, 24189, 24190, 24191, 24217, 24207,
+					24209, 24211, 24213, 24215, 24520
+				],
+				"count": 2
+			}
 		},
 		{
 			"id": "68ed059b-388d-43db-a9fa-eea35f59d5ee",
-			"name": "2 LMS log slots",
-			"tip": "2 LMS log slots",
+			"name": "Get 2 LMS slots",
+			"tip": "Can be purchased as a reward from the Last Man Standing PVP Minigame.",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Last_Man_Standing",
 			"imageLink": "https://oldschool.runescape.wiki/images/a/a9/Last_Man_Standing_shop_icon.png",
-			"displayItemId": 24213
+			"displayItemId": 24213,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					24219, 24201, 24192, 24195, 24204, 24198, 24189, 24190, 24191, 24217, 24207,
+					24209, 24211, 24213, 24215, 24520
+				],
+				"count": 4
+			}
 		},
 		{
 			"id": "4bf1f387-c5e2-425e-abcf-e7671fca5ef4",
-			"name": "2 LMS log slots",
-			"tip": "2 LMS log slots",
+			"name": "Get 2 LMS slots",
+			"tip": "Can be purchased as a reward from the Last Man Standing PVP Minigame.",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Last_Man_Standing",
 			"imageLink": "https://oldschool.runescape.wiki/images/a/a9/Last_Man_Standing_shop_icon.png",
-			"displayItemId": 24213
+			"displayItemId": 24213,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					24219, 24201, 24192, 24195, 24204, 24198, 24189, 24190, 24191, 24217, 24207,
+					24209, 24211, 24213, 24215, 24520
+				],
+				"count": 6
+			}
 		},
 		{
 			"id": "af908bd1-7f6c-4ff4-aa14-290a0538588c",
-			"name": "2 LMS log slots",
-			"tip": "2 LMS log slots",
+			"name": "Get 2 LMS slots",
+			"tip": "Can be purchased as a reward from the Last Man Standing PVP Minigame.",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Last_Man_Standing",
 			"imageLink": "https://oldschool.runescape.wiki/images/a/a9/Last_Man_Standing_shop_icon.png",
-			"displayItemId": 24213
+			"displayItemId": 24213,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					24219, 24201, 24192, 24195, 24204, 24198, 24189, 24190, 24191, 24217, 24207,
+					24209, 24211, 24213, 24215, 24520
+				],
+				"count": 8
+			}
 		},
 		{
 			"id": "4fc8f459-8f3b-4612-ada4-cd4bd140bbcc",
-			"name": "2 LMS log slots",
-			"tip": "2 LMS log slots",
+			"name": "Get 2 LMS slots",
+			"tip": "Can be purchased as a reward from the Last Man Standing PVP Minigame.",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Last_Man_Standing",
 			"imageLink": "https://oldschool.runescape.wiki/images/a/a9/Last_Man_Standing_shop_icon.png",
-			"displayItemId": 24213
+			"displayItemId": 24213,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					24219, 24201, 24192, 24195, 24204, 24198, 24189, 24190, 24191, 24217, 24207,
+					24209, 24211, 24213, 24215, 24520
+				],
+				"count": 10
+			}
 		},
 		{
 			"id": "84e4f620-d62e-46bc-8ff1-aea9b17cc216",
-			"name": "2 LMS log slots",
-			"tip": "2 LMS log slots",
+			"name": "Get 2 LMS slots",
+			"tip": "Can be purchased as a reward from the Last Man Standing PVP Minigame.",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Last_Man_Standing",
 			"imageLink": "https://oldschool.runescape.wiki/images/a/a9/Last_Man_Standing_shop_icon.png",
-			"displayItemId": 24213
+			"displayItemId": 24213,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					24219, 24201, 24192, 24195, 24204, 24198, 24189, 24190, 24191, 24217, 24207,
+					24209, 24211, 24213, 24215, 24520
+				],
+				"count": 12
+			}
 		},
 		{
 			"id": "b5e5139f-42fd-463b-ad6e-97ebdb842b13",
