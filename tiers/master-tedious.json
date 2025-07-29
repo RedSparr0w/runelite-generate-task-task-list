@@ -1335,7 +1335,7 @@
 			"displayItemId": 22111,
 			"verification": {
 				"method": "collection-log",
-				"itemIds": [ 22111, 11286, 22006 ],
+				"itemIds": [ 22111, 22006 ],
 				"count": 1
 			}
 		},
