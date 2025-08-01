@@ -1063,8 +1063,8 @@
 			"displayItemId": 8850,
 			"verification": {
 				"method": "collection-log",
-				"itemIds": [ 8850 ],
-				"count": 1
+				"itemIds": [ 8844, 8845, 8846, 8847, 8848, 8849, 8850 ],
+				"count": 7
 			}
 		},
 		{

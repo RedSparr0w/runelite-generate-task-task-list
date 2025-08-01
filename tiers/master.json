@@ -527,7 +527,15 @@
 			"tip": "Can be purchased as a reward from the Last Man Standing PVP Minigame.",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Last_Man_Standing",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Victor%27s_cape_%28500%29_detail.png/208px-Victor%27s_cape_%28500%29_detail.png",
-			"displayItemId": 24213
+			"displayItemId": 24213,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					24219, 24201, 24192, 24195, 24204, 24198, 24189, 24190, 24191, 24217, 24207,
+					24209, 24211, 24213, 24215, 24520
+				],
+				"count": 2
+			}
 		},
 		{
 			"id": "347d5712-ebc3-4b74-8aba-ba909c39013e",
@@ -535,7 +543,15 @@
 			"tip": "Can be purchased as a reward from the Last Man Standing PVP Minigame.",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Last_Man_Standing",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Victor%27s_cape_%28500%29_detail.png/208px-Victor%27s_cape_%28500%29_detail.png",
-			"displayItemId": 24213
+			"displayItemId": 24213,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					24219, 24201, 24192, 24195, 24204, 24198, 24189, 24190, 24191, 24217, 24207,
+					24209, 24211, 24213, 24215, 24520
+				],
+				"count": 4
+			}
 		},
 		{
 			"id": "2eb6623e-a326-4b63-9cae-8fa0823c5d49",
@@ -543,7 +559,15 @@
 			"tip": "Can be purchased as a reward from the Last Man Standing PVP Minigame.",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Last_Man_Standing",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Victor%27s_cape_%28500%29_detail.png/208px-Victor%27s_cape_%28500%29_detail.png",
-			"displayItemId": 24213
+			"displayItemId": 24213,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					24219, 24201, 24192, 24195, 24204, 24198, 24189, 24190, 24191, 24217, 24207,
+					24209, 24211, 24213, 24215, 24520
+				],
+				"count": 6
+			}
 		},
 		{
 			"id": "50b61b0e-70d0-40a9-bf42-c1b8ac917717",
@@ -551,7 +575,15 @@
 			"tip": "Can be purchased as a reward from the Last Man Standing PVP Minigame.",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Last_Man_Standing",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Victor%27s_cape_%28500%29_detail.png/208px-Victor%27s_cape_%28500%29_detail.png",
-			"displayItemId": 24213
+			"displayItemId": 24213,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					24219, 24201, 24192, 24195, 24204, 24198, 24189, 24190, 24191, 24217, 24207,
+					24209, 24211, 24213, 24215, 24520
+				],
+				"count": 8
+			}
 		},
 		{
 			"id": "917b912c-2716-4b12-a020-a758ee467e72",
@@ -559,7 +591,15 @@
 			"tip": "Can be purchased as a reward from the Last Man Standing PVP Minigame.",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Last_Man_Standing",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Victor%27s_cape_%28500%29_detail.png/208px-Victor%27s_cape_%28500%29_detail.png",
-			"displayItemId": 24213
+			"displayItemId": 24213,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					24219, 24201, 24192, 24195, 24204, 24198, 24189, 24190, 24191, 24217, 24207,
+					24209, 24211, 24213, 24215, 24520
+				],
+				"count": 10
+			}
 		},
 		{
 			"id": "5cbcc790-10d1-4c17-8b39-cad7b48dadf8",
@@ -567,7 +607,15 @@
 			"tip": "Can be purchased as a reward from the Last Man Standing PVP Minigame.",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Last_Man_Standing",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Victor%27s_cape_%28500%29_detail.png/208px-Victor%27s_cape_%28500%29_detail.png",
-			"displayItemId": 24213
+			"displayItemId": 24213,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					24219, 24201, 24192, 24195, 24204, 24198, 24189, 24190, 24191, 24217, 24207,
+					24209, 24211, 24213, 24215, 24520
+				],
+				"count": 12
+			}
 		},
 		{
 			"id": "4a387bb0-dfc3-4374-aa35-9bacfc2fc92d",
@@ -575,7 +623,15 @@
 			"tip": "Can be purchased as a reward from the Last Man Standing PVP Minigame.",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Last_Man_Standing",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Victor%27s_cape_%28500%29_detail.png/208px-Victor%27s_cape_%28500%29_detail.png",
-			"displayItemId": 24213
+			"displayItemId": 24213,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					24219, 24201, 24192, 24195, 24204, 24198, 24189, 24190, 24191, 24217, 24207,
+					24209, 24211, 24213, 24215, 24520
+				],
+				"count": 14
+			}
 		},
 		{
 			"id": "57672680-b11b-44a8-80f6-cb93510612f6",
@@ -1367,7 +1423,12 @@
 			"tip": "Good Luck on Imbued Heart!",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Collection_log#Slayer",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Imbued_heart_detail.png/320px-Imbued_heart_detail.png",
-			"displayItemId": 20724
+			"displayItemId": 20724,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 20724, 21270, 23047, 23050, 23053, 23056, 23059, 22963 ],
+				"count": 1
+			}
 		},
 		{
 			"id": "4f45620b-6307-442b-b573-ab3f52748c83",
@@ -1375,7 +1436,12 @@
 			"tip": "Good Luck on Imbued Heart!",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Collection_log#Slayer",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Imbued_heart_detail.png/320px-Imbued_heart_detail.png",
-			"displayItemId": 20724
+			"displayItemId": 20724,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 20724, 21270, 23047, 23050, 23053, 23056, 23059, 22963 ],
+				"count": 2
+			}
 		},
 		{
 			"id": "ce335909-da99-4075-ab4f-2b3be4f2e37a",
@@ -1383,7 +1449,12 @@
 			"tip": "Good Luck on Imbued Heart!",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Collection_log#Slayer",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Imbued_heart_detail.png/320px-Imbued_heart_detail.png",
-			"displayItemId": 20724
+			"displayItemId": 20724,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 20724, 21270, 23047, 23050, 23053, 23056, 23059, 22963 ],
+				"count": 3
+			}
 		},
 		{
 			"id": "1dfb4f79-ed56-4ba3-88d3-bbe56b92e822",
@@ -1391,7 +1462,12 @@
 			"tip": "Good Luck on Imbued Heart!",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Collection_log#Slayer",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Imbued_heart_detail.png/320px-Imbued_heart_detail.png",
-			"displayItemId": 20724
+			"displayItemId": 20724,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 20724, 21270, 23047, 23050, 23053, 23056, 23059, 22963 ],
+				"count": 4
+			}
 		},
 		{
 			"id": "57fa8a7f-1065-4375-8ae7-1ecbae1187ad",
@@ -1399,7 +1475,12 @@
 			"tip": "Good Luck on Imbued Heart!",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Collection_log#Slayer",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Imbued_heart_detail.png/320px-Imbued_heart_detail.png",
-			"displayItemId": 20724
+			"displayItemId": 20724,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 20724, 21270, 23047, 23050, 23053, 23056, 23059, 22963 ],
+				"count": 5
+			}
 		},
 		{
 			"id": "f2ea24c2-547f-4d95-a05b-ead9b7c9a0e0",
@@ -1407,7 +1488,12 @@
 			"tip": "Good Luck on Imbued Heart!",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Collection_log#Slayer",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Imbued_heart_detail.png/320px-Imbued_heart_detail.png",
-			"displayItemId": 20724
+			"displayItemId": 20724,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 20724, 21270, 23047, 23050, 23053, 23056, 23059, 22963 ],
+				"count": 6
+			}
 		},
 		{
 			"id": "dca0e9f0-c7eb-4d32-a4d4-e1568e51da06",
@@ -1415,7 +1501,15 @@
 			"tip": "May the bird gods bless you with evil chicken pieces",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Collection_log#Miscellaneous",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Dragon_full_helm_detail.png/277px-Dragon_full_helm_detail.png",
-			"displayItemId": 11335
+			"displayItemId": 11335,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					21509, 19707, 11335, 22103, 22100, 20439, 20436, 20442, 20433, 24034, 24037,
+					24040, 24043, 24046
+				],
+				"count": 1
+			}
 		},
 		{
 			"id": "b8f55499-8c32-4b15-9a70-c80cefb297c1",
@@ -1423,7 +1517,15 @@
 			"tip": "May the bird gods bless you with evil chicken pieces",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Collection_log#Miscellaneous",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Dragon_full_helm_detail.png/277px-Dragon_full_helm_detail.png",
-			"displayItemId": 11335
+			"displayItemId": 11335,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					21509, 19707, 11335, 22103, 22100, 20439, 20436, 20442, 20433, 24034, 24037,
+					24040, 24043, 24046
+				],
+				"count": 2
+			}
 		},
 		{
 			"id": "a1b4d9cc-8e86-45fe-af4b-61d844a5b078",
@@ -1431,7 +1533,15 @@
 			"tip": "May the bird gods bless you with evil chicken pieces",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Collection_log#Miscellaneous",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Dragon_full_helm_detail.png/277px-Dragon_full_helm_detail.png",
-			"displayItemId": 11335
+			"displayItemId": 11335,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					21509, 19707, 11335, 22103, 22100, 20439, 20436, 20442, 20433, 24034, 24037,
+					24040, 24043, 24046
+				],
+				"count": 3
+			}
 		},
 		{
 			"id": "89d777ac-5d60-4720-ba28-e23594ee06c1",
@@ -1439,7 +1549,15 @@
 			"tip": "May the bird gods bless you with evil chicken pieces",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Collection_log#Miscellaneous",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Dragon_full_helm_detail.png/277px-Dragon_full_helm_detail.png",
-			"displayItemId": 11335
+			"displayItemId": 11335,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					21509, 19707, 11335, 22103, 22100, 20439, 20436, 20442, 20433, 24034, 24037,
+					24040, 24043, 24046
+				],
+				"count": 4
+			}
 		},
 		{
 			"id": "1a25f42e-1202-40f3-b001-d2de28f6b530",
@@ -1447,7 +1565,15 @@
 			"tip": "May the bird gods bless you with evil chicken pieces",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Collection_log#Miscellaneous",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Dragon_full_helm_detail.png/277px-Dragon_full_helm_detail.png",
-			"displayItemId": 11335
+			"displayItemId": 11335,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					21509, 19707, 11335, 22103, 22100, 20439, 20436, 20442, 20433, 24034, 24037,
+					24040, 24043, 24046
+				],
+				"count": 5
+			}
 		},
 		{
 			"id": "bd9208a5-8c14-4fc9-b13f-b5323d036391",
@@ -1481,15 +1607,25 @@
 			"tip": "Boss or Minigame?",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Zalcano",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Zalcano_shard_detail.png/221px-Zalcano_shard_detail.png",
-			"displayItemId": 23908
+			"displayItemId": 23908,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 23953, 23908 ],
+				"count": 1
+			}
 		},
 		{
 			"id": "08a9dd78-a0d5-4497-9277-4b66097dba4b",
-			"name": "Get 1 vorkath unique",
-			"tip": "Money Dragon",
+			"name": "Obtain a Dragonbone necklace",
+			"tip": "A rare drop from Vorkath",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Vorkath",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Dragonbone_necklace_detail.png/147px-Dragonbone_necklace_detail.png",
-			"displayItemId": 22111
+			"displayItemId": 22111,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 22111 ],
+				"count": 1
+			}
 		},
 		{
 			"id": "b759ce53-4312-4a54-8b5d-48a7ec52bd34",
@@ -1497,7 +1633,14 @@
 			"tip": "Ironman retirement home",
 			"wikiLink": "https://oldschool.runescape.wiki/w/The_Nightmare",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Inquisitor%27s_mace_detail.png/234px-Inquisitor%27s_mace_detail.png",
-			"displayItemId": 24417
+			"displayItemId": 24417,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					24422, 24517, 24511, 24514, 24419, 24420, 24421, 24417, 25837, 25838
+				],
+				"count": 1
+			}
 		},
 		{
 			"id": "37a77af7-505f-440b-bb3f-5fe03bd1c1a9",
@@ -1505,7 +1648,14 @@
 			"tip": "Ironman retirement home",
 			"wikiLink": "https://oldschool.runescape.wiki/w/The_Nightmare",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Inquisitor%27s_mace_detail.png/234px-Inquisitor%27s_mace_detail.png",
-			"displayItemId": 24417
+			"displayItemId": 24417,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					24422, 24517, 24511, 24514, 24419, 24420, 24421, 24417, 25837, 25838
+				],
+				"count": 2
+			}
 		},
 		{
 			"id": "d7f94c27-684f-4f4b-8069-fa8263999a44",
@@ -1513,7 +1663,14 @@
 			"tip": "Ironman retirement home",
 			"wikiLink": "https://oldschool.runescape.wiki/w/The_Nightmare",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Inquisitor%27s_mace_detail.png/234px-Inquisitor%27s_mace_detail.png",
-			"displayItemId": 24417
+			"displayItemId": 24417,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					24422, 24517, 24511, 24514, 24419, 24420, 24421, 24417, 25837, 25838
+				],
+				"count": 3
+			}
 		},
 		{
 			"id": "8fa63977-c114-4733-ac89-5b4299e086a2",
@@ -1521,7 +1678,14 @@
 			"tip": "Ironman retirement home",
 			"wikiLink": "https://oldschool.runescape.wiki/w/The_Nightmare",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Inquisitor%27s_mace_detail.png/234px-Inquisitor%27s_mace_detail.png",
-			"displayItemId": 24417
+			"displayItemId": 24417,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					24422, 24517, 24511, 24514, 24419, 24420, 24421, 24417, 25837, 25838
+				],
+				"count": 4
+			}
 		},
 		{
 			"id": "384deb72-3c32-4646-ac51-30c661ebcab2",
@@ -1529,7 +1693,14 @@
 			"tip": "Ironman retirement home",
 			"wikiLink": "https://oldschool.runescape.wiki/w/The_Nightmare",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Inquisitor%27s_mace_detail.png/234px-Inquisitor%27s_mace_detail.png",
-			"displayItemId": 24417
+			"displayItemId": 24417,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					24422, 24517, 24511, 24514, 24419, 24420, 24421, 24417, 25837, 25838
+				],
+				"count": 5
+			}
 		},
 		{
 			"id": "ae31a0d7-1dfa-496a-bcd1-aa0703172b65",
@@ -2801,7 +2972,12 @@
 			"tip": "Reward from hunters loot sacks",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Quetzin",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Quetzin_%28follower%29.png/320px-Quetzin_%28follower%29.png",
-			"displayItemId": 28962
+			"displayItemId": 28962,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 28962 ],
+				"count": 1
+			}
 		},
 		{
 			"id": "a0940720-7203-4c7e-885b-8eade0702edf",
