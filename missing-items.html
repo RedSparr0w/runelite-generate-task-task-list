@@ -78,6 +78,8 @@
     </div>
     <!-- Add Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Add Bootstrap JS for dropdowns -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
       let myData = null;
       const listFiles = {
@@ -395,7 +397,7 @@
         if (!btn) {
           btn = document.createElement("button");
           btn.id = "mdBtn";
-          btn.className = "btn btn-secondary mt-3";
+          btn.className = "btn btn-secondary mt-3 me-2";
           btn.textContent = "Copy Markdown for GitHub";
           btn.onclick = function () {
             const summaryHtml =
@@ -419,6 +421,110 @@
         } else {
           btn.style.display = "";
         }
+
+        // Add Generate Tasks JSON dropdown button
+        let taskBtnGroup = document.getElementById("tasksBtnGroup");
+        if (!taskBtnGroup) {
+          taskBtnGroup = document.createElement("div");
+          taskBtnGroup.id = "tasksBtnGroup";
+          taskBtnGroup.className = "btn-group mt-3";
+          taskBtnGroup.innerHTML = `
+              <button type="button" class="btn btn-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                Generate Tasks JSON for Missing
+              </button>
+              <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="#" id="copyTasksJsonBtn">Copy to Clipboard</a></li>
+                <li><a class="dropdown-item" href="#" id="downloadTasksJsonBtn">Download File</a></li>
+              </ul>
+            `;
+          document.querySelector(".container").appendChild(taskBtnGroup);
+
+          // Add event listeners
+          document.getElementById("copyTasksJsonBtn").onclick = function (e) {
+            e.preventDefault();
+            const tasksJson = generateTasksJson(missingBySource);
+            navigator.clipboard.writeText(tasksJson).then(() => {
+              const btn = taskBtnGroup.querySelector("button");
+              const original = btn.textContent;
+              btn.textContent = "Copied!";
+              setTimeout(() => {
+                btn.textContent = original;
+              }, 1500);
+            });
+          };
+          document.getElementById("downloadTasksJsonBtn").onclick = function (
+            e
+          ) {
+            e.preventDefault();
+            const tasksJson = generateTasksJson(missingBySource);
+            const blob = new Blob([tasksJson], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "missing-items.json";
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+            }, 100);
+          };
+        } else {
+          taskBtnGroup.style.display = "";
+        }
+      }
+
+      // Generate a tasks JSON file for missing items, 1 task per category
+      function generateTasksJson(missingBySource) {
+        // Simple deterministic pseudo-UUID generator from a string (source name)
+        function uuidFromString(str) {
+          // FNV-1a hash, then format as UUID
+          let hash = 2166136261;
+          for (let i = 0; i < str.length; i++) {
+            hash ^= str.charCodeAt(i);
+            hash +=
+              (hash << 1) +
+              (hash << 4) +
+              (hash << 7) +
+              (hash << 8) +
+              (hash << 24);
+          }
+          // Convert hash to hex and pad
+          let hex = (hash >>> 0).toString(16).padStart(8, "0");
+          // Format as UUID: 8-4-4-4-12 (repeat/pad as needed)
+          return (
+            hex.slice(0, 8) +
+            "-" +
+            hex.slice(0, 4).padEnd(4, "0") +
+            "-" +
+            hex.slice(4, 8).padEnd(4, "0") +
+            "-0000-" +
+            hex.repeat(3).slice(0, 12)
+          );
+        }
+
+        const tasks = Object.entries(missingBySource).map(([source, items]) => {
+          // Use the first item as a representative for image, wiki, etc.
+          const first = items[0];
+          return {
+            id: uuidFromString(source),
+            name: `Obtain all missing items from ${source}`,
+            tip: `Collect all missing items from the ${source} category.`,
+            wikiLink: `https://oldschool.runescape.wiki/w/${source.replace(/\s+/g, "_")}`,
+            imageLink: first && first.imageUrl ? first.imageUrl : "",
+            displayItemId: first && first.id ? first.id : undefined,
+            verification: {
+              method: "collection-log",
+              itemIds: items.map((i) => i.id),
+              count: items.length,
+            },
+          };
+        });
+        const out = {
+          name: "missing-items",
+          tasks,
+        };
+        return JSON.stringify(out, null, 2);
       }
 
       function renderSummary(missingBySource, extraItems) {
