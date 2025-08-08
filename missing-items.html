@@ -1,0 +1,633 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Missing Items by Source</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        padding: 2rem;
+      }
+      .source-section {
+        margin-bottom: 2rem;
+      }
+      .item-list {
+        columns: 2 300px;
+        -webkit-columns: 2 300px;
+        -moz-columns: 2 300px;
+      }
+      .item-list li {
+        margin-bottom: 0.5rem;
+      }
+      .extra-list {
+        color: #b00;
+      }
+      /* Add some spacing for the chart */
+      #summaryChartContainer {
+        margin-bottom: 2rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1 class="mb-4">Missing Items by Source</h1>
+      <div class="mb-3">
+        <div class="btn-group" role="group" aria-label="Task List Selector">
+          <button class="btn btn-primary" id="officialBtn">Official</button>
+          <button class="btn btn-outline-primary" id="tediousBtn">
+            Tedious
+          </button>
+        </div>
+      </div>
+      <div class="mb-3">
+        <button class="btn btn-primary" id="runBtn">
+          Compare with Collection Log
+        </button>
+      </div>
+      <!-- Add summary and chart containers -->
+      <div id="summaryChartContainer" style="display: none">
+        <div id="summaryCard"></div>
+        <canvas id="summaryChart" height="120"></canvas>
+      </div>
+      <div id="results"></div>
+
+      <!-- Add ID Lookup Section -->
+      <div class="card mt-4" id="idLookupSection">
+        <div class="card-header bg-info text-white">
+          <h5 class="mb-0">Item ID Lookup</h5>
+        </div>
+        <div class="card-body">
+          <div class="mb-3">
+            <label for="idInput" class="form-label"
+              >Enter Item IDs (comma-separated):</label
+            >
+            <textarea
+              class="form-control"
+              id="idInput"
+              rows="3"
+              placeholder="1, 995, 4151, 11802, ..."
+            ></textarea>
+          </div>
+          <button class="btn btn-info" id="lookupBtn">Lookup Item Names</button>
+          <div id="lookupResults" class="mt-3" style="display: none"></div>
+        </div>
+      </div>
+    </div>
+    <!-- Add Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+      let myData = null;
+      const listFiles = {
+        official: "./lists/official.json",
+        tedious: "./lists/tedious.json",
+      };
+
+      async function loadList(listType) {
+        try {
+          const res = await fetch(listFiles[listType]);
+          if (!res.ok) throw new Error("Failed to load list: " + listType);
+          myData = await res.json();
+          document.getElementById("runBtn").disabled = false;
+        } catch (err) {
+          alert("Could not load list: " + err.message);
+          myData = null;
+          document.getElementById("runBtn").disabled = true;
+        }
+      }
+
+      function setActiveListButton(listType) {
+        const officialBtn = document.getElementById("officialBtn");
+        const tediousBtn = document.getElementById("tediousBtn");
+        if (listType === "official") {
+          officialBtn.classList.add("btn-primary");
+          officialBtn.classList.remove("btn-outline-primary");
+          tediousBtn.classList.remove("btn-primary");
+          tediousBtn.classList.add("btn-outline-primary");
+        } else {
+          tediousBtn.classList.add("btn-primary");
+          tediousBtn.classList.remove("btn-outline-primary");
+          officialBtn.classList.remove("btn-primary");
+          officialBtn.classList.add("btn-outline-primary");
+        }
+      }
+
+      document
+        .getElementById("officialBtn")
+        .addEventListener("click", async function () {
+          setActiveListButton("official");
+          await loadList("official");
+        });
+      document
+        .getElementById("tediousBtn")
+        .addEventListener("click", async function () {
+          setActiveListButton("tedious");
+          await loadList("tedious");
+        });
+
+      // Auto-load official on page load
+      window.addEventListener("DOMContentLoaded", async function () {
+        setActiveListButton("official");
+        await loadList("official");
+      });
+
+      async function fetchCollectionLogItems() {
+        const url = "https://oldschool.runescape.wiki/w/Collection_log/Table";
+        const res = await fetch(url);
+        const text = await res.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(text, "text/html");
+        const rows = doc.querySelectorAll("table.wikitable tbody tr");
+        const items = [];
+        const itemsBySource = {};
+        rows.forEach((row) => {
+          const itemId = row.getAttribute("data-item-id");
+          const tds = row.querySelectorAll("td");
+          // Get image URL (first <img> in the first <td>)
+          let imageUrl = null;
+          let wikiLink = null;
+          let name = null;
+          if (tds.length > 0) {
+            const img = tds[0].querySelector("img");
+            if (img) {
+              let src = img.getAttribute("src");
+              if (src && src.startsWith("/")) {
+                imageUrl = "https://oldschool.runescape.wiki" + src;
+              } else {
+                imageUrl = src;
+              }
+            }
+            // Get the <a> with the item name (not the file link)
+            const links = tds[0].querySelectorAll("a[title]");
+            for (const a of links) {
+              // Ignore file links (those with href containing '/File:')
+              if (!a.getAttribute("href").includes("/File:")) {
+                wikiLink =
+                  "https://oldschool.runescape.wiki" + a.getAttribute("href");
+                name = a.getAttribute("title")?.trim();
+                break;
+              }
+            }
+          }
+          // Get flavor text (assume it's in a data-flavour or a cell with class 'flavour', fallback to empty)
+          let flavor =
+            row.querySelector("td.flavour")?.textContent?.trim() ||
+            row.getAttribute("data-flavour") ||
+            "";
+          // If not found, try the last cell if it looks like flavor text (not a number, not empty, not a source)
+          if (!flavor) {
+            if (tds.length > 3) {
+              const last = tds[tds.length - 1].textContent.trim();
+              if (
+                last &&
+                last.length > 0 &&
+                !/^[\d,]+$/.test(last) &&
+                !last.includes("Obtained")
+              ) {
+                flavor = last;
+              }
+            }
+          }
+          // Get sources from the second <td>
+          const sources = [];
+          const sourceCell = tds[1];
+          if (sourceCell) {
+            sourceCell.textContent.split(",").forEach((sourceText) => {
+              const source = sourceText.trim();
+              if (source && !sources.includes(source)) {
+                sources.push(source);
+              }
+            });
+          }
+          if (itemId && name) {
+            const item = {
+              name,
+              id: parseInt(itemId, 10),
+              sources,
+              imageUrl,
+              wikiLink,
+              flavor,
+            };
+            items.push(item);
+            sources.forEach((source) => {
+              if (!itemsBySource[source]) itemsBySource[source] = [];
+              itemsBySource[source].push({
+                name,
+                id: item.id,
+                imageUrl,
+                wikiLink,
+                flavor,
+              });
+            });
+          }
+        });
+        return { items, itemsBySource };
+      }
+
+      function findMissingAndExtraItemsFromCollectionLog(
+        collectionData,
+        userData
+      ) {
+        const allUserItemIds = new Set();
+        Object.values(userData).forEach((difficultyList) => {
+          difficultyList.forEach((entry) => {
+            entry.verification?.itemIds?.forEach((id) =>
+              allUserItemIds.add(id)
+            );
+          });
+        });
+        const collectionItemIds = new Set(
+          collectionData.items.map((item) => item.id)
+        );
+        const missingItems = [];
+        const missingBySource = {};
+        collectionData.items.forEach((item) => {
+          if (!allUserItemIds.has(item.id)) {
+            missingItems.push(item);
+            item.sources.forEach((source) => {
+              if (!missingBySource[source]) missingBySource[source] = [];
+              missingBySource[source].push(item);
+            });
+          }
+        });
+        const extraItems = [];
+        allUserItemIds.forEach((id) => {
+          if (!collectionItemIds.has(id)) {
+            extraItems.push(id);
+          }
+        });
+        return { missingItems, missingBySource, extraItems };
+      }
+
+      // --- Item_IDs cache logic ---
+      let itemIdCache = { idToName: {}, idToExtra: {} };
+      const ITEM_IDS_CACHE_KEY = "osrs_item_ids_cache_v1";
+      const ITEM_IDS_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+
+      async function fetchAndCacheItemIds() {
+        // Try to load from localStorage
+        try {
+          const cached = localStorage.getItem(ITEM_IDS_CACHE_KEY);
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (
+              parsed.timestamp &&
+              Date.now() - parsed.timestamp < ITEM_IDS_CACHE_TTL
+            ) {
+              itemIdCache = parsed.data;
+              return;
+            }
+          }
+        } catch {}
+        // Fetch fresh data
+        const res = await fetch("https://oldschool.runescape.wiki/w/Item_IDs");
+        const html = await res.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, "text/html");
+        const rows = doc.querySelectorAll("table.wikitable tbody tr");
+        const idToName = {};
+        const idToExtra = {};
+        rows.forEach((row) => {
+          const nameAnchor = row.querySelector("td a[title]");
+          const idLinks = row.querySelectorAll("td:nth-child(2) a");
+          if (!nameAnchor || !idLinks.length) return;
+          let name = nameAnchor.getAttribute("title").trim();
+          let baseName = name.split("#")[0].trim();
+          idLinks.forEach((link) => {
+            const id = parseInt(link.textContent.trim(), 10);
+            if (!isNaN(id)) {
+              idToName[id] = baseName;
+              if (name !== baseName) {
+                idToExtra[id] = name;
+              }
+            }
+          });
+        });
+        itemIdCache = { idToName, idToExtra };
+        try {
+          localStorage.setItem(
+            ITEM_IDS_CACHE_KEY,
+            JSON.stringify({ timestamp: Date.now(), data: itemIdCache })
+          );
+        } catch {}
+      }
+
+      // Call this on page load
+      window.addEventListener("DOMContentLoaded", async function () {
+        setActiveListButton("official");
+        await loadList("official");
+        await fetchAndCacheItemIds();
+      });
+
+      function fetchItemNamesForIds(ids) {
+        // Use the cached data
+        const idToName = {};
+        const idToExtra = {};
+        ids.forEach((id) => {
+          if (itemIdCache.idToName[id]) idToName[id] = itemIdCache.idToName[id];
+          if (itemIdCache.idToExtra[id])
+            idToExtra[id] = itemIdCache.idToExtra[id];
+        });
+        return Promise.resolve({ idToName, idToExtra });
+      }
+
+      function generateMarkdownCollapsible(
+        missingBySource,
+        extraItems,
+        idToName,
+        idToExtra,
+        summaryHtml
+      ) {
+        // Extract summary values from summaryHtml
+        let summary = "";
+        if (summaryHtml) {
+          // Convert HTML summary to Markdown-like text
+          const div = document.createElement("div");
+          div.innerHTML = summaryHtml;
+          const lis = div.querySelectorAll("li");
+          summary = "## Summary\n\n";
+          lis.forEach((li) => {
+            summary += "- " + li.textContent.trim() + "\n";
+          });
+          summary += "\n";
+        }
+
+        let md = summary + `# Missing Items\n\n`;
+        for (const [source, items] of Object.entries(missingBySource).sort()) {
+          md += `<details>\n<summary>${source} (${items.length})</summary>\n\n`;
+          // Table header
+          md += `|   | Item | ID |\n|:-:|------|----|\n`;
+          items
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .forEach((item) => {
+              const img = item.imageUrl
+                ? `<img src="${item.imageUrl}" height="24" style="vertical-align:middle;">`
+                : "";
+              const link = `https://oldschool.runescape.wiki/Special:Lookup?utm_source=wiki&type=item&id=${item.id}`;
+              md += `| ${img} | <a href="${link}"><b>${item.name}</b></a> | ${item.id} |\n`;
+            });
+          md += `\n</details>\n\n`;
+        }
+        if (extraItems.length > 0) {
+          md += `<details>\n<summary>Extra Items (in your data but not in collection log) (${extraItems.length})</summary>\n\n`;
+          // Table header
+          md += `| Item | ID |\n|------|----|\n`;
+          extraItems.forEach((id) => {
+            let name = idToName && idToName[id] ? idToName[id] : "";
+            let extra =
+              idToExtra && idToExtra[id] ? ` _(Full: ${idToExtra[id]})_` : "";
+            md += `| ${name ? `<b>${name}</b>` : ""} | ${id}${extra} |\n`;
+          });
+          md += `\n</details>\n`;
+        }
+        return md;
+      }
+
+      function addMarkdownButton(
+        missingBySource,
+        extraItems,
+        idToName,
+        idToExtra
+      ) {
+        let btn = document.getElementById("mdBtn");
+        if (!btn) {
+          btn = document.createElement("button");
+          btn.id = "mdBtn";
+          btn.className = "btn btn-secondary mt-3";
+          btn.textContent = "Copy Markdown for GitHub";
+          btn.onclick = function () {
+            const summaryHtml =
+              document.getElementById("summaryCard").innerHTML;
+            const md = generateMarkdownCollapsible(
+              missingBySource,
+              extraItems,
+              idToName,
+              idToExtra,
+              summaryHtml
+            );
+            navigator.clipboard.writeText(md).then(() => {
+              btn.textContent = "Copied!";
+              setTimeout(
+                () => (btn.textContent = "Copy Markdown for GitHub"),
+                1500
+              );
+            });
+          };
+          document.querySelector(".container").appendChild(btn);
+        } else {
+          btn.style.display = "";
+        }
+      }
+
+      function renderSummary(missingBySource, extraItems) {
+        // Only count unique missing items (not duplicated across sources)
+        const uniqueMissingIds = new Set();
+        Object.values(missingBySource).forEach((arr) =>
+          arr.forEach((item) => uniqueMissingIds.add(item.id))
+        );
+        const totalMissing = uniqueMissingIds.size;
+        const totalSources = Object.keys(missingBySource).length;
+        const totalExtra = extraItems.length;
+        return `<div class="card mb-4"><div class="card-body"><h5 class="card-title">Summary</h5><ul class="mb-0"><li><b>Total missing items:</b> ${totalMissing}</li><li><b>Total sources:</b> ${totalSources}</li><li><b>Total extra items:</b> ${totalExtra}</li></ul></div></div>`;
+      }
+
+      // New: Render a bar chart of missing items per source
+      let summaryChartInstance = null;
+      function renderSummaryChart(missingBySource) {
+        const ctx = document.getElementById("summaryChart").getContext("2d");
+        const sortedSources = Object.entries(missingBySource)
+          .sort((a, b) => b[1].length - a[1].length)
+          .slice(0, 10); // Top 10 sources
+        const labels = sortedSources.map(([source]) => source);
+        const data = sortedSources.map(([, items]) => items.length);
+
+        if (summaryChartInstance) {
+          summaryChartInstance.destroy();
+        }
+        summaryChartInstance = new Chart(ctx, {
+          type: "bar",
+          data: {
+            labels,
+            datasets: [
+              {
+                label: "Missing Items",
+                data,
+                backgroundColor: "rgba(54, 162, 235, 0.7)",
+                borderColor: "rgba(54, 162, 235, 1)",
+                borderWidth: 1,
+              },
+            ],
+          },
+          options: {
+            indexAxis: "y",
+            plugins: {
+              legend: { display: false },
+              title: {
+                display: true,
+                text: "Top 10 Sources by Missing Items",
+              },
+            },
+            scales: {
+              x: { beginAtZero: true, precision: 0 },
+            },
+          },
+        });
+      }
+
+      function renderResults(missingBySource, extraItems, idToName, idToExtra) {
+        // Render summary card and chart at the top
+        document.getElementById("summaryChartContainer").style.display = "";
+        document.getElementById("summaryCard").innerHTML = renderSummary(
+          missingBySource,
+          extraItems
+        );
+        renderSummaryChart(missingBySource);
+
+        let html = "";
+        for (const [source, items] of Object.entries(missingBySource).sort()) {
+          const sortedItems = items
+            .slice()
+            .sort((a, b) => a.name.localeCompare(b.name));
+          const itemIds = sortedItems.map((item) => item.id).join(", ");
+          html += `<div class="source-section card mb-3"><div class="card-header bg-secondary text-white"><h5 class="mb-0">${source} <span class="badge bg-light text-dark">${items.length}</span></h5></div><div class="card-body"><ul class="item-list">`;
+          sortedItems.forEach((item) => {
+            html += `<li>`;
+            if (item.imageUrl)
+              html += `<img src="${item.imageUrl}" alt="" style="height:1.5em;vertical-align:middle;margin-right:0.5em;">`;
+            html += `<a href="https://oldschool.runescape.wiki/Special:Lookup?utm_source=wiki&type=item&id=${item.id}" target="_blank" class="fw-bold">${item.name}</a> <span class="text-muted">(ID: ${item.id})</span>`;
+            if (item.flavor)
+              html += `<div class="text-info small" style="margin-left:2.5em;">${item.flavor}</div>`;
+            html += `</li>`;
+          });
+          html += `</ul><div class="mt-2"><span class="text-muted small">Item IDs: ${itemIds}</span></div></div></div>`;
+        }
+        if (extraItems.length > 0) {
+          html += `<div class="card mt-4"><div class="card-header bg-danger text-white"><h5>Extra Items (in your data but not in collection log)</h5></div><div class="card-body"><ul class="extra-list">`;
+          extraItems.forEach((id) => {
+            let name = idToName && idToName[id] ? idToName[id] : "";
+            let extra =
+              idToExtra && idToExtra[id]
+                ? ` <span class='text-muted'>(Full: ${idToExtra[id]})</span>`
+                : "";
+            html += `<li>${name ? `<span class='fw-bold'>${name}</span> ` : ""}(ID: ${id})${extra}</li>`;
+          });
+          html += "</ul></div></div>";
+        }
+        document.getElementById("results").innerHTML = html;
+        addMarkdownButton(missingBySource, extraItems, idToName, idToExtra);
+      }
+
+      document.getElementById("runBtn").onclick = async function () {
+        if (!myData) {
+          alert("Please upload your default-tasks.json file first.");
+          return;
+        }
+        this.disabled = true;
+        this.textContent = "Loading...";
+        const collectionData = await fetchCollectionLogItems();
+        const { missingBySource, extraItems } =
+          findMissingAndExtraItemsFromCollectionLog(collectionData, myData);
+        let idToName = {},
+          idToExtra = {};
+        if (extraItems.length > 0) {
+          const lookup = await fetchItemNamesForIds(extraItems);
+          idToName = lookup.idToName;
+          idToExtra = lookup.idToExtra;
+        }
+        renderResults(missingBySource, extraItems, idToName, idToExtra);
+        this.disabled = false;
+        this.textContent = "Compare with Collection Log";
+      };
+
+      // Add ID Lookup functionality
+      document.getElementById("lookupBtn").onclick = async function () {
+        const input = document.getElementById("idInput").value.trim();
+        if (!input) {
+          alert("Please enter some item IDs.");
+          return;
+        }
+
+        // Parse comma-separated IDs
+        const ids = input
+          .split(",")
+          .map((id) => parseInt(id.trim(), 10))
+          .filter((id) => !isNaN(id) && id > 0);
+
+        if (ids.length === 0) {
+          alert("Please enter valid item IDs (numbers only).");
+          return;
+        }
+
+        this.disabled = true;
+        this.textContent = "Looking up...";
+
+        try {
+          const { idToName, idToExtra } = await fetchItemNamesForIds(ids);
+          displayLookupResults(ids, idToName, idToExtra);
+        } catch (error) {
+          alert("Error looking up item names: " + error.message);
+        }
+
+        this.disabled = false;
+        this.textContent = "Lookup Item Names";
+      };
+
+      function displayLookupResults(ids, idToName, idToExtra) {
+        const resultsDiv = document.getElementById("lookupResults");
+        let html =
+          '<div class="table-responsive"><table class="table table-striped"><thead><tr><th>ID</th><th>Item Name</th><th>Full Name</th></tr></thead><tbody>';
+
+        ids.forEach((id) => {
+          const name = idToName[id] || "Unknown";
+          const fullName = idToExtra[id] || name;
+          const nameCell =
+            name !== "Unknown"
+              ? `<span class="fw-bold">${name}</span>`
+              : `<span class="text-muted">${name}</span>`;
+          const fullNameCell = fullName !== name ? fullName : "";
+
+          html += `<tr><td>${id}</td><td>${nameCell}</td><td class="text-muted">${fullNameCell}</td></tr>`;
+        });
+
+        html += "</tbody></table></div>";
+
+        // Add copy button for results
+        html +=
+          '<button class="btn btn-secondary btn-sm" onclick="copyLookupResults()">Copy Results as Text</button>';
+
+        resultsDiv.innerHTML = html;
+        resultsDiv.style.display = "block";
+      }
+
+      function copyLookupResults() {
+        const input = document.getElementById("idInput").value.trim();
+        const ids = input
+          .split(",")
+          .map((id) => parseInt(id.trim(), 10))
+          .filter((id) => !isNaN(id) && id > 0);
+
+        fetchItemNamesForIds(ids).then(({ idToName, idToExtra }) => {
+          let text = "Item ID Lookup Results:\n\n";
+          ids.forEach((id) => {
+            const name = idToName[id] || "Unknown";
+            const fullName = idToExtra[id] || name;
+            text += `${id}: ${name}`;
+            if (fullName !== name) {
+              text += ` (Full: ${fullName})`;
+            }
+            text += "\n";
+          });
+
+          navigator.clipboard.writeText(text).then(() => {
+            const btn = event.target;
+            const originalText = btn.textContent;
+            btn.textContent = "Copied!";
+            setTimeout(() => (btn.textContent = originalText), 1500);
+          });
+        });
+      }
+    </script>
+  </body>
+</html>
