@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>All Tasks by Tier</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        padding: 2rem;
+      }
+      .tier-section {
+        margin-bottom: 2rem;
+      }
+      .task-list {
+        columns: 2 350px;
+        -webkit-columns: 2 350px;
+        -moz-columns: 2 350px;
+      }
+      .task-list li {
+        margin-bottom: 0.5rem;
+      }
+      .list-selector {
+        margin-bottom: 1.5rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1 class="mb-4">All Tasks by Tier</h1>
+      <div class="list-selector">
+        <div class="btn-group" role="group" aria-label="Task List Selector">
+          <button class="btn btn-primary" id="officialBtn">Official</button>
+          <button class="btn btn-outline-primary" id="tediousBtn">
+            Tedious
+          </button>
+        </div>
+      </div>
+      <div id="results"></div>
+    </div>
+    <script>
+      // --- Collection Log Item Fetcher (copied from missing-items.html) ---
+      async function fetchCollectionLogItems() {
+        const url = "https://oldschool.runescape.wiki/w/Collection_log/Table";
+        const res = await fetch(url);
+        const text = await res.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(text, "text/html");
+        const rows = doc.querySelectorAll("table.wikitable tbody tr");
+        const items = [];
+        const itemsById = {};
+        rows.forEach((row) => {
+          const itemId = row.getAttribute("data-item-id");
+          const tds = row.querySelectorAll("td");
+          let imageUrl = null;
+          let wikiLink = null;
+          let name = null;
+          if (tds.length > 0) {
+            const img = tds[0].querySelector("img");
+            if (img) {
+              let src = img.getAttribute("src");
+              if (src && src.startsWith("/")) {
+                imageUrl = "https://oldschool.runescape.wiki" + src;
+              } else {
+                imageUrl = src;
+              }
+            }
+            const links = tds[0].querySelectorAll("a[title]");
+            for (const a of links) {
+              if (!a.getAttribute("href").includes("/File:")) {
+                wikiLink =
+                  "https://oldschool.runescape.wiki" + a.getAttribute("href");
+                name = a.getAttribute("title")?.trim();
+                break;
+              }
+            }
+          }
+          if (itemId && name) {
+            const item = {
+              name,
+              id: parseInt(itemId, 10),
+              imageUrl,
+              wikiLink,
+            };
+            items.push(item);
+            itemsById[item.id] = item;
+          }
+        });
+        return { items, itemsById };
+      }
+      const listFiles = {
+        official: "./lists/official.json",
+        tedious: "./lists/tedious.json",
+      };
+      let currentList = "official";
+      let allData = null;
+
+      async function loadList(listType) {
+        try {
+          const res = await fetch(listFiles[listType]);
+          if (!res.ok) throw new Error("Failed to load list: " + listType);
+          const data = await res.json();
+          // Remove the 'missing-items' tier if present
+          if (data && typeof data === "object" && data["missing-items"]) {
+            delete data["missing-items"];
+          }
+          allData = data;
+          // Group tasks by name and by item sources
+          allData = Object.fromEntries(
+            Object.entries(allData).map(([tier, tasks]) => {
+              const grouped = {};
+              tasks.forEach((task) => {
+                const name = task.name;
+                if (!grouped[name]) {
+                  grouped[name] = {
+                    name,
+                    tip: task.tip,
+                    wikiLink: task.wikiLink,
+                    imageLink: task.imageLink,
+                    id: task.id,
+                    sourcesMap: {},
+                  };
+                }
+                const key = JSON.stringify(task.verification?.itemIds || []);
+                if (!grouped[name].sourcesMap[key]) {
+                  grouped[name].sourcesMap[key] = {
+                    itemIds: task.verification?.itemIds || [],
+                    counts: [],
+                  };
+                }
+                grouped[name].sourcesMap[key].counts.push(
+                  task.verification?.count || 0
+                );
+              });
+              const result = Object.values(grouped).map((g) => ({
+                name: g.name,
+                tip: g.tip,
+                wikiLink: g.wikiLink,
+                imageLink: g.imageLink,
+                id: g.id,
+                sources: Object.values(g.sourcesMap),
+              }));
+              return [tier, result];
+            })
+          );
+          renderResults();
+        } catch (err) {
+          alert("Could not load list: " + err.message);
+          allData = null;
+        }
+      }
+
+      function setActiveListButton(listType) {
+        const officialBtn = document.getElementById("officialBtn");
+        const tediousBtn = document.getElementById("tediousBtn");
+        if (listType === "official") {
+          officialBtn.classList.add("btn-primary");
+          officialBtn.classList.remove("btn-outline-primary");
+          tediousBtn.classList.remove("btn-primary");
+          tediousBtn.classList.add("btn-outline-primary");
+        } else {
+          tediousBtn.classList.add("btn-primary");
+          tediousBtn.classList.remove("btn-outline-primary");
+          officialBtn.classList.remove("btn-primary");
+          officialBtn.classList.add("btn-outline-primary");
+        }
+      }
+
+      function renderResults() {
+        let html = "";
+        fetchCollectionLogItems().then(({ itemsById }) => {
+          for (const [tier, tasks] of Object.entries(allData)) {
+            html += `<div class="tier-section card m-0 p-0">
+              <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0 text-capitalize fw-bold">${tier} <span class="badge bg-light text-dark">${tasks.length}</span></h5>
+              </div>
+              <div class="card-body row g-3">`;
+            tasks.forEach((task) => {
+              html += `<div class="col-12 col-md-6 col-lg-4">
+                <div class="card h-100 shadow-sm border-secondary">
+                    <div class="card-header bg-secondary text-light">${task.name}</div>
+                    <div class="card-body">`;
+              // Render each variant with its counts and item sources
+              task.sources.forEach((src, idx) => {
+                html += `<div class="text-muted small mt-1">Counts: `;
+                if (src.counts.length > 0) {
+                  html += src.counts
+                    .map(
+                      (count) =>
+                        `<span class='badge bg-success me-1'>${count}</span>`
+                    )
+                    .join("");
+                }
+                html += `</div>`;
+                if (src.itemIds && src.itemIds.length > 0) {
+                  html += `<div class="d-flex flex-wrap mb-2 mt-1">`;
+                  src.itemIds.forEach((id) => {
+                    const item = itemsById[id];
+                    const link =
+                      item?.wikiLink ||
+                      `https://oldschool.runescape.wiki/Special:Lookup?utm_source=wiki&type=item&id=${id}`;
+                    const imgUrl =
+                      item?.imageUrl ||
+                      `https://oldschool.runescape.wiki/images/${id}.png`;
+                    const name = item?.name || id;
+                    html += `<a href="${link}" target="_blank" class="me-2 mb-1" title="${name} (ID: ${id})"><img src="${imgUrl}" alt="${name}" style="height:1.7em;width:1.7em;object-fit:contain;border-radius:0.25em;border:1px solid #ccc;background:#fff;"></a>`;
+                  });
+                  html += `</div>`;
+                }
+              });
+              // Tip text
+              if (task.tip) {
+                html += `<div class="text-muted small">${task.tip}</div>`;
+              }
+              html += `<div class="d-flex justify-content-between align-items-end mt-2">
+                  <a href="${task.wikiLink}" target="_blank" class="btn btn-sm btn-outline-primary">Wiki</a>
+                </div>
+                  </div>
+                </div>
+              </div>`;
+            });
+            html += `</div></div>`;
+          }
+          document.getElementById("results").innerHTML = html;
+        });
+      }
+
+      document
+        .getElementById("officialBtn")
+        .addEventListener("click", async function () {
+          setActiveListButton("official");
+          currentList = "official";
+          await loadList("official");
+        });
+      document
+        .getElementById("tediousBtn")
+        .addEventListener("click", async function () {
+          setActiveListButton("tedious");
+          currentList = "tedious";
+          await loadList("tedious");
+        });
+
+      // Auto-load official on page load
+      window.addEventListener("DOMContentLoaded", async function () {
+        setActiveListButton("official");
+        await loadList("official");
+      });
+    </script>
+  </body>
+</html>
