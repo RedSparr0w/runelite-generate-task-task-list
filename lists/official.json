@@ -1062,8 +1062,8 @@
 			"displayItemId": 8850,
 			"verification": {
 				"method": "collection-log",
-				"itemIds": [ 8850 ],
-				"count": 1
+				"itemIds": [ 8844, 8845, 8846, 8847, 8848, 8849, 8850 ],
+				"count": 7
 			}
 		},
 		{
@@ -2323,6 +2323,32 @@
 				"itemIds": [ 30040 ],
 				"count": 1
 			}
+		},
+		{
+			"id": "583f9e90-f977-40f9-adba-111f8064f289",
+			"name": "Get 1 unique from Vale Totems",
+			"tip": "This fletching minigame takes place in Auburn Valley. You can chop you own logs.",
+			"wikiLink": "https://oldschool.runescape.wiki/w/Vale_Totems",
+			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Vale_offerings_detail.png/320px-Vale_offerings_detail.png",
+			"displayItemId": 31054,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 31032, 31052, 31043, 31034 ],
+				"count": 1
+			}
+		},
+		{
+			"id": "50bf552f-5f5a-48b1-aeff-28a2e81d240c",
+			"name": "Get 1 unique from Vale Totems",
+			"tip": "This fletching minigame takes place in Auburn Valley. You can chop you own logs.",
+			"wikiLink": "https://oldschool.runescape.wiki/w/Vale_Totems",
+			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Vale_offerings_detail.png/320px-Vale_offerings_detail.png",
+			"displayItemId": 31054,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 31032, 31052, 31043, 31034 ],
+				"count": 2
+			}
 		}
 	],
 	"medium": [
@@ -3453,8 +3479,8 @@
 			"displayItemId": 12954,
 			"verification": {
 				"method": "collection-log",
-				"itemIds": [ 12954 ],
-				"count": 1
+				"itemIds": [ 8844, 8845, 8846, 8847, 8848, 8849, 8850, 12954 ],
+				"count": 8
 			}
 		},
 		{
@@ -4140,6 +4166,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Last_Man_Standing",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/1/19/Ward_upgrade_kit_detail.png/150px-Ward_upgrade_kit_detail.png",
 			"displayItemId": 12802,
+			"tags": [ "lms" ],
 			"verification": {
 				"method": "collection-log",
 				"itemIds": [ 12802 ],
@@ -4153,6 +4180,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Last_Man_Standing",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/6/6b/Granite_clamp_detail.png/150px-Granite_clamp_detail.png",
 			"displayItemId": 12849,
+			"tags": [ "lms" ],
 			"verification": {
 				"method": "collection-log",
 				"itemIds": [ 12849 ],
@@ -4166,6 +4194,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Last_Man_Standing",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/5/59/Volcanic_whip_mix_detail_animated.gif/120px-Volcanic_whip_mix_detail_animated.gif",
 			"displayItemId": 12771,
+			"tags": [ "lms" ],
 			"verification": {
 				"method": "collection-log",
 				"itemIds": [ 12771 ],
@@ -4179,6 +4208,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Last_Man_Standing",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/e/e4/Frozen_whip_mix_detail.png/120px-Frozen_whip_mix_detail.png",
 			"displayItemId": 12769,
+			"tags": [ "lms" ],
 			"verification": {
 				"method": "collection-log",
 				"itemIds": [ 12769 ],
@@ -4192,6 +4222,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Last_Man_Standing",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/3/3e/Steam_staff_upgrade_kit_detail.png/150px-Steam_staff_upgrade_kit_detail.png",
 			"displayItemId": 12798,
+			"tags": [ "lms" ],
 			"verification": {
 				"method": "collection-log",
 				"itemIds": [ 12798 ],
@@ -4205,6 +4236,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Last_Man_Standing",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/c/c9/Lava_staff_upgrade_kit_detail.png/150px-Lava_staff_upgrade_kit_detail.png",
 			"displayItemId": 21202,
+			"tags": [ "lms" ],
 			"verification": {
 				"method": "collection-log",
 				"itemIds": [ 21202 ],
@@ -4218,6 +4250,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Last_Man_Standing",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/f/f8/Dragon_pickaxe_upgrade_kit_detail.png/150px-Dragon_pickaxe_upgrade_kit_detail.png",
 			"displayItemId": 12800,
+			"tags": [ "lms" ],
 			"verification": {
 				"method": "collection-log",
 				"itemIds": [ 12800 ],
@@ -4231,6 +4264,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Last_Man_Standing",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/a/a2/Ornate_maul_handle_detail.png/120px-Ornate_maul_handle_detail.png",
 			"displayItemId": 24229,
+			"tags": [ "lms" ],
 			"verification": {
 				"method": "collection-log",
 				"itemIds": [ 24229 ],
@@ -4819,7 +4853,7 @@
 		{
 			"id": "8faa724f-442a-48f2-9576-33d6ef1cd4a0",
 			"name": "Get a Huasca seed",
-			"tip": "Can be received as a drop from the Amoxliatl.",
+			"tip": "Can be received as a drop from the Hueycoatl, Amoxliatl or Custodian stalkers. Pick any of those you can access without additional quests.",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Huasca_seed",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Huasca_seed_detail.png/200px-Huasca_seed_detail.png",
 			"displayItemId": 30088,
@@ -4843,6 +4877,84 @@
 					30060
 				],
 				"count": 6
+			}
+		},
+		{
+			"id": "f3a0cc76-6f55-426e-8440-5a47e6920a84",
+			"name": "Get 1 unique from Vale Totems",
+			"tip": "This fletching minigame takes place in Auburn Valley. You can chop you own logs.",
+			"wikiLink": "https://oldschool.runescape.wiki/w/Vale_Totems",
+			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Vale_offerings_detail.png/320px-Vale_offerings_detail.png",
+			"displayItemId": 31054,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 31032, 31052, 31043, 31034 ],
+				"count": 3
+			}
+		},
+		{
+			"id": "c47d1afa-63ba-4235-be79-425d345375b7",
+			"name": "Get 1 unique from Vale Totems",
+			"tip": "This fletching minigame takes place in Auburn Valley. You can chop you own logs.",
+			"wikiLink": "https://oldschool.runescape.wiki/w/Vale_Totems",
+			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Vale_offerings_detail.png/320px-Vale_offerings_detail.png",
+			"displayItemId": 31054,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 31032, 31052, 31043, 31034 ],
+				"count": 4
+			}
+		},
+		{
+			"id": "b8d6aac5-2580-4ca1-8129-a1f71d4c4ebf",
+			"name": "Get 1 unique from Custodian stalkers",
+			"tip": "Three different variants can be found inside the Stalker Den in Varlamare, after completion of the Shadows of Custodia quest.",
+			"wikiLink": "https://oldschool.runescape.wiki/w/Custodian_stalker",
+			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Antler_guard_detail.png/320px-Antler_guard_detail.png",
+			"displayItemId": 31081,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 31086, 31081, 31084 ],
+				"count": 1
+			}
+		},
+		{
+			"id": "9ebbb378-a2c2-438e-9481-784d7ed7a8cf",
+			"name": "Get 1 unique from Custodian stalkers",
+			"tip": "Three different variants can be found inside the Stalker Den in Varlamare, after completion of the Shadows of Custodia quest.",
+			"wikiLink": "https://oldschool.runescape.wiki/w/Custodian_stalker",
+			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Antler_guard_detail.png/320px-Antler_guard_detail.png",
+			"displayItemId": 31081,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 31086, 31081, 31084 ],
+				"count": 2
+			}
+		},
+		{
+			"id": "5e135307-dc58-4873-b89d-b6c68484aa07",
+			"name": "Get 1 unique from Custodian stalkers",
+			"tip": "Three different variants can be found inside the Stalker Den in Varlamare, after completion of the Shadows of Custodia quest.",
+			"wikiLink": "https://oldschool.runescape.wiki/w/Custodian_stalker",
+			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Antler_guard_detail.png/320px-Antler_guard_detail.png",
+			"displayItemId": 31081,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 31086, 31081, 31084 ],
+				"count": 3
+			}
+		},
+		{
+			"id": "ab8b387e-c395-4fc0-8b8a-33991887eb63",
+			"name": "Get the Earthbound tecpatl",
+			"tip": "Dropped from Earthen naguas in the Tonali Cavern, after progression in The Final Dawn quest.",
+			"wikiLink": "https://oldschool.runescape.wiki/w/Earthbound_tecpatl",
+			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Earthbound_tecpatl_detail.png/225px-Earthbound_tecpatl_detail.png",
+			"displayItemId": 30957,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 30957 ],
+				"count": 1
 			}
 		}
 	],
@@ -5343,7 +5455,7 @@
 					12653, 12655, 12816, 12921, 13177, 13178, 13179, 13181, 13225, 13247, 13262,
 					20851, 21273, 21291, 21748, 21992, 22473, 22746, 23495, 23757, 24491, 26348,
 					27352, 27590, 28246, 28248, 28250, 28252, 28801, 28960, 29836, 30152, 30154,
-					30622, 30888
+					30622, 30888, 31130
 				],
 				"count": 1
 			}
@@ -7263,6 +7375,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Last_Man_Standing",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/7/73/Yellow_dark_bow_paint_detail.png/120px-Yellow_dark_bow_paint_detail.png",
 			"displayItemId": 12757,
+			"tags": [ "lms" ],
 			"verification": {
 				"method": "collection-log",
 				"itemIds": [ 12757, 12759, 12761, 12763 ],
@@ -7276,6 +7389,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Last_Man_Standing",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/7/73/Yellow_dark_bow_paint_detail.png/120px-Yellow_dark_bow_paint_detail.png",
 			"displayItemId": 12757,
+			"tags": [ "lms" ],
 			"verification": {
 				"method": "collection-log",
 				"itemIds": [ 12757, 12759, 12761, 12763 ],
@@ -7289,6 +7403,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Last_Man_Standing",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/7/73/Yellow_dark_bow_paint_detail.png/120px-Yellow_dark_bow_paint_detail.png",
 			"displayItemId": 12757,
+			"tags": [ "lms" ],
 			"verification": {
 				"method": "collection-log",
 				"itemIds": [ 12757, 12759, 12761, 12763 ],
@@ -7302,6 +7417,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Last_Man_Standing",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/7/73/Yellow_dark_bow_paint_detail.png/120px-Yellow_dark_bow_paint_detail.png",
 			"displayItemId": 12757,
+			"tags": [ "lms" ],
 			"verification": {
 				"method": "collection-log",
 				"itemIds": [ 12757, 12759, 12761, 12763 ],
@@ -7971,6 +8087,32 @@
 				"itemIds": [ 30626, 30627, 30628, 30631, 30637, 30640 ],
 				"count": 6
 			}
+		},
+		{
+			"id": "62c25092-cdd4-421e-a528-d97e46712ad3",
+			"name": "Get 1 unique from Doom of Mokhaiotl",
+			"tip": "Giant, insect-like, demonic boss found in the Tonali Cavern after completion of The Final Dawn quest.",
+			"wikiLink": "https://oldschool.runescape.wiki/w/Doom_of_Mokhaiotl",
+			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Eye_of_ayak_detail.png/320px-Eye_of_ayak_detail.png",
+			"displayItemId": 31113,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 31111, 31099, 31109, 31113, 31088 ],
+				"count": 1
+			}
+		},
+		{
+			"id": "22762b53-7e09-4f0a-b20d-3fdb6fe8cc02",
+			"name": "Get 1 unique from Doom of Mokhaiotl",
+			"tip": "Giant, insect-like, demonic boss found in the Tonali Cavern after completion of The Final Dawn quest.",
+			"wikiLink": "https://oldschool.runescape.wiki/w/Doom_of_Mokhaiotl",
+			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Eye_of_ayak_detail.png/320px-Eye_of_ayak_detail.png",
+			"displayItemId": 31113,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 31111, 31099, 31109, 31113, 31088 ],
+				"count": 2
+			}
 		}
 	],
 	"elite": [
@@ -8514,7 +8656,7 @@
 					12653, 12655, 12816, 12921, 13177, 13178, 13179, 13181, 13225, 13247, 13262,
 					20851, 21273, 21291, 21748, 21992, 22473, 22746, 23495, 23757, 24491, 26348,
 					27352, 27590, 28246, 28248, 28250, 28252, 28801, 28960, 29836, 30152, 30154,
-					30622, 30888
+					30622, 30888, 31130
 				],
 				"count": 2
 			}
@@ -8552,7 +8694,7 @@
 					12653, 12655, 12816, 12921, 13177, 13178, 13179, 13181, 13225, 13247, 13262,
 					20851, 21273, 21291, 21748, 21992, 22473, 22746, 23495, 23757, 24491, 26348,
 					27352, 27590, 28246, 28248, 28250, 28252, 28801, 28960, 29836, 30152, 30154,
-					30622, 30888
+					30622, 30888, 30888
 				],
 				"count": 4
 			}
@@ -10513,6 +10655,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Last_Man_Standing",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/a/a2/Armadyl_hilt_detail.png/120px-Armadyl_hilt_detail.png",
 			"displayItemId": 11810,
+			"tags": [ "lms" ],
 			"verification": {
 				"method": "collection-log",
 				"itemIds": [ 24868, 24869, 24870, 24871 ],
@@ -10526,6 +10669,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Last_Man_Standing",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/a/a2/Armadyl_hilt_detail.png/120px-Armadyl_hilt_detail.png",
 			"displayItemId": 11810,
+			"tags": [ "lms" ],
 			"verification": {
 				"method": "collection-log",
 				"itemIds": [ 24868, 24869, 24870, 24871 ],
@@ -10539,6 +10683,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Last_Man_Standing",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/a/a2/Armadyl_hilt_detail.png/120px-Armadyl_hilt_detail.png",
 			"displayItemId": 11810,
+			"tags": [ "lms" ],
 			"verification": {
 				"method": "collection-log",
 				"itemIds": [ 24868, 24869, 24870, 24871 ],
@@ -10552,6 +10697,7 @@
 			"wikiLink": "https://oldschool.runescape.wiki/w/Last_Man_Standing",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/a/a2/Armadyl_hilt_detail.png/120px-Armadyl_hilt_detail.png",
 			"displayItemId": 11810,
+			"tags": [ "lms" ],
 			"verification": {
 				"method": "collection-log",
 				"itemIds": [ 24868, 24869, 24870, 24871 ],
@@ -11311,6 +11457,32 @@
 				],
 				"count": 7
 			}
+		},
+		{
+			"id": "03bcbb0b-fcc3-4a7a-9afe-8906d9da8cfe",
+			"name": "Get 1 unique from Doom of Mokhaiotl",
+			"tip": "Giant, insect-like, demonic boss found in the Tonali Cavern after completion of The Final Dawn quest.",
+			"wikiLink": "https://oldschool.runescape.wiki/w/Doom_of_Mokhaiotl",
+			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Eye_of_ayak_detail.png/320px-Eye_of_ayak_detail.png",
+			"displayItemId": 31113,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 31111, 31099, 31109, 31113, 31088 ],
+				"count": 3
+			}
+		},
+		{
+			"id": "c847f79a-3473-48a4-915d-b2874c4f4544",
+			"name": "Get 1 unique from Doom of Mokhaiotl",
+			"tip": "Giant, insect-like, demonic boss found in the Tonali Cavern after completion of The Final Dawn quest.",
+			"wikiLink": "https://oldschool.runescape.wiki/w/Doom_of_Mokhaiotl",
+			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Eye_of_ayak_detail.png/320px-Eye_of_ayak_detail.png",
+			"displayItemId": 31113,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 31111, 31099, 31109, 31113, 31088 ],
+				"count": 4
+			}
 		}
 	],
 	"master": [
@@ -11840,7 +12012,16 @@
 			"tip": "Can be purchased as a reward from the Last Man Standing PVP Minigame.",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Last_Man_Standing",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Victor%27s_cape_%28500%29_detail.png/208px-Victor%27s_cape_%28500%29_detail.png",
-			"displayItemId": 24213
+			"displayItemId": 24213,
+			"tags": [ "lms" ],
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					24219, 24201, 24192, 24195, 24204, 24198, 24189, 24190, 24191, 24217, 24207,
+					24209, 24211, 24213, 24215, 24520
+				],
+				"count": 2
+			}
 		},
 		{
 			"id": "347d5712-ebc3-4b74-8aba-ba909c39013e",
@@ -11848,7 +12029,16 @@
 			"tip": "Can be purchased as a reward from the Last Man Standing PVP Minigame.",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Last_Man_Standing",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Victor%27s_cape_%28500%29_detail.png/208px-Victor%27s_cape_%28500%29_detail.png",
-			"displayItemId": 24213
+			"displayItemId": 24213,
+			"tags": [ "lms" ],
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					24219, 24201, 24192, 24195, 24204, 24198, 24189, 24190, 24191, 24217, 24207,
+					24209, 24211, 24213, 24215, 24520
+				],
+				"count": 4
+			}
 		},
 		{
 			"id": "2eb6623e-a326-4b63-9cae-8fa0823c5d49",
@@ -11856,7 +12046,16 @@
 			"tip": "Can be purchased as a reward from the Last Man Standing PVP Minigame.",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Last_Man_Standing",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Victor%27s_cape_%28500%29_detail.png/208px-Victor%27s_cape_%28500%29_detail.png",
-			"displayItemId": 24213
+			"displayItemId": 24213,
+			"tags": [ "lms" ],
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					24219, 24201, 24192, 24195, 24204, 24198, 24189, 24190, 24191, 24217, 24207,
+					24209, 24211, 24213, 24215, 24520
+				],
+				"count": 6
+			}
 		},
 		{
 			"id": "50b61b0e-70d0-40a9-bf42-c1b8ac917717",
@@ -11864,7 +12063,16 @@
 			"tip": "Can be purchased as a reward from the Last Man Standing PVP Minigame.",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Last_Man_Standing",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Victor%27s_cape_%28500%29_detail.png/208px-Victor%27s_cape_%28500%29_detail.png",
-			"displayItemId": 24213
+			"displayItemId": 24213,
+			"tags": [ "lms" ],
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					24219, 24201, 24192, 24195, 24204, 24198, 24189, 24190, 24191, 24217, 24207,
+					24209, 24211, 24213, 24215, 24520
+				],
+				"count": 8
+			}
 		},
 		{
 			"id": "917b912c-2716-4b12-a020-a758ee467e72",
@@ -11872,7 +12080,16 @@
 			"tip": "Can be purchased as a reward from the Last Man Standing PVP Minigame.",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Last_Man_Standing",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Victor%27s_cape_%28500%29_detail.png/208px-Victor%27s_cape_%28500%29_detail.png",
-			"displayItemId": 24213
+			"displayItemId": 24213,
+			"tags": [ "lms" ],
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					24219, 24201, 24192, 24195, 24204, 24198, 24189, 24190, 24191, 24217, 24207,
+					24209, 24211, 24213, 24215, 24520
+				],
+				"count": 10
+			}
 		},
 		{
 			"id": "5cbcc790-10d1-4c17-8b39-cad7b48dadf8",
@@ -11880,7 +12097,16 @@
 			"tip": "Can be purchased as a reward from the Last Man Standing PVP Minigame.",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Last_Man_Standing",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Victor%27s_cape_%28500%29_detail.png/208px-Victor%27s_cape_%28500%29_detail.png",
-			"displayItemId": 24213
+			"displayItemId": 24213,
+			"tags": [ "lms" ],
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					24219, 24201, 24192, 24195, 24204, 24198, 24189, 24190, 24191, 24217, 24207,
+					24209, 24211, 24213, 24215, 24520
+				],
+				"count": 12
+			}
 		},
 		{
 			"id": "4a387bb0-dfc3-4374-aa35-9bacfc2fc92d",
@@ -11888,7 +12114,16 @@
 			"tip": "Can be purchased as a reward from the Last Man Standing PVP Minigame.",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Last_Man_Standing",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Victor%27s_cape_%28500%29_detail.png/208px-Victor%27s_cape_%28500%29_detail.png",
-			"displayItemId": 24213
+			"displayItemId": 24213,
+			"tags": [ "lms" ],
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					24219, 24201, 24192, 24195, 24204, 24198, 24189, 24190, 24191, 24217, 24207,
+					24209, 24211, 24213, 24215, 24520
+				],
+				"count": 14
+			}
 		},
 		{
 			"id": "57672680-b11b-44a8-80f6-cb93510612f6",
@@ -12097,7 +12332,7 @@
 					12816, 12650, 12652, 12655, 12649, 12648, 12921, 12651, 12653, 13181, 28801,
 					21273, 23495, 13225, 27352, 13177, 13179, 21992, 28960, 30622, 28250, 28252,
 					28246, 28248, 30888, 23760, 23757, 12007, 12885, 12936, 13245, 13277, 19701,
-					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760
+					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760, 31130
 				],
 				"count": 5
 			}
@@ -12117,7 +12352,7 @@
 					12816, 12650, 12652, 12655, 12649, 12648, 12921, 12651, 12653, 13181, 28801,
 					21273, 23495, 13225, 27352, 13177, 13179, 21992, 28960, 30622, 28250, 28252,
 					28246, 28248, 30888, 23760, 23757, 12007, 12885, 12936, 13245, 13277, 19701,
-					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760
+					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760, 31130
 				],
 				"count": 6
 			}
@@ -12137,7 +12372,7 @@
 					12816, 12650, 12652, 12655, 12649, 12648, 12921, 12651, 12653, 13181, 28801,
 					21273, 23495, 13225, 27352, 13177, 13179, 21992, 28960, 30622, 28250, 28252,
 					28246, 28248, 30888, 23760, 23757, 12007, 12885, 12936, 13245, 13277, 19701,
-					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760
+					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760, 31130
 				],
 				"count": 7
 			}
@@ -12157,7 +12392,7 @@
 					12816, 12650, 12652, 12655, 12649, 12648, 12921, 12651, 12653, 13181, 28801,
 					21273, 23495, 13225, 27352, 13177, 13179, 21992, 28960, 30622, 28250, 28252,
 					28246, 28248, 30888, 23760, 23757, 12007, 12885, 12936, 13245, 13277, 19701,
-					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760
+					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760, 31130
 				],
 				"count": 8
 			}
@@ -12177,7 +12412,7 @@
 					12816, 12650, 12652, 12655, 12649, 12648, 12921, 12651, 12653, 13181, 28801,
 					21273, 23495, 13225, 27352, 13177, 13179, 21992, 28960, 30622, 28250, 28252,
 					28246, 28248, 30888, 23760, 23757, 12007, 12885, 12936, 13245, 13277, 19701,
-					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760
+					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760, 31130
 				],
 				"count": 9
 			}
@@ -12197,7 +12432,7 @@
 					12816, 12650, 12652, 12655, 12649, 12648, 12921, 12651, 12653, 13181, 28801,
 					21273, 23495, 13225, 27352, 13177, 13179, 21992, 28960, 30622, 28250, 28252,
 					28246, 28248, 30888, 23760, 23757, 12007, 12885, 12936, 13245, 13277, 19701,
-					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760
+					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760, 31130
 				],
 				"count": 10
 			}
@@ -12217,7 +12452,7 @@
 					12816, 12650, 12652, 12655, 12649, 12648, 12921, 12651, 12653, 13181, 28801,
 					21273, 23495, 13225, 27352, 13177, 13179, 21992, 28960, 30622, 28250, 28252,
 					28246, 28248, 30888, 23760, 23757, 12007, 12885, 12936, 13245, 13277, 19701,
-					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760
+					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760, 31130
 				],
 				"count": 11
 			}
@@ -12237,7 +12472,7 @@
 					12816, 12650, 12652, 12655, 12649, 12648, 12921, 12651, 12653, 13181, 28801,
 					21273, 23495, 13225, 27352, 13177, 13179, 21992, 28960, 30622, 28250, 28252,
 					28246, 28248, 30888, 23760, 23757, 12007, 12885, 12936, 13245, 13277, 19701,
-					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760
+					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760, 31130
 				],
 				"count": 12
 			}
@@ -12257,7 +12492,7 @@
 					12816, 12650, 12652, 12655, 12649, 12648, 12921, 12651, 12653, 13181, 28801,
 					21273, 23495, 13225, 27352, 13177, 13179, 21992, 28960, 30622, 28250, 28252,
 					28246, 28248, 30888, 23760, 23757, 12007, 12885, 12936, 13245, 13277, 19701,
-					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760
+					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760, 31130
 				],
 				"count": 13
 			}
@@ -12277,7 +12512,7 @@
 					12816, 12650, 12652, 12655, 12649, 12648, 12921, 12651, 12653, 13181, 28801,
 					21273, 23495, 13225, 27352, 13177, 13179, 21992, 28960, 30622, 28250, 28252,
 					28246, 28248, 30888, 23760, 23757, 12007, 12885, 12936, 13245, 13277, 19701,
-					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760
+					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760, 31130
 				],
 				"count": 14
 			}
@@ -12297,7 +12532,7 @@
 					12816, 12650, 12652, 12655, 12649, 12648, 12921, 12651, 12653, 13181, 28801,
 					21273, 23495, 13225, 27352, 13177, 13179, 21992, 28960, 30622, 28250, 28252,
 					28246, 28248, 30888, 23760, 23757, 12007, 12885, 12936, 13245, 13277, 19701,
-					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760
+					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760, 31130
 				],
 				"count": 15
 			}
@@ -12317,7 +12552,7 @@
 					12816, 12650, 12652, 12655, 12649, 12648, 12921, 12651, 12653, 13181, 28801,
 					21273, 23495, 13225, 27352, 13177, 13179, 21992, 28960, 30622, 28250, 28252,
 					28246, 28248, 30888, 23760, 23757, 12007, 12885, 12936, 13245, 13277, 19701,
-					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760
+					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760, 31130
 				],
 				"count": 16
 			}
@@ -12337,7 +12572,7 @@
 					12816, 12650, 12652, 12655, 12649, 12648, 12921, 12651, 12653, 13181, 28801,
 					21273, 23495, 13225, 27352, 13177, 13179, 21992, 28960, 30622, 28250, 28252,
 					28246, 28248, 30888, 23760, 23757, 12007, 12885, 12936, 13245, 13277, 19701,
-					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760
+					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760, 31130
 				],
 				"count": 17
 			}
@@ -12357,7 +12592,7 @@
 					12816, 12650, 12652, 12655, 12649, 12648, 12921, 12651, 12653, 13181, 28801,
 					21273, 23495, 13225, 27352, 13177, 13179, 21992, 28960, 30622, 28250, 28252,
 					28246, 28248, 30888, 23760, 23757, 12007, 12885, 12936, 13245, 13277, 19701,
-					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760
+					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760, 31130
 				],
 				"count": 18
 			}
@@ -12377,7 +12612,7 @@
 					12816, 12650, 12652, 12655, 12649, 12648, 12921, 12651, 12653, 13181, 28801,
 					21273, 23495, 13225, 27352, 13177, 13179, 21992, 28960, 30622, 28250, 28252,
 					28246, 28248, 30888, 23760, 23757, 12007, 12885, 12936, 13245, 13277, 19701,
-					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760
+					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760, 31130
 				],
 				"count": 19
 			}
@@ -12397,7 +12632,7 @@
 					12816, 12650, 12652, 12655, 12649, 12648, 12921, 12651, 12653, 13181, 28801,
 					21273, 23495, 13225, 27352, 13177, 13179, 21992, 28960, 30622, 28250, 28252,
 					28246, 28248, 30888, 23760, 23757, 12007, 12885, 12936, 13245, 13277, 19701,
-					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760
+					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760, 31130
 				],
 				"count": 20
 			}
@@ -12417,7 +12652,7 @@
 					12816, 12650, 12652, 12655, 12649, 12648, 12921, 12651, 12653, 13181, 28801,
 					21273, 23495, 13225, 27352, 13177, 13179, 21992, 28960, 30622, 28250, 28252,
 					28246, 28248, 30888, 23760, 23757, 12007, 12885, 12936, 13245, 13277, 19701,
-					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760
+					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760, 31130
 				],
 				"count": 21
 			}
@@ -12437,7 +12672,7 @@
 					12816, 12650, 12652, 12655, 12649, 12648, 12921, 12651, 12653, 13181, 28801,
 					21273, 23495, 13225, 27352, 13177, 13179, 21992, 28960, 30622, 28250, 28252,
 					28246, 28248, 30888, 23760, 23757, 12007, 12885, 12936, 13245, 13277, 19701,
-					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760
+					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760, 31130
 				],
 				"count": 22
 			}
@@ -12457,7 +12692,7 @@
 					12816, 12650, 12652, 12655, 12649, 12648, 12921, 12651, 12653, 13181, 28801,
 					21273, 23495, 13225, 27352, 13177, 13179, 21992, 28960, 30622, 28250, 28252,
 					28246, 28248, 30888, 23760, 23757, 12007, 12885, 12936, 13245, 13277, 19701,
-					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760
+					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760, 31130
 				],
 				"count": 23
 			}
@@ -12477,7 +12712,7 @@
 					12816, 12650, 12652, 12655, 12649, 12648, 12921, 12651, 12653, 13181, 28801,
 					21273, 23495, 13225, 27352, 13177, 13179, 21992, 28960, 30622, 28250, 28252,
 					28246, 28248, 30888, 23760, 23757, 12007, 12885, 12936, 13245, 13277, 19701,
-					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760
+					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760, 31130
 				],
 				"count": 24
 			}
@@ -12497,7 +12732,7 @@
 					12816, 12650, 12652, 12655, 12649, 12648, 12921, 12651, 12653, 13181, 28801,
 					21273, 23495, 13225, 27352, 13177, 13179, 21992, 28960, 30622, 28250, 28252,
 					28246, 28248, 30888, 23760, 23757, 12007, 12885, 12936, 13245, 13277, 19701,
-					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760
+					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760, 31130
 				],
 				"count": 25
 			}
@@ -12517,7 +12752,7 @@
 					12816, 12650, 12652, 12655, 12649, 12648, 12921, 12651, 12653, 13181, 28801,
 					21273, 23495, 13225, 27352, 13177, 13179, 21992, 28960, 30622, 28250, 28252,
 					28246, 28248, 30888, 23760, 23757, 12007, 12885, 12936, 13245, 13277, 19701,
-					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760
+					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760, 31130
 				],
 				"count": 26
 			}
@@ -12537,7 +12772,7 @@
 					12816, 12650, 12652, 12655, 12649, 12648, 12921, 12651, 12653, 13181, 28801,
 					21273, 23495, 13225, 27352, 13177, 13179, 21992, 28960, 30622, 28250, 28252,
 					28246, 28248, 30888, 23760, 23757, 12007, 12885, 12936, 13245, 13277, 19701,
-					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760
+					21745, 22106, 23064, 23525, 24495, 25521, 25524, 29786, 23760, 31130
 				],
 				"count": 27
 			}
@@ -12680,7 +12915,12 @@
 			"tip": "Good Luck on Imbued Heart!",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Collection_log#Slayer",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Imbued_heart_detail.png/320px-Imbued_heart_detail.png",
-			"displayItemId": 20724
+			"displayItemId": 20724,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 20724, 21270, 23047, 23050, 23053, 23056, 23059, 22963 ],
+				"count": 1
+			}
 		},
 		{
 			"id": "4f45620b-6307-442b-b573-ab3f52748c83",
@@ -12688,7 +12928,12 @@
 			"tip": "Good Luck on Imbued Heart!",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Collection_log#Slayer",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Imbued_heart_detail.png/320px-Imbued_heart_detail.png",
-			"displayItemId": 20724
+			"displayItemId": 20724,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 20724, 21270, 23047, 23050, 23053, 23056, 23059, 22963 ],
+				"count": 2
+			}
 		},
 		{
 			"id": "ce335909-da99-4075-ab4f-2b3be4f2e37a",
@@ -12696,7 +12941,12 @@
 			"tip": "Good Luck on Imbued Heart!",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Collection_log#Slayer",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Imbued_heart_detail.png/320px-Imbued_heart_detail.png",
-			"displayItemId": 20724
+			"displayItemId": 20724,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 20724, 21270, 23047, 23050, 23053, 23056, 23059, 22963 ],
+				"count": 3
+			}
 		},
 		{
 			"id": "1dfb4f79-ed56-4ba3-88d3-bbe56b92e822",
@@ -12704,7 +12954,12 @@
 			"tip": "Good Luck on Imbued Heart!",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Collection_log#Slayer",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Imbued_heart_detail.png/320px-Imbued_heart_detail.png",
-			"displayItemId": 20724
+			"displayItemId": 20724,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 20724, 21270, 23047, 23050, 23053, 23056, 23059, 22963 ],
+				"count": 4
+			}
 		},
 		{
 			"id": "57fa8a7f-1065-4375-8ae7-1ecbae1187ad",
@@ -12712,7 +12967,12 @@
 			"tip": "Good Luck on Imbued Heart!",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Collection_log#Slayer",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Imbued_heart_detail.png/320px-Imbued_heart_detail.png",
-			"displayItemId": 20724
+			"displayItemId": 20724,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 20724, 21270, 23047, 23050, 23053, 23056, 23059, 22963 ],
+				"count": 5
+			}
 		},
 		{
 			"id": "f2ea24c2-547f-4d95-a05b-ead9b7c9a0e0",
@@ -12720,7 +12980,12 @@
 			"tip": "Good Luck on Imbued Heart!",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Collection_log#Slayer",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Imbued_heart_detail.png/320px-Imbued_heart_detail.png",
-			"displayItemId": 20724
+			"displayItemId": 20724,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 20724, 21270, 23047, 23050, 23053, 23056, 23059, 22963 ],
+				"count": 6
+			}
 		},
 		{
 			"id": "dca0e9f0-c7eb-4d32-a4d4-e1568e51da06",
@@ -12728,7 +12993,15 @@
 			"tip": "May the bird gods bless you with evil chicken pieces",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Collection_log#Miscellaneous",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Dragon_full_helm_detail.png/277px-Dragon_full_helm_detail.png",
-			"displayItemId": 11335
+			"displayItemId": 11335,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					21509, 19707, 11335, 22103, 22100, 20439, 20436, 20442, 20433, 24034, 24037,
+					24040, 24043, 24046
+				],
+				"count": 1
+			}
 		},
 		{
 			"id": "b8f55499-8c32-4b15-9a70-c80cefb297c1",
@@ -12736,7 +13009,15 @@
 			"tip": "May the bird gods bless you with evil chicken pieces",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Collection_log#Miscellaneous",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Dragon_full_helm_detail.png/277px-Dragon_full_helm_detail.png",
-			"displayItemId": 11335
+			"displayItemId": 11335,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					21509, 19707, 11335, 22103, 22100, 20439, 20436, 20442, 20433, 24034, 24037,
+					24040, 24043, 24046
+				],
+				"count": 2
+			}
 		},
 		{
 			"id": "a1b4d9cc-8e86-45fe-af4b-61d844a5b078",
@@ -12744,7 +13025,15 @@
 			"tip": "May the bird gods bless you with evil chicken pieces",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Collection_log#Miscellaneous",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Dragon_full_helm_detail.png/277px-Dragon_full_helm_detail.png",
-			"displayItemId": 11335
+			"displayItemId": 11335,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					21509, 19707, 11335, 22103, 22100, 20439, 20436, 20442, 20433, 24034, 24037,
+					24040, 24043, 24046
+				],
+				"count": 3
+			}
 		},
 		{
 			"id": "89d777ac-5d60-4720-ba28-e23594ee06c1",
@@ -12752,7 +13041,15 @@
 			"tip": "May the bird gods bless you with evil chicken pieces",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Collection_log#Miscellaneous",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Dragon_full_helm_detail.png/277px-Dragon_full_helm_detail.png",
-			"displayItemId": 11335
+			"displayItemId": 11335,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					21509, 19707, 11335, 22103, 22100, 20439, 20436, 20442, 20433, 24034, 24037,
+					24040, 24043, 24046
+				],
+				"count": 4
+			}
 		},
 		{
 			"id": "1a25f42e-1202-40f3-b001-d2de28f6b530",
@@ -12760,7 +13057,15 @@
 			"tip": "May the bird gods bless you with evil chicken pieces",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Collection_log#Miscellaneous",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Dragon_full_helm_detail.png/277px-Dragon_full_helm_detail.png",
-			"displayItemId": 11335
+			"displayItemId": 11335,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					21509, 19707, 11335, 22103, 22100, 20439, 20436, 20442, 20433, 24034, 24037,
+					24040, 24043, 24046
+				],
+				"count": 5
+			}
 		},
 		{
 			"id": "bd9208a5-8c14-4fc9-b13f-b5323d036391",
@@ -12794,15 +13099,25 @@
 			"tip": "Boss or Minigame?",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Zalcano",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Zalcano_shard_detail.png/221px-Zalcano_shard_detail.png",
-			"displayItemId": 23908
+			"displayItemId": 23908,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 23953, 23908 ],
+				"count": 1
+			}
 		},
 		{
 			"id": "08a9dd78-a0d5-4497-9277-4b66097dba4b",
-			"name": "Get 1 vorkath unique",
-			"tip": "Money Dragon",
+			"name": "Obtain a Dragonbone necklace",
+			"tip": "A rare drop from Vorkath",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Vorkath",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Dragonbone_necklace_detail.png/147px-Dragonbone_necklace_detail.png",
-			"displayItemId": 22111
+			"displayItemId": 22111,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 22111 ],
+				"count": 1
+			}
 		},
 		{
 			"id": "b759ce53-4312-4a54-8b5d-48a7ec52bd34",
@@ -12810,7 +13125,14 @@
 			"tip": "Ironman retirement home",
 			"wikiLink": "https://oldschool.runescape.wiki/w/The_Nightmare",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Inquisitor%27s_mace_detail.png/234px-Inquisitor%27s_mace_detail.png",
-			"displayItemId": 24417
+			"displayItemId": 24417,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					24422, 24517, 24511, 24514, 24419, 24420, 24421, 24417, 25837, 25838
+				],
+				"count": 1
+			}
 		},
 		{
 			"id": "37a77af7-505f-440b-bb3f-5fe03bd1c1a9",
@@ -12818,7 +13140,14 @@
 			"tip": "Ironman retirement home",
 			"wikiLink": "https://oldschool.runescape.wiki/w/The_Nightmare",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Inquisitor%27s_mace_detail.png/234px-Inquisitor%27s_mace_detail.png",
-			"displayItemId": 24417
+			"displayItemId": 24417,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					24422, 24517, 24511, 24514, 24419, 24420, 24421, 24417, 25837, 25838
+				],
+				"count": 2
+			}
 		},
 		{
 			"id": "d7f94c27-684f-4f4b-8069-fa8263999a44",
@@ -12826,7 +13155,14 @@
 			"tip": "Ironman retirement home",
 			"wikiLink": "https://oldschool.runescape.wiki/w/The_Nightmare",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Inquisitor%27s_mace_detail.png/234px-Inquisitor%27s_mace_detail.png",
-			"displayItemId": 24417
+			"displayItemId": 24417,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					24422, 24517, 24511, 24514, 24419, 24420, 24421, 24417, 25837, 25838
+				],
+				"count": 3
+			}
 		},
 		{
 			"id": "8fa63977-c114-4733-ac89-5b4299e086a2",
@@ -12834,7 +13170,14 @@
 			"tip": "Ironman retirement home",
 			"wikiLink": "https://oldschool.runescape.wiki/w/The_Nightmare",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Inquisitor%27s_mace_detail.png/234px-Inquisitor%27s_mace_detail.png",
-			"displayItemId": 24417
+			"displayItemId": 24417,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					24422, 24517, 24511, 24514, 24419, 24420, 24421, 24417, 25837, 25838
+				],
+				"count": 4
+			}
 		},
 		{
 			"id": "384deb72-3c32-4646-ac51-30c661ebcab2",
@@ -12842,7 +13185,14 @@
 			"tip": "Ironman retirement home",
 			"wikiLink": "https://oldschool.runescape.wiki/w/The_Nightmare",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Inquisitor%27s_mace_detail.png/234px-Inquisitor%27s_mace_detail.png",
-			"displayItemId": 24417
+			"displayItemId": 24417,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [
+					24422, 24517, 24511, 24514, 24419, 24420, 24421, 24417, 25837, 25838
+				],
+				"count": 5
+			}
 		},
 		{
 			"id": "ae31a0d7-1dfa-496a-bcd1-aa0703172b65",
@@ -14114,7 +14464,12 @@
 			"tip": "Reward from hunters loot sacks",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Quetzin",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Quetzin_%28follower%29.png/320px-Quetzin_%28follower%29.png",
-			"displayItemId": 28962
+			"displayItemId": 28962,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 28962 ],
+				"count": 1
+			}
 		},
 		{
 			"id": "a0940720-7203-4c7e-885b-8eade0702edf",
@@ -14167,6 +14522,19 @@
 					30775, 30750, 30753, 30756, 30759, 30806, 30763, 30805, 30795, 30765
 				],
 				"count": 10
+			}
+		},
+		{
+			"id": "5434205b-b02b-4a54-a1ad-84ad865be450",
+			"name": "Get 1 unique from Doom of Mokhaiotl",
+			"tip": "Giant, insect-like, demonic boss found in the Tonali Cavern after completion of The Final Dawn quest.",
+			"wikiLink": "https://oldschool.runescape.wiki/w/Doom_of_Mokhaiotl",
+			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Eye_of_ayak_detail.png/320px-Eye_of_ayak_detail.png",
+			"displayItemId": 31113,
+			"verification": {
+				"method": "collection-log",
+				"itemIds": [ 31111, 31099, 31109, 31113, 31088 ],
+				"count": 5
 			}
 		}
 	]
