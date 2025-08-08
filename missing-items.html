@@ -91,7 +91,12 @@
         try {
           const res = await fetch(listFiles[listType]);
           if (!res.ok) throw new Error("Failed to load list: " + listType);
-          myData = await res.json();
+          const data = await res.json();
+          // Remove the 'missing-items' tier if present
+          if (data && typeof data === "object" && data["missing-items"]) {
+            delete data["missing-items"];
+          }
+          myData = data;
           document.getElementById("runBtn").disabled = false;
         } catch (err) {
           alert("Could not load list: " + err.message);
