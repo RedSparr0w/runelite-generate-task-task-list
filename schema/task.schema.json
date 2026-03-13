@@ -22,6 +22,11 @@
 		"diary-difficulty": {
 			"type": "string",
 			"enum": ["easy", "medium", "hard", "elite"]
+		},
+		"skill-experience": {
+			"type": "integer",
+			"minimum": 0,
+			"maximum": 200000000
 		}
 	},
 	"type": "object",
@@ -91,6 +96,51 @@
 						},
 						"difficulty": {
 							"$ref": "#/definitions/diary-difficulty"
+						}
+					}
+				},
+				{
+					"type": "object",
+					"required": ["method", "experience", "count"],
+					"additionalProperties": false,
+					"properties": {
+						"method": {
+							"type": "string",
+							"const": "skill"
+						},
+						"experience": {
+							"type": "object",
+							"additionalProperties": false,
+							"properties": {
+								"attack": { "$ref": "#/definitions/skill-experience" },
+								"strength": { "$ref": "#/definitions/skill-experience" },
+								"defence": { "$ref": "#/definitions/skill-experience" },
+								"ranged": { "$ref": "#/definitions/skill-experience" },
+								"prayer": { "$ref": "#/definitions/skill-experience" },
+								"magic": { "$ref": "#/definitions/skill-experience" },
+								"runecraft": { "$ref": "#/definitions/skill-experience" },
+								"hitpoints": { "$ref": "#/definitions/skill-experience" },
+								"crafting": { "$ref": "#/definitions/skill-experience" },
+								"mining": { "$ref": "#/definitions/skill-experience" },
+								"smithing": { "$ref": "#/definitions/skill-experience" },
+								"fishing": { "$ref": "#/definitions/skill-experience" },
+								"cooking": { "$ref": "#/definitions/skill-experience" },
+								"firemaking": { "$ref": "#/definitions/skill-experience" },
+								"woodcutting": { "$ref": "#/definitions/skill-experience" },
+								"agility": { "$ref": "#/definitions/skill-experience" },
+								"herblore": { "$ref": "#/definitions/skill-experience" },
+								"thieving": { "$ref": "#/definitions/skill-experience" },
+								"fletching": { "$ref": "#/definitions/skill-experience" },
+								"slayer": { "$ref": "#/definitions/skill-experience" },
+								"farming": { "$ref": "#/definitions/skill-experience" },
+								"construction": { "$ref": "#/definitions/skill-experience" },
+								"hunter": { "$ref": "#/definitions/skill-experience" },
+								"sailing": { "$ref": "#/definitions/skill-experience" }
+							}
+						},
+						"count": {
+							"type": "integer",
+							"minimum": 1
 						}
 					}
 				}
