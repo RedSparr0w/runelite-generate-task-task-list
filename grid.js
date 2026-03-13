@@ -370,7 +370,7 @@ loadAll().then(data => {
     let isDragging = false;
     let lastX, lastY;
     container.addEventListener('mousedown', e => {
-        if (e.button === 1) { // middle button
+        if (e.button === 0 || e.button === 1) { // middle button or left click
             isDragging = true;
             lastX = e.clientX;
             lastY = e.clientY;
@@ -389,7 +389,7 @@ loadAll().then(data => {
         }
     });
     window.addEventListener('mouseup', e => {
-        if (e.button === 1 && isDragging) {
+        if ((e.button === 0 || e.button === 1) && isDragging) {
             isDragging = false;
             e.preventDefault();
         }
