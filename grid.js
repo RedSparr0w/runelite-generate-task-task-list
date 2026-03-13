@@ -54,33 +54,33 @@ const CELL_STEP = CELL_SIZE + CELL_GAP;
 const CELL_RADIUS = 14;
 const TIER_COLORS_BY_THEME = {
     osrs: {
-        easy: '#6c5a43',
-        medium: '#5e5040',
-        hard: '#826646',
-        elite: '#77524a',
-        master: '#5f4b45',
-        'master-tedious': '#585753',
-        extra: '#74573f',
-        pets: '#6a5b50'
+        easy: '#4CAF50',
+        medium: '#2196F3',
+        hard: '#FACC15',
+        elite: '#EF4444',
+        master: '#A855F7',
+        'master-tedious': '#7C3AED',
+        extra: '#F97316',
+        pets: '#EC4899'
     },
     dark: {
-        easy: '#5f646d',
-        medium: '#5a606a',
-        hard: '#726457',
-        elite: '#6d5b59',
-        master: '#5f5a66',
-        'master-tedious': '#58606b',
-        extra: '#6a5f52',
-        pets: '#675f67'
+        easy: '#5FD46A',
+        medium: '#4AA8FF',
+        hard: '#F6D64A',
+        elite: '#FF6B6B',
+        master: '#C084FC',
+        'master-tedious': '#9F7AEA',
+        extra: '#FB923C',
+        pets: '#F472B6'
     }
 };
 
 const CELL_PALETTES_BY_THEME = {
     osrs: {
-        locked: { fill: '#3e362f', border: 'rgba(132, 118, 100, 0.62)', text: '#f1e8d4' },
-        incomplete: { fill: '#5f5247', border: 'rgba(148, 134, 109, 0.62)', text: '#f1e8d4' },
-        complete: { fill: '#4f453d', border: 'rgba(132, 118, 100, 0.62)', text: '#f1e8d4' },
-        hidden: { fill: '#2E2C29', border: 'rgba(96, 88, 77, 0.56)', text: '#b79d7e' },
+        locked: { fill: '#2f2822', border: 'rgba(170, 149, 119, 0.82)', borderWidth: 2, text: '#f1e8d4' },
+        incomplete: { fill: '#847161', border: 'rgba(88, 72, 53, 0.96)', borderWidth: 2, text: '#f1e8d4' },
+        complete: { fill: '#4f453d', border: 'rgba(132, 118, 100, 0.62)', borderWidth: 2, text: '#f1e8d4' },
+        hidden: { fill: '#2E2C29', border: 'rgba(96, 88, 77, 0.56)', borderWidth: 2, text: '#b79d7e' },
         badgeFill: 'rgba(15, 15, 15, 0.84)',
         badgeBorder: 'rgba(96, 88, 77, 0.8)',
         badgeText: '#f1e8d4',
@@ -88,10 +88,10 @@ const CELL_PALETTES_BY_THEME = {
         placeholderFill: 'rgba(24, 20, 12, 0.4)'
     },
     dark: {
-        locked: { fill: '#2b3038', border: 'rgba(96, 103, 116, 0.68)', text: '#e6ebf3' },
-        incomplete: { fill: '#3a3f48', border: 'rgba(118, 126, 142, 0.66)', text: '#e6ebf3' },
-        complete: { fill: '#343a43', border: 'rgba(110, 118, 132, 0.66)', text: '#e6ebf3' },
-        hidden: { fill: '#1f2329', border: 'rgba(80, 88, 100, 0.58)', text: '#b5becb' },
+        locked: { fill: '#21262e', border: 'rgba(132, 142, 160, 0.84)', borderWidth: 2, text: '#e6ebf3' },
+        incomplete: { fill: '#596171', border: 'rgba(68, 76, 92, 0.96)', borderWidth: 2, text: '#e6ebf3' },
+        complete: { fill: '#343a43', border: 'rgba(110, 118, 132, 0.66)', borderWidth: 2, text: '#e6ebf3' },
+        hidden: { fill: '#1f2329', border: 'rgba(80, 88, 100, 0.58)', borderWidth: 2, text: '#b5becb' },
         badgeFill: 'rgba(10, 12, 16, 0.88)',
         badgeBorder: 'rgba(96, 103, 116, 0.8)',
         badgeText: '#e6ebf3',
@@ -675,12 +675,24 @@ function drawCellBackgroundSprite(spriteContext, state, options = {}) {
 
     const themePalette = getActiveCellPalette();
     const palette = themePalette[state] || themePalette.hidden;
+    const borderWidth = palette.borderWidth || 1;
 
     drawRoundedRect(spriteContext, x, y, CELL_SIZE, CELL_SIZE, CELL_RADIUS);
     spriteContext.fillStyle = palette.fill;
     spriteContext.fill();
+
+    const borderInset = borderWidth / 2;
+    const borderRadius = Math.max(0, CELL_RADIUS - borderInset);
+    drawRoundedRect(
+        spriteContext,
+        x + borderInset,
+        y + borderInset,
+        CELL_SIZE - borderWidth,
+        CELL_SIZE - borderWidth,
+        borderRadius
+    );
     spriteContext.strokeStyle = palette.border;
-    spriteContext.lineWidth = 1;
+    spriteContext.lineWidth = borderWidth;
     spriteContext.stroke();
 
     if (state === 'locked' && !skipBadge) {

@@ -29,19 +29,21 @@
     --action-bg: #3e362f;
     --action-bg-hover: #4a4138;
     --action-border: rgba(115, 101, 89, 0.56);
+    --state-incomplete-bg: #847161;
+    --state-incomplete-border: rgba(88, 72, 53, 0.96);
 
     --radius-large: 8px;
     --radius-medium: 6px;
     --radius-small: 4px;
 
-    --tier-easy: #6c5a43;
-    --tier-medium: #5e5040;
-    --tier-hard: #826646;
-    --tier-elite: #77524a;
-    --tier-master: #5f4b45;
-    --tier-master-tedious: #585753;
-    --tier-extra: #74573f;
-    --tier-pets: #6a5b50;
+    --tier-easy: #4CAF50;
+    --tier-medium: #2196F3;
+    --tier-hard: #FACC15;
+    --tier-elite: #EF4444;
+    --tier-master: #A855F7;
+    --tier-master-tedious: #7C3AED;
+    --tier-extra: #F97316;
+    --tier-pets: #EC4899;
 }
 
 body[data-theme="dark"] {
@@ -61,15 +63,17 @@ body[data-theme="dark"] {
     --action-bg: #2f353f;
     --action-bg-hover: #3a414d;
     --action-border: rgba(96, 103, 116, 0.58);
+    --state-incomplete-bg: #596171;
+    --state-incomplete-border: rgba(68, 76, 92, 0.96);
 
-    --tier-easy: #5f646d;
-    --tier-medium: #5a606a;
-    --tier-hard: #726457;
-    --tier-elite: #6d5b59;
-    --tier-master: #5f5a66;
-    --tier-master-tedious: #58606b;
-    --tier-extra: #6a5f52;
-    --tier-pets: #675f67;
+    --tier-easy: #5FD46A;
+    --tier-medium: #4AA8FF;
+    --tier-hard: #F6D64A;
+    --tier-elite: #FF6B6B;
+    --tier-master: #C084FC;
+    --tier-master-tedious: #9F7AEA;
+    --tier-extra: #FB923C;
+    --tier-pets: #F472B6;
 }
 
 html, body {
@@ -1017,7 +1021,8 @@ body::-webkit-scrollbar {
 
 .state-locked {
     opacity: 1 !important;
-    background: var(--theme-surface);
+    background: var(--theme-panel);
+    border-width: 2px;
     border-color: var(--theme-border-strong);
     box-shadow:
         0 14px 30px var(--theme-shadow),
@@ -1043,8 +1048,9 @@ body::-webkit-scrollbar {
 }
 .state-incomplete {
     opacity: 1 !important;
-    background: var(--theme-surface);
-    border-color: var(--theme-border);
+    background: var(--state-incomplete-bg);
+    border-width: 2px;
+    border-color: var(--state-incomplete-border);
     box-shadow:
         0 0 0 1px rgba(255,255,255,0.03),
         0 16px 32px var(--theme-shadow),
@@ -1056,6 +1062,7 @@ body::-webkit-scrollbar {
 .state-complete {
     opacity: 1 !important;
     background: var(--theme-surface-hover);
+    border-width: 2px;
     border-color: var(--theme-border);
     box-shadow:
         0 12px 28px var(--theme-shadow),
