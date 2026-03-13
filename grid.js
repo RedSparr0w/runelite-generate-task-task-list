@@ -19,7 +19,7 @@ const STORAGE_KEY = 'taskGridOrder';
 const MIN_SCALE = 0.5;
 const MAX_SCALE = 2.5;
 const ZOOM_FACTOR = 1.1;
-const POP_STAGGER_MS = 30;
+const POP_STAGGER_MS = 50;
 const POP_DURATION_MS = 500;
 const EDGE_POP_OFFSET_MS = 120;
 const INITIAL_REVEAL_DURATION_MS = 3000;
@@ -2689,9 +2689,9 @@ function render(tasks) {
             const distanceB = Math.abs(b.x - center.x) + Math.abs(b.y - center.y);
             return distanceA - distanceB;
         });
-    const revealStagger = sortedVisibleCells.length > 1
+    const revealStagger = sortedVisibleCells.length * POP_STAGGER_MS > INITIAL_REVEAL_DURATION_MS
         ? INITIAL_REVEAL_DURATION_MS / (sortedVisibleCells.length - 1)
-        : 0;
+        : POP_STAGGER_MS;
     const revealDelayByCoord = new Map();
 
     sortedVisibleCells.forEach((item, index) => {
