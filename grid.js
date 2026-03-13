@@ -522,6 +522,33 @@ function hideTierTasksModal() {
     modal.classList.remove('open');
 }
 
+function centerTaskInView(taskId, options = {}) {
+    const { smooth = true } = options;
+    const container = document.getElementById('grid-container');
+    const cell = getCellById(taskId);
+    if (!container || !cell) {
+        return false;
+    }
+
+    const containerRect = container.getBoundingClientRect();
+    const cellRect = cell.getBoundingClientRect();
+    const deltaX = (cellRect.left + (cellRect.width / 2)) - (containerRect.left + (containerRect.width / 2));
+    const deltaY = (cellRect.top + (cellRect.height / 2)) - (containerRect.top + (containerRect.height / 2));
+
+    const maxLeft = Math.max(0, container.scrollWidth - container.clientWidth);
+    const maxTop = Math.max(0, container.scrollHeight - container.clientHeight);
+    const nextLeft = clamp(container.scrollLeft + deltaX, 0, maxLeft);
+    const nextTop = clamp(container.scrollTop + deltaY, 0, maxTop);
+
+    container.scrollTo({
+        left: nextLeft,
+        top: nextTop,
+        behavior: smooth ? 'smooth' : 'auto'
+    });
+
+    return true;
+}
+
 function updateCurrentTasksPopover() {
     const button = document.getElementById('current-tasks-button');
     const listEl = document.getElementById('current-tasks-list');
@@ -555,9 +582,16 @@ function updateCurrentTasksPopover() {
     }
 
     incompleteTasks.forEach(task => {
-        const item = document.createElement('div');
+        const item = document.createElement('button');
+        item.type = 'button';
         item.className = 'current-task-item';
         item.textContent = `[${formatTierName(task.tier)}] ${task.name}`;
+        item.addEventListener('click', () => {
+            const centered = centerTaskInView(task.id, { smooth: true });
+            if (centered) {
+                closeCurrentTasksPopover();
+            }
+        });
         listEl.appendChild(item);
     });
 }
