@@ -23,6 +23,8 @@ const POP_STAGGER_MS = 50;
 const POP_DURATION_MS = 400;
 const EDGE_POP_OFFSET_MS = 120;
 const UNLOCK_TOAST_DURATION_MS = 4500;
+const SYNC_BATCH_SIZE = 3;
+const SYNC_BATCH_DELAY_MS = 45;
 const SYNC_STATUS_DURATION_MS = 2200;
 const CL_CACHE_KEY = 'collectionLogCache';
 const CL_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
@@ -117,6 +119,12 @@ function setImageWithFallback(image, src, alt = '') {
     image.dataset.fallbackApplied = '0';
     image.alt = alt;
     image.src = src || QUESTION_MARK_ICON;
+}
+
+function wait(ms) {
+    return new Promise(resolve => {
+        setTimeout(resolve, ms);
+    });
 }
 
 function normalizeUsername(value) {
@@ -379,44 +387,65 @@ function refreshOpenModal() {
     }
 }
 
-function syncCompletedTasksFromObtained(options = {}) {
+function revealFrontierFromCompletedTasks() {
+    tasksGlobal.forEach(task => {
+        if (getState(task.id) === 'complete') {
+            revealTaskNeighbors(task.id);
+        }
+    });
+}
+
+async function syncCompletedTasksFromObtained(options = {}) {
     const {
         animate = true,
         showToast = true,
-        refreshModal = true
+        refreshModal = true,
+        batchSize = SYNC_BATCH_SIZE,
+        batchDelay = SYNC_BATCH_DELAY_MS
     } = options;
 
     const previousLimit = getUnlockLimit();
     let completedCount = 0;
 
-    let changed = true;
-    while (changed) {
-        changed = false;
-
-        tasksGlobal.forEach(task => {
-            const state = getState(task.id);
-            if (state === 'complete' || state === 'hidden') {
-                return;
-            }
-
+    const statePriority = {
+        incomplete: 0,
+        locked: 1,
+        hidden: 2
+    };
+    const tasksToComplete = tasksGlobal
+        .filter(task => getState(task.id) !== 'complete')
+        .filter(task => {
             const requiredCount = getTaskRequiredCount(task);
-            if (requiredCount === 0) {
-                return;
-            }
-
-            if (getTaskObtainedCount(task) >= requiredCount) {
-                applyTaskCompletion(task);
-                completedCount += 1;
-                changed = true;
-            }
+            return requiredCount > 0 && getTaskObtainedCount(task) >= requiredCount;
+        })
+        .sort((taskA, taskB) => {
+            const stateA = statePriority[getState(taskA.id)] ?? 99;
+            const stateB = statePriority[getState(taskB.id)] ?? 99;
+            return stateA - stateB;
         });
+
+    for (let index = 0; index < tasksToComplete.length; index += batchSize) {
+        const batch = tasksToComplete.slice(index, index + batchSize);
+        batch.forEach(task => {
+            applyTaskCompletion(task);
+        });
+
+        completedCount += batch.length;
+        normalizeUnlockStates();
+        updateUnlockHud();
+        refreshHiddenEdges({ animate: false });
+
+        if (index + batchSize < tasksToComplete.length) {
+            await wait(batchDelay);
+        }
     }
 
+    revealFrontierFromCompletedTasks();
     normalizeUnlockStates();
     updateUnlockHud();
 
     if (completedCount > 0) {
-        refreshHiddenEdges({ animate });
+        refreshHiddenEdges({ animate: false });
     }
 
     const nextLimit = getUnlockLimit();
@@ -1141,7 +1170,7 @@ function startApp() {
     tasksGlobal = all;
     updateTaskCoordinates(all);
     normalizeUnlockStates();
-    syncCompletedTasksFromObtained({ animate: false, showToast: false, refreshModal: false });
+    updateUnlockHud();
 
     const loadingIcons = Array.from(document.querySelectorAll('#loading .loading-icon'));
     loadingIcons.forEach(icon => {
