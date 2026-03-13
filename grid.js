@@ -18,6 +18,9 @@ const STORAGE_KEY = 'taskGridOrder';
 const MIN_SCALE = 0.5;
 const MAX_SCALE = 2.5;
 const ZOOM_FACTOR = 1.1;
+const POP_STAGGER_MS = 50;
+const POP_DURATION_MS = 400;
+const EDGE_POP_OFFSET_MS = 120;
 
 let suppressTaskClick = false;
 let tasksGlobal = [];
@@ -352,16 +355,39 @@ function revealNeighborAsLocked(id) {
     }
 
     setCellState(cell, 'locked');
-    cell.classList.add('reveal');
-    setTimeout(() => {
-        cell.classList.remove('reveal');
-        cell.classList.add('visible');
-    }, 400);
+    playPopReveal(cell, { addVisible: true });
 }
 
-function refreshHiddenEdges() {
+function playPopReveal(cell, options = {}) {
+    const { addVisible = false, delay = 0 } = options;
+    if (!cell) {
+        return;
+    }
+
+    const run = () => {
+        cell.classList.remove('reveal');
+        void cell.offsetWidth;
+        cell.classList.add('reveal');
+        setTimeout(() => {
+            cell.classList.remove('reveal');
+            if (addVisible) {
+                cell.classList.add('visible');
+            }
+        }, POP_DURATION_MS);
+    };
+
+    if (delay > 0) {
+        setTimeout(run, delay);
+    } else {
+        run();
+    }
+}
+
+function refreshHiddenEdges(options = {}) {
+    const { animate = false, center = null, revealDelayByCoord = null, edgeDelayOffset = EDGE_POP_OFFSET_MS } = options;
     const stateByCoord = new Map();
     const isFrontierState = state => state === 'incomplete' || state === 'locked';
+    const newlyVisibleEdges = [];
 
     idToCoords.forEach((coord, id) => {
         stateByCoord.set(`${coord.x},${coord.y}`, getState(id));
@@ -373,6 +399,7 @@ function refreshHiddenEdges() {
             return;
         }
 
+        const hadVisibleEdge = cell.classList.contains('state-hidden-edge');
         cell.classList.remove('state-hidden-edge', 'hidden-edge-top', 'hidden-edge-right', 'hidden-edge-bottom', 'hidden-edge-left');
 
         if (getState(id) !== 'hidden') {
@@ -380,27 +407,85 @@ function refreshHiddenEdges() {
         }
 
         let hasVisibleEdge = false;
+        let minAdjacentDelay = Number.POSITIVE_INFINITY;
+
+        const noteAdjacentDelay = (x, y) => {
+            if (!revealDelayByCoord) {
+                return;
+            }
+            const delay = revealDelayByCoord.get(`${x},${y}`);
+            if (typeof delay === 'number') {
+                minAdjacentDelay = Math.min(minAdjacentDelay, delay);
+            }
+        };
 
         if (isFrontierState(stateByCoord.get(`${coord.x},${coord.y - 1}`))) {
             cell.classList.add('hidden-edge-top');
             hasVisibleEdge = true;
+            noteAdjacentDelay(coord.x, coord.y - 1);
         }
         if (isFrontierState(stateByCoord.get(`${coord.x + 1},${coord.y}`))) {
             cell.classList.add('hidden-edge-right');
             hasVisibleEdge = true;
+            noteAdjacentDelay(coord.x + 1, coord.y);
         }
         if (isFrontierState(stateByCoord.get(`${coord.x},${coord.y + 1}`))) {
             cell.classList.add('hidden-edge-bottom');
             hasVisibleEdge = true;
+            noteAdjacentDelay(coord.x, coord.y + 1);
         }
         if (isFrontierState(stateByCoord.get(`${coord.x - 1},${coord.y}`))) {
             cell.classList.add('hidden-edge-left');
             hasVisibleEdge = true;
+            noteAdjacentDelay(coord.x - 1, coord.y);
         }
 
         if (hasVisibleEdge) {
-            cell.classList.add('state-hidden-edge');
+            if (animate && !hadVisibleEdge) {
+                const hasTimedNeighbor = Number.isFinite(minAdjacentDelay);
+                newlyVisibleEdges.push({
+                    cell,
+                    coord,
+                    startDelay: hasTimedNeighbor ? minAdjacentDelay + edgeDelayOffset : edgeDelayOffset
+                });
+            } else {
+                cell.classList.add('state-hidden-edge');
+            }
         }
+    });
+
+    if (!animate || newlyVisibleEdges.length === 0) {
+        return;
+    }
+
+    const orderedEdges = center
+        ? newlyVisibleEdges
+            .slice()
+            .sort((a, b) => {
+                const distanceA = Math.abs(a.coord.x - center.x) + Math.abs(a.coord.y - center.y);
+                const distanceB = Math.abs(b.coord.x - center.x) + Math.abs(b.coord.y - center.y);
+                return distanceA - distanceB;
+            })
+        : newlyVisibleEdges;
+
+    orderedEdges.forEach((item, index) => {
+        const startDelay = Math.max(item.startDelay ?? edgeDelayOffset, index * POP_STAGGER_MS);
+        setTimeout(() => {
+            const cellId = item.cell.dataset.id;
+            if (getState(cellId) !== 'hidden') {
+                return;
+            }
+            const stillHasEdgeSide =
+                item.cell.classList.contains('hidden-edge-top') ||
+                item.cell.classList.contains('hidden-edge-right') ||
+                item.cell.classList.contains('hidden-edge-bottom') ||
+                item.cell.classList.contains('hidden-edge-left');
+            if (!stillHasEdgeSide) {
+                return;
+            }
+            item.cell.classList.add('state-hidden-edge');
+            playPopReveal(item.cell);
+        }, startDelay);
     });
 }
 
@@ -455,7 +540,7 @@ function showModal(task, anchor) {
             }
 
             updateUnlockHud();
-            refreshHiddenEdges();
+            refreshHiddenEdges({ animate: true });
             hideModal();
         };
     } else if (state === 'locked') {
@@ -476,7 +561,7 @@ function showModal(task, anchor) {
                 setCellState(cell, 'incomplete');
             }
             updateUnlockHud();
-            refreshHiddenEdges();
+            refreshHiddenEdges({ animate: true });
             hideModal();
         } : null;
     } else {
@@ -526,22 +611,21 @@ function render(tasks) {
     });
 
     const visibleCells = cells.filter(item => getState(item.cell.dataset.id) !== 'hidden');
-    visibleCells
+    const sortedVisibleCells = visibleCells
         .sort((a, b) => {
             const distanceA = Math.abs(a.x - center.x) + Math.abs(a.y - center.y);
             const distanceB = Math.abs(b.x - center.x) + Math.abs(b.y - center.y);
             return distanceA - distanceB;
-        })
-        .forEach((item, index) => {
-            setTimeout(() => {
-                item.cell.classList.add('reveal');
-                setTimeout(() => {
-                    item.cell.classList.add('visible');
-                }, 300);
-            }, index * 50);
         });
+    const revealDelayByCoord = new Map();
 
-    refreshHiddenEdges();
+    sortedVisibleCells.forEach((item, index) => {
+        const revealDelay = index * POP_STAGGER_MS;
+        revealDelayByCoord.set(`${item.x},${item.y}`, revealDelay);
+        playPopReveal(item.cell, { addVisible: true, delay: revealDelay });
+    });
+
+    refreshHiddenEdges({ animate: true, center, revealDelayByCoord });
     updateGridScale();
     updateUnlockHud();
 

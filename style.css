@@ -397,7 +397,7 @@ body::-webkit-scrollbar {
 
 /* state styling */
 .state-hidden {
-    opacity: 0 !important;
+    opacity: 0;
     pointer-events: none !important;
 }
 
@@ -405,13 +405,13 @@ body::-webkit-scrollbar {
 .state-hidden::after,
 .state-hidden img,
 .state-hidden .task-name {
-    opacity: 0 !important;
+    opacity: 0;
 }
 
 .state-hidden.state-hidden-edge {
-    opacity: 1 !important;
-    transform: scale(1) !important;
-    background: transparent !important;
+    opacity: 1;
+    transform: scale(1);
+    background: transparent;
     border: 1px solid transparent;
     box-shadow: none;
     cursor: default;
@@ -420,12 +420,12 @@ body::-webkit-scrollbar {
 
 .state-hidden.state-hidden-edge::before,
 .state-hidden.state-hidden-edge::after {
-    display: none !important;
+    display: none;
 }
 
 .state-hidden.state-hidden-edge img,
 .state-hidden.state-hidden-edge .task-name {
-    display: none !important;
+    display: none;
 }
 
 .state-hidden.state-hidden-edge.hidden-edge-top {
