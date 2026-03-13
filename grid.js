@@ -2831,10 +2831,10 @@ window.addEventListener('DOMContentLoaded', () => {
 const tierWeights = {
     easy: 100000,
     medium: 10000,
-    hard: 100,
-    elite: 10,
-    master: 1,
-    pets: 1
+    hard: 1000,
+    elite: 100,
+    master: 10,
+    pets: 10
 };
 
 async function preloadTaskImages(tasks) {
