@@ -76,8 +76,12 @@ function createCell(task) {
     el.classList.add(`state-${state}`);
 
     const img = document.createElement('img');
-    img.src = task.imageLink;
     img.alt = task.name;
+    if (getState(task.id) !== 'hidden') {
+        img.src = task.imageLink;
+    } else {
+        img._src = task.imageLink; // store original link for later reveal
+    }
     img.width = 48;
     img.height = 48;
     const name = document.createElement('div');
@@ -161,6 +165,7 @@ function showModal(task) {
                                 ncell.classList.remove('state-hidden');
                                 ncell.classList.add('state-incomplete');
                                 ncell.classList.add('reveal');
+                                ncell.getElementsByTagName('img')[0].src = ncell.getElementsByTagName('img')[0]._src;
                                 // keep visible after reveal
                                 setTimeout(() => {
                                     ncell.classList.remove('reveal');
