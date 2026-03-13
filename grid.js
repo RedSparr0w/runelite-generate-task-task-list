@@ -2501,7 +2501,16 @@ function showModal(task, anchor) {
             }
             updateUnlockHud();
             refreshHiddenEdges({ animate: true });
+
             hideModal();
+            requestAnimationFrame(() => {
+                const unlockedCell = getCellById(task.id);
+                if (!unlockedCell || getState(task.id) !== 'incomplete') {
+                    return;
+                }
+
+                showModal(unlockedCell.task, createCellAnchor(unlockedCell));
+            });
         } : null;
     } else {
         button.style.display = 'none';
