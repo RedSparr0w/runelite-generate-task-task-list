@@ -480,6 +480,7 @@ body::-webkit-scrollbar {
         border-color .18s ease,
         background .18s ease,
         filter .18s ease;
+    contain: paint;
 }
 
 .cell::before {
@@ -565,7 +566,7 @@ body::-webkit-scrollbar {
 
 /* state styling */
 .state-hidden {
-    opacity: 0;
+    display: none;
     pointer-events: none !important;
 }
 
@@ -577,6 +578,7 @@ body::-webkit-scrollbar {
 }
 
 .state-hidden.state-hidden-edge {
+    display: flex;
     opacity: 1;
     transform: scale(1);
     background: transparent;

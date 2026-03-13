@@ -43,6 +43,7 @@ let obtainedItemIds = new Set();
 let syncButtonStatusTimer = null;
 
 const idToCoords = new Map();
+const idToCell = new Map();
 
 // collection log item map: id -> { name, category, wikiLink, imageUrl }
 let collectionLogMap = new Map();
@@ -125,6 +126,10 @@ function wait(ms) {
     return new Promise(resolve => {
         setTimeout(resolve, ms);
     });
+}
+
+function getCellById(id) {
+    return idToCell.get(String(id)) || null;
 }
 
 function normalizeUsername(value) {
@@ -368,7 +373,7 @@ function revealTaskNeighbors(taskId) {
 
 function applyTaskCompletion(task) {
     setState(task.id, 'complete');
-    const cell = document.querySelector(`.cell[data-id="${task.id}"]`);
+    const cell = getCellById(task.id);
     if (cell) {
         setCellState(cell, 'complete');
     }
@@ -647,7 +652,7 @@ function positionPopover(anchor) {
 
 function revealNeighborAsLocked(id) {
     setState(id, 'locked');
-    const cell = document.querySelector(`.cell[data-id="${id}"]`);
+    const cell = getCellById(id);
     if (!cell) {
         return;
     }
@@ -686,23 +691,35 @@ function refreshHiddenEdges(options = {}) {
     const stateByCoord = new Map();
     const isFrontierState = state => state === 'incomplete' || state === 'locked';
     const newlyVisibleEdges = [];
+    const hiddenEdgeClasses = ['state-hidden-edge', 'hidden-edge-top', 'hidden-edge-right', 'hidden-edge-bottom', 'hidden-edge-left'];
 
     idToCoords.forEach((coord, id) => {
         stateByCoord.set(`${coord.x},${coord.y}`, getState(id));
     });
 
     idToCoords.forEach((coord, id) => {
-        const cell = document.querySelector(`.cell[data-id="${id}"]`);
+        const cell = getCellById(id);
         if (!cell) {
             return;
         }
 
-        const hadVisibleEdge = cell.classList.contains('state-hidden-edge');
-        cell.classList.remove('state-hidden-edge', 'hidden-edge-top', 'hidden-edge-right', 'hidden-edge-bottom', 'hidden-edge-left');
+        const state = stateByCoord.get(`${coord.x},${coord.y}`);
+        const hasEdgeClass =
+            cell.classList.contains('state-hidden-edge') ||
+            cell.classList.contains('hidden-edge-top') ||
+            cell.classList.contains('hidden-edge-right') ||
+            cell.classList.contains('hidden-edge-bottom') ||
+            cell.classList.contains('hidden-edge-left');
 
-        if (getState(id) !== 'hidden') {
+        if (state !== 'hidden') {
+            if (hasEdgeClass) {
+                cell.classList.remove(...hiddenEdgeClasses);
+            }
             return;
         }
+
+        const hadVisibleEdge = cell.classList.contains('state-hidden-edge');
+        cell.classList.remove(...hiddenEdgeClasses);
 
         let hasVisibleEdge = false;
         let minAdjacentDelay = Number.POSITIVE_INFINITY;
@@ -794,7 +811,7 @@ function showModal(task, anchor) {
     const tip = document.getElementById('modal-tip');
     const wiki = document.getElementById('modal-wiki');
     const button = document.getElementById('modal-complete');
-    const cell = document.querySelector(`.cell[data-id="${task.id}"]`);
+    const cell = getCellById(task.id);
     const state = getState(task.id) || 'incomplete';
 
     if (state === 'locked') {
@@ -967,6 +984,7 @@ function render(tasks) {
     const grid = document.getElementById('grid');
     hideModal();
     grid.innerHTML = '';
+    idToCell.clear();
 
     const { size, coords, center } = updateTaskCoordinates(tasks);
     const cells = [];
@@ -980,6 +998,7 @@ function render(tasks) {
         cell.style.gridColumnStart = x + 1;
         cell.style.gridRowStart = y + 1;
         grid.appendChild(cell);
+        idToCell.set(String(task.id), cell);
         cells.push({ cell, x, y });
         if (index === 0) {
             firstCell = cell;
