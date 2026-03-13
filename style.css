@@ -31,7 +31,7 @@
     --action-border: rgba(115, 101, 89, 0.56);
     --state-incomplete-bg: var(--theme-surface-hover);
     --state-incomplete-border: var(--theme-border-strong);
-    --state-complete-bg: #6f6d69;
+    --state-complete-bg: #797774;
     --state-complete-border: rgba(98, 94, 88, 0.9);
 
     --radius-large: 8px;
@@ -67,7 +67,7 @@ body[data-theme="dark"] {
     --action-border: rgba(96, 103, 116, 0.58);
     --state-incomplete-bg: var(--theme-surface-hover);
     --state-incomplete-border: var(--theme-border-strong);
-    --state-complete-bg: #646d7a;
+    --state-complete-bg: #6f7886;
     --state-complete-border: rgba(78, 86, 100, 0.9);
 
     --tier-easy: #5FD46A;
