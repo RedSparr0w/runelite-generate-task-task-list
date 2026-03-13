@@ -524,7 +524,8 @@ function getBackgroundSpriteKey(state) {
     return `bg::${state}@${Math.round(getSpritePixelRatio() * 1000)}`;
 }
 
-function drawCellBackgroundSprite(spriteContext, state) {
+function drawCellBackgroundSprite(spriteContext, state, options = {}) {
+    const { skipBadge = false } = options;
     const x = 0;
     const y = 0;
 
@@ -576,7 +577,7 @@ function drawCellBackgroundSprite(spriteContext, state) {
     spriteContext.fillRect(x, y, CELL_SIZE, 24);
     spriteContext.restore();
 
-    if (state === 'locked') {
+    if (state === 'locked' && !skipBadge) {
         const label = 'LOCKED';
         spriteContext.font = '700 8px sans-serif';
         const badgePaddingX = 5;
@@ -722,9 +723,85 @@ function ensureCellSprite(cell) {
     return spriteCanvas;
 }
 
+function getEdgeCellSpriteKey(edgeSides) {
+    const pixelRatioKey = Math.round(getSpritePixelRatio() * 1000);
+    const t = edgeSides.top ? 1 : 0;
+    const r = edgeSides.right ? 1 : 0;
+    const b = edgeSides.bottom ? 1 : 0;
+    const l = edgeSides.left ? 1 : 0;
+    return `edge::${t}${r}${b}${l}@${pixelRatioKey}`;
+}
+
+function ensureEdgeCellSprite(edgeSides) {
+    const spriteKey = getEdgeCellSpriteKey(edgeSides);
+    if (backgroundSpriteCache.has(spriteKey)) {
+        return backgroundSpriteCache.get(spriteKey);
+    }
+
+    const pixelRatio = getSpritePixelRatio();
+    const pxSize = Math.max(1, Math.round(CELL_SIZE * pixelRatio));
+
+    // 7.5% = where opacity reaches 50%; 10% = where it hits 0.
+    const fade1 = CELL_SIZE * 0.075;
+    const fade2 = CELL_SIZE * 0.10;
+    const midStop = fade1 / fade2; // 0.75
+
+    // Build a mask canvas: each active edge contributes a fade gradient.
+    // 'lighter' composite accumulates contributions so corners read full opacity.
+    const maskCanvas = document.createElement('canvas');
+    maskCanvas.width = pxSize;
+    maskCanvas.height = pxSize;
+    const maskCtx = maskCanvas.getContext('2d');
+    if (!maskCtx) {
+        return null;
+    }
+
+    maskCtx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+    maskCtx.globalCompositeOperation = 'lighter';
+
+    const drawFade = (x0, y0, x1, y1, rX, rY, rW, rH) => {
+        const grad = maskCtx.createLinearGradient(x0, y0, x1, y1);
+        grad.addColorStop(0,       'rgba(0,0,0,1)');
+        grad.addColorStop(midStop, 'rgba(0,0,0,0.5)');
+        grad.addColorStop(1,       'rgba(0,0,0,0)');
+        maskCtx.fillStyle = grad;
+        maskCtx.fillRect(rX, rY, rW, rH);
+    };
+
+    if (edgeSides.left)   drawFade(0,         0, fade2,             0, 0,                  0,                  fade2,     CELL_SIZE);
+    if (edgeSides.right)  drawFade(CELL_SIZE,  0, CELL_SIZE - fade2, 0, CELL_SIZE - fade2, 0,                  fade2,     CELL_SIZE);
+    if (edgeSides.top)    drawFade(0, 0,         0, fade2,             0,                  0,                  CELL_SIZE, fade2);
+    if (edgeSides.bottom) drawFade(0, CELL_SIZE, 0, CELL_SIZE - fade2, 0,                  CELL_SIZE - fade2, CELL_SIZE, fade2);
+
+    // Draw the full locked cell background then cut it with the mask.
+    const spriteCanvas = document.createElement('canvas');
+    spriteCanvas.width = pxSize;
+    spriteCanvas.height = pxSize;
+    const spriteContext = spriteCanvas.getContext('2d');
+    if (!spriteContext) {
+        return null;
+    }
+
+    spriteContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+    spriteContext.imageSmoothingEnabled = false;
+    drawCellBackgroundSprite(spriteContext, 'locked', { skipBadge: true });
+
+    // destination-in preserves existing pixels scaled by the incoming alpha.
+    spriteContext.globalCompositeOperation = 'destination-in';
+    spriteContext.drawImage(maskCanvas, 0, 0, CELL_SIZE, CELL_SIZE);
+    spriteContext.globalCompositeOperation = 'source-over';
+
+    backgroundSpriteCache.set(spriteKey, spriteCanvas);
+    return spriteCanvas;
+}
+
 function prewarmCellSprites() {
     idToCell.forEach(cell => {
-        if (cell.state !== 'hidden') {
+        if (cell.state === 'hidden') {
+            if (cell.edgeVisible && (cell.edgeSides.top || cell.edgeSides.right || cell.edgeSides.bottom || cell.edgeSides.left)) {
+                ensureEdgeCellSprite(cell.edgeSides);
+            }
+        } else {
             ensureCellSprite(cell);
         }
     });
@@ -745,7 +822,15 @@ function prewarmVisibleCellSprites() {
             }
 
             const cell = getCellById(taskId);
-            if (cell && cell.state !== 'hidden') {
+            if (!cell) {
+                continue;
+            }
+
+            if (cell.state === 'hidden') {
+                if (cell.edgeVisible && (cell.edgeSides.top || cell.edgeSides.right || cell.edgeSides.bottom || cell.edgeSides.left)) {
+                    ensureEdgeCellSprite(cell.edgeSides);
+                }
+            } else {
                 ensureCellSprite(cell);
             }
         }
@@ -831,44 +916,11 @@ function drawCanvasCell(context, cell, now) {
     context.translate(-centerX, -centerY);
 
     if (hasEdge) {
-        context.lineCap = 'round';
+        const edgeSprite = ensureEdgeCellSprite(cell.edgeSides);
+        if (edgeSprite) {
+            context.drawImage(edgeSprite, x, y, CELL_SIZE, CELL_SIZE);
+        }
 
-        const drawEdgePath = () => {
-            context.beginPath();
-            if (cell.edgeSides.top) {
-                context.moveTo(x + 5, y + 2);
-                context.lineTo(x + CELL_SIZE - 5, y + 2);
-            }
-            if (cell.edgeSides.right) {
-                context.moveTo(x + CELL_SIZE - 2, y + 5);
-                context.lineTo(x + CELL_SIZE - 2, y + CELL_SIZE - 5);
-            }
-            if (cell.edgeSides.bottom) {
-                context.moveTo(x + 5, y + CELL_SIZE - 2);
-                context.lineTo(x + CELL_SIZE - 5, y + CELL_SIZE - 2);
-            }
-            if (cell.edgeSides.left) {
-                context.moveTo(x + 2, y + 5);
-                context.lineTo(x + 2, y + CELL_SIZE - 5);
-            }
-        };
-
-        drawEdgePath();
-        context.lineWidth = 4;
-        context.strokeStyle = 'rgba(15, 23, 42, 0.95)';
-        context.stroke();
-
-        drawEdgePath();
-        context.lineWidth = 2;
-        context.strokeStyle = 'rgba(148, 163, 184, 0.42)';
-        context.stroke();
-
-        drawEdgePath();
-        context.lineWidth = 1;
-        context.strokeStyle = 'rgba(255, 255, 255, 0.18)';
-        context.stroke();
-
-        context.lineCap = 'butt';
         context.restore();
         return keepAnimating;
     }
