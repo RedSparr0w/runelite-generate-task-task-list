@@ -21,6 +21,7 @@ const ZOOM_FACTOR = 1.1;
 const POP_STAGGER_MS = 50;
 const POP_DURATION_MS = 400;
 const EDGE_POP_OFFSET_MS = 120;
+const UNLOCK_TOAST_DURATION_MS = 4500;
 
 let suppressTaskClick = false;
 let tasksGlobal = [];
@@ -521,7 +522,12 @@ function showModal(task, anchor) {
         button.style.display = 'block';
         button.onclick = e => {
             e.preventDefault();
+            const prevLimit = getUnlockLimit();
             setState(task.id, 'complete');
+            const newLimit = getUnlockLimit();
+            if (newLimit > prevLimit) {
+                showUnlockToast(newLimit);
+            }
             if (cell) {
                 setCellState(cell, 'complete');
             }
@@ -583,6 +589,34 @@ function hideModal() {
     activePopoverAnchor = null;
 }
 
+let unlockToastTimer = null;
+
+function showUnlockToast(newLimit) {
+    const toast = document.getElementById('unlock-toast');
+    const slots = document.getElementById('unlock-toast-slots');
+    if (!toast || !slots) {
+        return;
+    }
+
+    slots.textContent = newLimit;
+
+    if (unlockToastTimer) {
+        clearTimeout(unlockToastTimer);
+        unlockToastTimer = null;
+    }
+
+    toast.classList.remove('leaving');
+    // force reflow so transition plays even if already visible
+    void toast.offsetWidth;
+    toast.classList.add('visible');
+
+    unlockToastTimer = setTimeout(() => {
+        toast.classList.add('leaving');
+        setTimeout(() => toast.classList.remove('visible', 'leaving'), 350);
+        unlockToastTimer = null;
+    }, UNLOCK_TOAST_DURATION_MS);
+}
+
 function render(tasks) {
     const grid = document.getElementById('grid');
     hideModal();
@@ -639,6 +673,19 @@ window.addEventListener('DOMContentLoaded', () => {
     const close = modal.querySelector('.modal-close');
 
     close.addEventListener('click', hideModal);
+
+    const toastClose = document.querySelector('.unlock-toast-close');
+    if (toastClose) {
+        toastClose.addEventListener('click', () => {
+            const toast = document.getElementById('unlock-toast');
+            if (unlockToastTimer) {
+                clearTimeout(unlockToastTimer);
+                unlockToastTimer = null;
+            }
+            toast.classList.add('leaving');
+            setTimeout(() => toast.classList.remove('visible', 'leaving'), 350);
+        });
+    }
 
     document.addEventListener('mousedown', e => {
         if (!modal.classList.contains('open')) {
