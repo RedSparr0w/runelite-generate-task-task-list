@@ -1031,6 +1031,16 @@ body::-webkit-scrollbar {
 .tier-master-tedious::after { background: var(--tier-master-tedious); }
 .tier-extra::after { background: var(--tier-extra); }
 .tier-pets::after { background: var(--tier-pets); }
+
+.state-incomplete.tier-easy { border-color: var(--tier-easy); }
+.state-incomplete.tier-medium { border-color: var(--tier-medium); }
+.state-incomplete.tier-hard { border-color: var(--tier-hard); }
+.state-incomplete.tier-elite { border-color: var(--tier-elite); }
+.state-incomplete.tier-master { border-color: var(--tier-master); }
+.state-incomplete.tier-master-tedious { border-color: var(--tier-master-tedious); }
+.state-incomplete.tier-extra { border-color: var(--tier-extra); }
+.state-incomplete.tier-pets { border-color: var(--tier-pets); }
+
 .cell img {
     display: block;
     margin-bottom: 2px;
