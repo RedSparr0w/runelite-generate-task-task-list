@@ -413,8 +413,14 @@ function getTierOpacityForCell(cell) {
         return 1;
     }
 
-    if (state === 'locked' && hideTierHintOnLocked) {
-        return selectedTierFilters.has(LOCKED_FILTER_KEY) ? 1 : FILTERED_TIER_OPACITY;
+    if (state === 'locked') {
+        if (selectedTierFilters.has(LOCKED_FILTER_KEY)) {
+            return 1;
+        }
+
+        if (hideTierHintOnLocked) {
+            return FILTERED_TIER_OPACITY;
+        }
     }
 
     const tier = String(task.tier || '').trim();
