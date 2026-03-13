@@ -23,6 +23,7 @@ const POP_STAGGER_MS = 50;
 const POP_DURATION_MS = 400;
 const EDGE_POP_OFFSET_MS = 120;
 const UNLOCK_TOAST_DURATION_MS = 4500;
+const SYNC_STATUS_DURATION_MS = 2200;
 const CL_CACHE_KEY = 'collectionLogCache';
 const CL_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 const USERNAME_KEY = 'playerUsername';
@@ -37,6 +38,7 @@ let stateMap = loadStates();
 let playerUsername = '';
 let hasStartedApp = false;
 let obtainedItemIds = new Set();
+let syncButtonStatusTimer = null;
 
 const idToCoords = new Map();
 
@@ -129,31 +131,34 @@ function getPlayerCacheKey(username) {
     return `${PLAYER_CL_CACHE_PREFIX}:${normalizeUsername(username).toLowerCase()}`;
 }
 
-async function loadPlayerCollectionLog(username) {
+async function loadPlayerCollectionLog(username, options = {}) {
+    const { forceRefresh = false } = options;
     const normalized = normalizeUsername(username);
-    obtainedItemIds = new Set();
     if (!normalized) {
+        obtainedItemIds = new Set();
         return;
     }
 
     const cacheKey = getPlayerCacheKey(normalized);
-    try {
-        const raw = localStorage.getItem(cacheKey);
-        if (raw) {
-            const { ts, ids } = JSON.parse(raw);
-            if (Date.now() - ts < PLAYER_CL_CACHE_TTL && Array.isArray(ids)) {
-                obtainedItemIds = new Set(ids.map(id => Number(id)).filter(id => Number.isInteger(id) && id > 0));
-                return;
+    if (!forceRefresh) {
+        try {
+            const raw = localStorage.getItem(cacheKey);
+            if (raw) {
+                const { ts, ids } = JSON.parse(raw);
+                if (Date.now() - ts < PLAYER_CL_CACHE_TTL && Array.isArray(ids)) {
+                    obtainedItemIds = new Set(ids.map(id => Number(id)).filter(id => Number.isInteger(id) && id > 0));
+                    return;
+                }
             }
+        } catch {
+            // ignore corrupt cache
         }
-    } catch {
-        // ignore corrupt cache
     }
 
     try {
         const syncName = encodeURIComponent(toSyncUsername(normalized));
         const url = `https://sync.runescape.wiki/runelite/player/${syncName}/STANDARD`;
-        const response = await fetch(url);
+        const response = await fetch(url, { cache: forceRefresh ? 'no-store' : 'default' });
         if (!response.ok) {
             throw new Error(`sync request failed (${response.status})`);
         }
@@ -312,6 +317,127 @@ function normalizeUnlockStates() {
     incompleteTasks.slice(unlockLimit).forEach(task => {
         setState(task.id, 'locked');
     });
+}
+
+function getTaskVerificationItemIds(task) {
+    return task?.verification?.itemIds || [];
+}
+
+function getTaskRequiredCount(task) {
+    const totalItems = getTaskVerificationItemIds(task).length;
+    if (totalItems === 0) {
+        return 0;
+    }
+
+    const rawRequired = task?.verification?.count;
+    return Number.isFinite(rawRequired)
+        ? clamp(Math.floor(rawRequired), 1, totalItems)
+        : totalItems;
+}
+
+function getTaskObtainedCount(task) {
+    return getTaskVerificationItemIds(task).reduce((count, id) => {
+        return count + (obtainedItemIds.has(Number(id)) ? 1 : 0);
+    }, 0);
+}
+
+function revealTaskNeighbors(taskId) {
+    const coords = idToCoords.get(taskId);
+    if (!coords) {
+        return;
+    }
+
+    const { x, y } = coords;
+    idToCoords.forEach((coord, id) => {
+        const isNeighbor =
+            (coord.x === x && (coord.y === y - 1 || coord.y === y + 1)) ||
+            (coord.y === y && (coord.x === x - 1 || coord.x === x + 1));
+        if (isNeighbor && getState(id) === 'hidden') {
+            revealNeighborAsLocked(id);
+        }
+    });
+}
+
+function applyTaskCompletion(task) {
+    setState(task.id, 'complete');
+    const cell = document.querySelector(`.cell[data-id="${task.id}"]`);
+    if (cell) {
+        setCellState(cell, 'complete');
+    }
+    revealTaskNeighbors(task.id);
+}
+
+function refreshOpenModal() {
+    const modal = document.getElementById('task-modal');
+    if (!modal?.classList.contains('open') || !activePopoverAnchor || !document.body.contains(activePopoverAnchor)) {
+        return;
+    }
+
+    const task = activePopoverAnchor._task;
+    if (task) {
+        showModal(task, activePopoverAnchor);
+    }
+}
+
+function syncCompletedTasksFromObtained(options = {}) {
+    const {
+        animate = true,
+        showToast = true,
+        refreshModal = true
+    } = options;
+
+    const previousLimit = getUnlockLimit();
+    let completedCount = 0;
+
+    let changed = true;
+    while (changed) {
+        changed = false;
+
+        tasksGlobal.forEach(task => {
+            const state = getState(task.id);
+            if (state === 'complete' || state === 'hidden') {
+                return;
+            }
+
+            const requiredCount = getTaskRequiredCount(task);
+            if (requiredCount === 0) {
+                return;
+            }
+
+            if (getTaskObtainedCount(task) >= requiredCount) {
+                applyTaskCompletion(task);
+                completedCount += 1;
+                changed = true;
+            }
+        });
+    }
+
+    normalizeUnlockStates();
+    updateUnlockHud();
+
+    if (completedCount > 0) {
+        refreshHiddenEdges({ animate });
+    }
+
+    const nextLimit = getUnlockLimit();
+    if (showToast && nextLimit > previousLimit) {
+        showUnlockToast(nextLimit);
+    }
+
+    if (refreshModal) {
+        refreshOpenModal();
+    }
+
+    return completedCount;
+}
+
+async function syncPlayerProgress() {
+    if (!playerUsername) {
+        return 0;
+    }
+
+    await loadPlayerCollectionLog(playerUsername, { forceRefresh: true });
+    return syncCompletedTasksFromObtained({ animate: true, showToast: true, refreshModal: true });
 }
 
 function getMinScale() {
@@ -662,31 +788,14 @@ function showModal(task, anchor) {
         button.style.display = 'block';
         button.onclick = e => {
             e.preventDefault();
-            const prevLimit = getUnlockLimit();
-            setState(task.id, 'complete');
-            const newLimit = getUnlockLimit();
-            if (newLimit > prevLimit) {
-                showUnlockToast(newLimit);
-            }
-            if (cell) {
-                setCellState(cell, 'complete');
-            }
-
-            const coords = idToCoords.get(task.id);
-            if (coords) {
-                const { x, y } = coords;
-                idToCoords.forEach((coord, id) => {
-                    const isNeighbor =
-                        (coord.x === x && (coord.y === y - 1 || coord.y === y + 1)) ||
-                        (coord.y === y && (coord.x === x - 1 || coord.x === x + 1));
-                    if (isNeighbor && getState(id) === 'hidden') {
-                        revealNeighborAsLocked(id);
-                    }
-                });
-            }
-
+            const previousLimit = getUnlockLimit();
+            applyTaskCompletion(task);
             updateUnlockHud();
             refreshHiddenEdges({ animate: true });
+            const nextLimit = getUnlockLimit();
+            if (nextLimit > previousLimit) {
+                showUnlockToast(nextLimit);
+            }
             hideModal();
         };
     } else if (state === 'locked') {
@@ -719,18 +828,11 @@ function showModal(task, anchor) {
     const itemsEl = document.getElementById('modal-items');
     const requiredEl = document.getElementById('modal-items-required');
     if (itemsEl) {
-        const verification = state !== 'locked' ? task.verification : null;
-        const itemIds = verification?.itemIds || [];
+        const itemIds = state !== 'locked' ? getTaskVerificationItemIds(task) : [];
         itemsEl.innerHTML = '';
         if (itemIds.length > 0) {
-            const totalItems = itemIds.length;
-            const rawRequired = verification?.count;
-            const requiredItems = Number.isFinite(rawRequired)
-                ? clamp(Math.floor(rawRequired), 1, totalItems)
-                : totalItems;
-            const obtainedItemCount = itemIds.reduce((count, id) => {
-                return count + (obtainedItemIds.has(Number(id)) ? 1 : 0);
-            }, 0);
+            const requiredItems = getTaskRequiredCount(task);
+            const obtainedItemCount = getTaskObtainedCount(task);
             const obtainedForTask = Math.min(obtainedItemCount, requiredItems);
 
             if (requiredEl) {
@@ -815,24 +917,37 @@ function showUnlockToast(newLimit) {
     }, UNLOCK_TOAST_DURATION_MS);
 }
 
+function updateTaskCoordinates(tasks) {
+    const size = computeGridSize(tasks.length);
+    const coords = generateSpiral(tasks.length, size);
+
+    idToCoords.clear();
+    tasks.forEach((task, index) => {
+        const [x, y] = coords[index];
+        idToCoords.set(task.id, { x, y });
+    });
+
+    return {
+        size,
+        coords,
+        center: coords.length > 0 ? { x: coords[0][0], y: coords[0][1] } : { x: 0, y: 0 }
+    };
+}
+
 function render(tasks) {
     const grid = document.getElementById('grid');
     hideModal();
     grid.innerHTML = '';
 
-    const size = computeGridSize(tasks.length);
-    const coords = generateSpiral(tasks.length, size);
-    const center = { x: coords[0][0], y: coords[0][1] };
+    const { size, coords, center } = updateTaskCoordinates(tasks);
     const cells = [];
     let firstCell = null;
 
     grid.style.setProperty('--grid-size', size);
-    idToCoords.clear();
 
     tasks.forEach((task, index) => {
         const [x, y] = coords[index];
         const cell = createCell(task);
-        idToCoords.set(task.id, { x, y });
         cell.style.gridColumnStart = x + 1;
         cell.style.gridRowStart = y + 1;
         grid.appendChild(cell);
@@ -902,6 +1017,38 @@ window.addEventListener('DOMContentLoaded', () => {
             hideModal();
         }
     });
+
+    const syncButton = document.getElementById('sync-button');
+    if (syncButton) {
+        syncButton.addEventListener('click', async () => {
+            if (syncButtonStatusTimer) {
+                clearTimeout(syncButtonStatusTimer);
+                syncButtonStatusTimer = null;
+            }
+
+            syncButton.disabled = true;
+            syncButton.textContent = 'Syncing...';
+
+            try {
+                const completedCount = await syncPlayerProgress();
+                syncButton.disabled = false;
+                syncButton.textContent = completedCount === 1
+                    ? 'Synced 1 task'
+                    : `Synced ${completedCount} tasks`;
+                syncButtonStatusTimer = setTimeout(() => {
+                    syncButton.textContent = 'Sync';
+                    syncButtonStatusTimer = null;
+                }, SYNC_STATUS_DURATION_MS);
+            } catch {
+                syncButton.disabled = false;
+                syncButton.textContent = 'Sync failed';
+                syncButtonStatusTimer = setTimeout(() => {
+                    syncButton.textContent = 'Sync';
+                    syncButtonStatusTimer = null;
+                }, SYNC_STATUS_DURATION_MS);
+            }
+        });
+    }
 });
 
 const tierWeights = {
@@ -992,8 +1139,9 @@ function startApp() {
     }
 
     tasksGlobal = all;
+    updateTaskCoordinates(all);
     normalizeUnlockStates();
-    updateUnlockHud();
+    syncCompletedTasksFromObtained({ animate: false, showToast: false, refreshModal: false });
 
     const loadingIcons = Array.from(document.querySelectorAll('#loading .loading-icon'));
     loadingIcons.forEach(icon => {
