@@ -69,6 +69,7 @@ let gridContext = null;
 let canvasFrameId = null;
 let gridPixelWidth = 0;
 let gridPixelHeight = 0;
+let gridCellCount = 0;
 
 const idToCoords = new Map();
 const idToCell = new Map();
@@ -382,6 +383,189 @@ function buildTaskNameLines(name, options = {}) {
     return clipped;
 }
 
+function getCellImageDrawState(imageSource) {
+    if (!imageSource) {
+        return {
+            image: null,
+            key: 'none',
+            hasImageSource: false
+        };
+    }
+
+    const image = resolveImageForDraw(imageSource);
+    const asset = imageAssetCache.get(imageSource) || getImageAsset(imageSource);
+
+    let mode = 'placeholder';
+    if (asset.status === 'ready' && image) {
+        mode = 'ready';
+    } else if (image) {
+        mode = 'fallback';
+    }
+
+    return {
+        image,
+        key: `${mode}:${imageSource}`,
+        hasImageSource: true
+    };
+}
+
+function getCellSpriteKey(cell, imageKey) {
+    return [
+        cell.state,
+        cell.task.tier || '',
+        (cell.nameLines || []).join('|'),
+        imageKey
+    ].join('::');
+}
+
+function drawCellSprite(spriteContext, cell, imageState) {
+    const state = cell.state || 'hidden';
+    const x = 0;
+    const y = 0;
+
+    const palettes = {
+        locked: {
+            fillTop: '#334155',
+            fillBottom: '#0f172a',
+            border: 'rgba(148, 163, 184, 0.42)',
+            text: '#e2e8f0'
+        },
+        incomplete: {
+            fillTop: '#fff8d6',
+            fillBottom: '#fde68a',
+            border: 'rgba(251, 191, 36, 0.9)',
+            text: '#4a2d00'
+        },
+        complete: {
+            fillTop: '#dcfce7',
+            fillBottom: '#86efac',
+            border: 'rgba(34, 197, 94, 0.88)',
+            text: '#14532d'
+        },
+        hidden: {
+            fillTop: '#1e293b',
+            fillBottom: '#1e293b',
+            border: 'rgba(148, 163, 184, 0.2)',
+            text: '#e2e8f0'
+        }
+    };
+
+    const palette = palettes[state] || palettes.hidden;
+    drawRoundedRect(spriteContext, x, y, CELL_SIZE, CELL_SIZE, CELL_RADIUS);
+    const gradient = spriteContext.createLinearGradient(0, y, 0, y + CELL_SIZE);
+    gradient.addColorStop(0, palette.fillTop);
+    gradient.addColorStop(1, palette.fillBottom);
+    spriteContext.fillStyle = gradient;
+    spriteContext.fill();
+    spriteContext.strokeStyle = palette.border;
+    spriteContext.lineWidth = 1;
+    spriteContext.stroke();
+
+    drawRoundedRect(spriteContext, x, y, CELL_SIZE, CELL_SIZE, CELL_RADIUS);
+    spriteContext.save();
+    spriteContext.clip();
+    const highlight = spriteContext.createLinearGradient(0, y, 0, y + 24);
+    highlight.addColorStop(0, 'rgba(255,255,255,0.22)');
+    highlight.addColorStop(1, 'rgba(255,255,255,0)');
+    spriteContext.fillStyle = highlight;
+    spriteContext.fillRect(x, y, CELL_SIZE, 24);
+    spriteContext.restore();
+
+    if (state === 'locked') {
+        const label = 'LOCKED';
+        spriteContext.font = '700 8px sans-serif';
+        const badgePaddingX = 5;
+        const badgeWidth = Math.ceil(spriteContext.measureText(label).width) + (badgePaddingX * 2);
+        const badgeHeight = 14;
+        const badgeX = x + 7;
+        const badgeY = y + 7;
+
+        drawRoundedRect(spriteContext, badgeX, badgeY, badgeWidth, badgeHeight, 7);
+        spriteContext.fillStyle = 'rgba(15, 23, 42, 0.8)';
+        spriteContext.fill();
+        spriteContext.strokeStyle = 'rgba(148, 163, 184, 0.32)';
+        spriteContext.lineWidth = 1;
+        spriteContext.stroke();
+
+        spriteContext.fillStyle = '#e2e8f0';
+        spriteContext.textAlign = 'center';
+        spriteContext.textBaseline = 'middle';
+        spriteContext.fillText(label, badgeX + (badgeWidth / 2), badgeY + (badgeHeight / 2));
+    }
+
+    const imageSize = state === 'locked' ? 42 : 30;
+    const imageX = x + ((CELL_SIZE - imageSize) / 2);
+    const imageY = y + (state === 'locked' ? 22 : 14);
+
+    if (imageState.image) {
+        spriteContext.save();
+        spriteContext.shadowColor = 'rgba(15, 23, 42, 0.24)';
+        spriteContext.shadowBlur = 6;
+        spriteContext.shadowOffsetY = 2;
+        spriteContext.drawImage(imageState.image, imageX, imageY, imageSize, imageSize);
+        spriteContext.restore();
+    } else if (imageState.hasImageSource) {
+        drawRoundedRect(spriteContext, imageX + 2, imageY + 2, imageSize - 4, imageSize - 4, 8);
+        spriteContext.fillStyle = 'rgba(15, 23, 42, 0.26)';
+        spriteContext.fill();
+        spriteContext.fillStyle = palette.text;
+        spriteContext.font = '700 16px sans-serif';
+        spriteContext.textAlign = 'center';
+        spriteContext.textBaseline = 'middle';
+        spriteContext.fillText('?', x + (CELL_SIZE / 2), imageY + (imageSize / 2));
+    }
+
+    if (state === 'incomplete' || state === 'complete') {
+        spriteContext.fillStyle = palette.text;
+        spriteContext.font = '700 8.5px sans-serif';
+        spriteContext.textAlign = 'center';
+        spriteContext.textBaseline = 'alphabetic';
+        const lines = cell.nameLines || [];
+        const lineHeight = 9;
+        const startY = y + CELL_SIZE - 8 - ((lines.length - 1) * lineHeight);
+        lines.forEach((line, lineIndex) => {
+            spriteContext.fillText(line, x + (CELL_SIZE / 2), startY + (lineIndex * lineHeight));
+        });
+    }
+
+    spriteContext.beginPath();
+    spriteContext.arc(x + CELL_SIZE - 8, y + 8, 4, 0, Math.PI * 2);
+    spriteContext.fillStyle = getTierColor(cell.task.tier);
+    spriteContext.fill();
+}
+
+function ensureCellSprite(cell) {
+    if (!cell || cell.state === 'hidden') {
+        return null;
+    }
+
+    const imageSource = cell.state === 'locked'
+        ? LOCKED_TILE_IMAGE
+        : (cell.state === 'incomplete' || cell.state === 'complete' ? cell.task.imageLink : null);
+    const imageState = getCellImageDrawState(imageSource);
+    const spriteKey = getCellSpriteKey(cell, imageState.key);
+
+    if (cell.spriteCanvas && cell.spriteKey === spriteKey) {
+        return cell.spriteCanvas;
+    }
+
+    const spriteCanvas = cell.spriteCanvas || document.createElement('canvas');
+    spriteCanvas.width = CELL_SIZE;
+    spriteCanvas.height = CELL_SIZE;
+    const spriteContext = spriteCanvas.getContext('2d');
+    if (!spriteContext) {
+        return null;
+    }
+
+    spriteContext.clearRect(0, 0, CELL_SIZE, CELL_SIZE);
+    spriteContext.imageSmoothingEnabled = false;
+    drawCellSprite(spriteContext, cell, imageState);
+
+    cell.spriteCanvas = spriteCanvas;
+    cell.spriteKey = spriteKey;
+    return spriteCanvas;
+}
+
 function drawCanvasCell(context, cell, now) {
     const state = cell.state || 'hidden';
     const hasEdge = state === 'hidden' && cell.edgeVisible && (cell.edgeSides.top || cell.edgeSides.right || cell.edgeSides.bottom || cell.edgeSides.left);
@@ -471,119 +655,10 @@ function drawCanvasCell(context, cell, now) {
         return keepAnimating;
     }
 
-    const palettes = {
-        locked: {
-            fillTop: '#334155',
-            fillBottom: '#0f172a',
-            border: 'rgba(148, 163, 184, 0.42)',
-            text: '#e2e8f0'
-        },
-        incomplete: {
-            fillTop: '#fff8d6',
-            fillBottom: '#fde68a',
-            border: 'rgba(251, 191, 36, 0.9)',
-            text: '#4a2d00'
-        },
-        complete: {
-            fillTop: '#dcfce7',
-            fillBottom: '#86efac',
-            border: 'rgba(34, 197, 94, 0.88)',
-            text: '#14532d'
-        },
-        hidden: {
-            fillTop: '#1e293b',
-            fillBottom: '#1e293b',
-            border: 'rgba(148, 163, 184, 0.2)',
-            text: '#e2e8f0'
-        }
-    };
-
-    const palette = palettes[state] || palettes.hidden;
-    drawRoundedRect(context, x, y, CELL_SIZE, CELL_SIZE, CELL_RADIUS);
-    const gradient = context.createLinearGradient(0, y, 0, y + CELL_SIZE);
-    gradient.addColorStop(0, palette.fillTop);
-    gradient.addColorStop(1, palette.fillBottom);
-    context.fillStyle = gradient;
-    context.fill();
-    context.strokeStyle = palette.border;
-    context.lineWidth = 1;
-    context.stroke();
-
-    drawRoundedRect(context, x, y, CELL_SIZE, CELL_SIZE, CELL_RADIUS);
-    context.save();
-    context.clip();
-    const highlight = context.createLinearGradient(0, y, 0, y + 24);
-    highlight.addColorStop(0, 'rgba(255,255,255,0.22)');
-    highlight.addColorStop(1, 'rgba(255,255,255,0)');
-    context.fillStyle = highlight;
-    context.fillRect(x, y, CELL_SIZE, 24);
-    context.restore();
-
-    if (state === 'locked') {
-        const label = 'LOCKED';
-        context.font = '700 8px sans-serif';
-        const badgePaddingX = 5;
-        const badgeWidth = Math.ceil(context.measureText(label).width) + (badgePaddingX * 2);
-        const badgeHeight = 14;
-        const badgeX = x + 7;
-        const badgeY = y + 7;
-
-        drawRoundedRect(context, badgeX, badgeY, badgeWidth, badgeHeight, 7);
-        context.fillStyle = 'rgba(15, 23, 42, 0.8)';
-        context.fill();
-        context.strokeStyle = 'rgba(148, 163, 184, 0.32)';
-        context.lineWidth = 1;
-        context.stroke();
-
-        context.fillStyle = '#e2e8f0';
-        context.textAlign = 'center';
-        context.textBaseline = 'middle';
-        context.fillText(label, badgeX + (badgeWidth / 2), badgeY + (badgeHeight / 2));
+    const sprite = ensureCellSprite(cell);
+    if (sprite) {
+        context.drawImage(sprite, x, y, CELL_SIZE, CELL_SIZE);
     }
-
-    const imageSource = state === 'locked'
-        ? LOCKED_TILE_IMAGE
-        : (state === 'incomplete' || state === 'complete' ? cell.task.imageLink : null);
-    const image = imageSource ? resolveImageForDraw(imageSource) : null;
-    const imageSize = state === 'locked' ? 42 : 30;
-    const imageX = x + ((CELL_SIZE - imageSize) / 2);
-    const imageY = y + (state === 'locked' ? 22 : 14);
-
-    if (image) {
-        context.save();
-        context.shadowColor = 'rgba(15, 23, 42, 0.24)';
-        context.shadowBlur = 6;
-        context.shadowOffsetY = 2;
-        context.drawImage(image, imageX, imageY, imageSize, imageSize);
-        context.restore();
-    } else if (imageSource) {
-        drawRoundedRect(context, imageX + 2, imageY + 2, imageSize - 4, imageSize - 4, 8);
-        context.fillStyle = 'rgba(15, 23, 42, 0.26)';
-        context.fill();
-        context.fillStyle = palette.text;
-        context.font = '700 16px sans-serif';
-        context.textAlign = 'center';
-        context.textBaseline = 'middle';
-        context.fillText('?', x + (CELL_SIZE / 2), imageY + (imageSize / 2));
-    }
-
-    if (state === 'incomplete' || state === 'complete') {
-        context.fillStyle = palette.text;
-        context.font = '700 8.5px sans-serif';
-        context.textAlign = 'center';
-        context.textBaseline = 'alphabetic';
-        const lines = cell.nameLines || [];
-        const lineHeight = 9;
-        const startY = y + CELL_SIZE - 8 - ((lines.length - 1) * lineHeight);
-        lines.forEach((line, lineIndex) => {
-            context.fillText(line, x + (CELL_SIZE / 2), startY + (lineIndex * lineHeight));
-        });
-    }
-
-    context.beginPath();
-    context.arc(x + CELL_SIZE - 8, y + 8, 4, 0, Math.PI * 2);
-    context.fillStyle = getTierColor(cell.task.tier);
-    context.fill();
 
     context.restore();
     return keepAnimating;
@@ -604,19 +679,23 @@ function getVisibleWorldBounds() {
     };
 }
 
-function isCellInVisibleBounds(cell, bounds) {
-    if (!bounds) {
-        return true;
+function getVisibleCoordBounds(bounds) {
+    if (!bounds || gridCellCount <= 0) {
+        return null;
     }
 
-    const cellRight = cell.pixelX + CELL_SIZE;
-    const cellBottom = cell.pixelY + CELL_SIZE;
-    return (
-        cellRight >= bounds.left &&
-        cell.pixelX <= bounds.right &&
-        cellBottom >= bounds.top &&
-        cell.pixelY <= bounds.bottom
-    );
+    const maxCoord = gridCellCount - 1;
+    const left = clamp(Math.floor(bounds.left / CELL_STEP), 0, maxCoord);
+    const right = clamp(Math.floor(bounds.right / CELL_STEP), 0, maxCoord);
+    const top = clamp(Math.floor(bounds.top / CELL_STEP), 0, maxCoord);
+    const bottom = clamp(Math.floor(bounds.bottom / CELL_STEP), 0, maxCoord);
+
+    return {
+        left,
+        right,
+        top,
+        bottom
+    };
 }
 
 function renderGridCanvas(now = performance.now()) {
@@ -626,16 +705,28 @@ function renderGridCanvas(now = performance.now()) {
 
     gridContext.clearRect(0, 0, gridPixelWidth, gridPixelHeight);
     const visibleBounds = getVisibleWorldBounds();
+    const visibleCoords = getVisibleCoordBounds(visibleBounds);
+    if (!visibleCoords) {
+        return false;
+    }
 
     let keepAnimating = false;
-    idToCell.forEach(cell => {
-        if (!isCellInVisibleBounds(cell, visibleBounds)) {
-            return;
-        }
+    for (let y = visibleCoords.top; y <= visibleCoords.bottom; y++) {
+        for (let x = visibleCoords.left; x <= visibleCoords.right; x++) {
+            const taskId = coordToTaskId.get(`${x},${y}`);
+            if (!taskId) {
+                continue;
+            }
 
-        const cellAnimating = drawCanvasCell(gridContext, cell, now);
-        keepAnimating = keepAnimating || cellAnimating;
-    });
+            const cell = getCellById(taskId);
+            if (!cell) {
+                continue;
+            }
+
+            const cellAnimating = drawCanvasCell(gridContext, cell, now);
+            keepAnimating = keepAnimating || cellAnimating;
+        }
+    }
 
     return keepAnimating;
 }
@@ -1427,6 +1518,7 @@ function setCellState(cell, nextState) {
     }
 
     cell.state = nextState;
+    cell.spriteKey = '';
     if (nextState !== 'hidden') {
         cell.edgeVisible = false;
         cell.edgeSides = {
@@ -1458,6 +1550,8 @@ function createCell(task, coord) {
         pixelY: coord.y * CELL_STEP,
         nameLines,
         popAnimation: null,
+        spriteCanvas: null,
+        spriteKey: '',
         edgeVisible: false,
         edgeSides: {
             top: false,
@@ -1847,6 +1941,7 @@ function render(tasks) {
     coordToTaskId.clear();
 
     const { size, coords, center } = updateTaskCoordinates(tasks);
+    gridCellCount = size;
     const canvas = ensureGridCanvas();
     if (!canvas || !gridContext) {
         return;
