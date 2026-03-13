@@ -29,7 +29,7 @@ const CANVAS_PIXEL_RATIO_STEP = 0.25;
 const HOVER_LERP_FACTOR = 0.25;
 const HOVER_SCALE_BOOST = 0.04;
 const HOVER_LIFT_PX = 2;
-const COMPLETE_CELL_OPACITY = 0.85;
+const COMPLETE_CELL_OPACITY = 0.75;
 const UNLOCK_TOAST_DURATION_MS = 4500;
 const SYNC_BATCH_SIZE = 3;
 const SYNC_BATCH_DELAY_MS = 45;
@@ -91,7 +91,7 @@ const CELL_PALETTES_BY_THEME = {
     dark: {
         locked: { fill: '#21262e', border: 'rgba(132, 142, 160, 0.84)', borderWidth: 2, text: '#e6ebf3' },
         incomplete: { fill: '#3a414d', border: 'rgba(132, 142, 160, 0.84)', borderWidth: 2, text: '#e6ebf3' },
-        complete: { fill: '#525a65', border: 'rgba(78, 86, 100, 0.9)', borderWidth: 2, text: '#e6ebf3' },
+        complete: { fill: '#646d7a', border: 'rgba(78, 86, 100, 0.9)', borderWidth: 2, text: '#e6ebf3' },
         hidden: { fill: '#1f2329', border: 'rgba(80, 88, 100, 0.58)', borderWidth: 2, text: '#b5becb' },
         badgeFill: 'rgba(10, 12, 16, 0.88)',
         badgeBorder: 'rgba(96, 103, 116, 0.8)',
