@@ -63,9 +63,17 @@ function generateSpiral(count, size) {
     return coords;
 }
 
+// valid states for tasks
+const STATES = ['hidden','incomplete','current','complete'];
+
 function createCell(task) {
     const el = document.createElement('div');
-    el.className = `cell tier-${task.tier}`;
+    el.className = 'cell';
+    el.classList.add(`tier-${task.tier}`); // used only for indicator
+    // apply stored state class
+    const state = getState(task.id) || 'incomplete';
+    el.classList.add(`state-${state}`);
+
     const img = document.createElement('img');
     img.src = task.imageLink;
     img.alt = task.name;
@@ -76,10 +84,44 @@ function createCell(task) {
     name.className = 'task-name';
     el.appendChild(img);
     el.appendChild(name);
-    el.onclick = () => {
+
+    el.onclick = e => {
+        // left-click cycles state
+        if (e.button === 0) {
+            const next = nextState(getState(task.id));
+            setState(task.id, next);
+            el.classList.remove(`state-${state}`);
+            el.classList.add(`state-${next}`);
+        }
+    };
+
+    el.oncontextmenu = e => {
+        e.preventDefault();
+        // open wiki on right click
         window.open(task.wikiLink, '_blank');
     };
     return el;
+}
+
+// state storage helpers
+const STATE_KEY = 'taskStates';
+function loadStates() {
+    try {
+        const s = localStorage.getItem(STATE_KEY);
+        return s ? JSON.parse(s) : {};
+    } catch {
+        return {};
+    }
+}
+function saveStates(map) {
+    try { localStorage.setItem(STATE_KEY, JSON.stringify(map)); } catch {}
+}
+let stateMap = loadStates();
+function getState(id) { return stateMap[id]; }
+function setState(id, state) { stateMap[id] = state; saveStates(stateMap); }
+function nextState(current) {
+    const idx = STATES.indexOf(current);
+    return STATES[(idx + 1) % STATES.length];
 }
 
 function render(tasks) {
@@ -150,7 +192,8 @@ loadAll().then(data => {
         }
     }
 
-    if (all.length === 0) {
+    const freshOrder = all.length === 0;
+    if (freshOrder) {
         // generate fresh list if we didn't restore
         data.forEach(tierObj => {
             const weight = tierWeights[tierObj.name] || 1;
@@ -165,6 +208,20 @@ loadAll().then(data => {
         // sort by priority so that weighted tiers (easy) are earlier
         all.sort((a, b) => a.priority - b.priority);
     }
+
+    // if there are new tasks added after a restore, give them hidden state by default
+    all.forEach(task => {
+        if (!getState(task.id)) {
+            setState(task.id, 'hidden');
+        }
+    });
+
+    // if we just generated a fresh order, set every task hidden except first
+    if (freshOrder && all.length > 0) {
+        all.forEach((t, idx) => setState(t.id, idx === 0 ? 'incomplete' : 'hidden'));
+        stateMap = loadStates(); // reload updated map
+    }
+
 
     render(all);
 

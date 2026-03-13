@@ -42,6 +42,7 @@ body::-webkit-scrollbar {
 .cell {
     background: #f0f0f0;
     border: 1px solid #ccc;
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -51,17 +52,36 @@ body::-webkit-scrollbar {
     font-size: 10px;
     cursor: pointer;
 }
+
+/* small tier indicator circle */
+.cell::after {
+    content: '';
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: transparent;
+}
+
+.tier-easy::after { background: #4caf50; }      /* brighter green */
+.tier-medium::after { background: #2196f3; }    /* vivid blue */
+.tier-hard::after { background: #ffeb3b; }      /* bright yellow */
+.tier-elite::after { background: #f44336; }     /* strong red */
+.tier-master::after { background: #9c27b0; }    /* deep purple */
+.tier-master-tedious::after { background: #607d8b; } /* slate gray */
+.tier-extra::after { background: #ff9800; }     /* orange */
+.tier-pets::after { background: #8bc34a; }      /* light green */
 .cell img {
     display: block;
     margin-bottom: 2px;
 }
 
-/* assign colours per tier */
-.tier-easy { background: #d4edda; }
-.tier-medium { background: #cce5ff; }
-.tier-hard { background: #fff3cd; }
-.tier-elite { background: #f8d7da; }
-.tier-master { background: #d1c4e9; }
-.tier-master-tedious { background: #e0e0e0; }
-.tier-extra { background: #ffe0b2; }
-.tier-pets { background: #f0f4c3; }
+/* state styling */
+.state-hidden { visibility: hidden; }
+.state-incomplete { opacity: 0.7; }
+.state-current { outline: 2px solid #007bff; }
+.state-complete { opacity: 0.4; filter: grayscale(50%); }
+
+/* no background colors – cells use default background regardless of tier */
