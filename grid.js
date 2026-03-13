@@ -120,6 +120,9 @@ function nextState(current) {
     return STATES[(idx + 1) % STATES.length];
 }
 
+// keep copy of tasks for re-rendering when neighbours change
+let tasksGlobal = [];
+
 // modal helpers
 function showModal(task) {
     const modal = document.getElementById('task-modal');
@@ -134,13 +137,31 @@ function showModal(task) {
     const btn = document.getElementById('modal-complete');
     const state = getState(task.id) || 'incomplete';
     if (state === 'incomplete' || state === 'current') {
+        btn.type = 'button';
         btn.style.display = 'block';
-        btn.onclick = () => {
+        btn.onclick = e => {
+            e.preventDefault();
             setState(task.id, 'complete');
             // update cell class
             const cell = document.querySelector(`.cell img[alt="${task.name}"]`).parentElement;
             cell.classList.remove(`state-${state}`);
             cell.classList.add('state-complete');
+            // unhide four-direction neighbours
+            const coords = idToCoords.get(task.id);
+            if (coords) {
+                const {x,y} = coords;
+                idToCoords.forEach((c, id) => {
+                    if ((c.x === x && (c.y === y-1 || c.y === y+1)) ||
+                        (c.y === y && (c.x === x-1 || c.x === x+1))) {
+                        if (getState(id) === 'hidden') {
+                            setState(id, 'incomplete');
+                        }
+                    }
+                });
+                // rerender to apply new states
+                document.getElementById('grid').innerHTML = '';
+                render(tasksGlobal);
+            }
             hideModal();
         };
     } else {
@@ -165,15 +186,19 @@ window.addEventListener('DOMContentLoaded', () => {
     });
 });
 
+// maps for neighbor lookup
+const idToCoords = new Map();
 function render(tasks) {
     const grid = document.getElementById('grid');
     const size = computeGridSize(tasks.length);
     grid.style.setProperty('--grid-size', size);
     const coords = generateSpiral(tasks.length, size);
+    idToCoords.clear();
     let firstCell = null;
 
     tasks.forEach((t, idx) => {
         const [x, y] = coords[idx];
+        idToCoords.set(t.id, {x,y});
         const cell = createCell(t);
         cell.style.gridColumnStart = x + 1;
         cell.style.gridRowStart = y + 1;
@@ -205,6 +230,7 @@ const STORAGE_KEY = 'taskGridOrder';
 
 loadAll().then(data => {
     let all = [];
+    tasksGlobal = all; // keep reference for neighbour updates
 
     // if we have a saved order, try to restore it
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -263,6 +289,8 @@ loadAll().then(data => {
         stateMap = loadStates(); // reload updated map
     }
 
+    // keep global reference
+    tasksGlobal = all;
 
     render(all);
 
