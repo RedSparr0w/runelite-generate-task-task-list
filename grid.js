@@ -70,11 +70,14 @@ let canvasFrameId = null;
 let gridPixelWidth = 0;
 let gridPixelHeight = 0;
 let gridCellCount = 0;
+let lastCanvasPixelRatio = 0;
+let spritePrewarmTimer = null;
 
 const idToCoords = new Map();
 const idToCell = new Map();
 const coordToTaskId = new Map();
 const imageAssetCache = new Map();
+const backgroundSpriteCache = new Map();
 
 // collection log item map: id -> { name, category, wikiLink, imageUrl }
 let collectionLogMap = new Map();
@@ -233,6 +236,39 @@ function ensureGridCanvas() {
     gridCanvas = canvas;
     gridContext = canvas.getContext('2d');
     return canvas;
+}
+
+function getCanvasPixelRatio() {
+    return Math.max(0.25, (window.devicePixelRatio || 1) * currentScale);
+}
+
+function syncCanvasResolution() {
+    if (!gridCanvas || !gridContext || gridPixelWidth <= 0 || gridPixelHeight <= 0) {
+        return;
+    }
+
+    const pixelRatio = getCanvasPixelRatio();
+    const canvasWidth = Math.max(1, Math.round(gridPixelWidth * pixelRatio));
+    const canvasHeight = Math.max(1, Math.round(gridPixelHeight * pixelRatio));
+
+    if (gridCanvas.width !== canvasWidth || gridCanvas.height !== canvasHeight) {
+        gridCanvas.width = canvasWidth;
+        gridCanvas.height = canvasHeight;
+    }
+
+    gridCanvas.style.width = `${gridPixelWidth}px`;
+    gridCanvas.style.height = `${gridPixelHeight}px`;
+    gridContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+    gridContext.imageSmoothingEnabled = false;
+
+    if (Math.abs(lastCanvasPixelRatio - pixelRatio) > 0.001) {
+        backgroundSpriteCache.clear();
+        idToCell.forEach(cell => {
+            cell.spriteKey = '';
+        });
+        lastCanvasPixelRatio = pixelRatio;
+        scheduleSpritePrewarm(60);
+    }
 }
 
 function getImageAsset(source) {
@@ -410,16 +446,24 @@ function getCellImageDrawState(imageSource) {
 }
 
 function getCellSpriteKey(cell, imageKey) {
+    const pixelRatioKey = Math.round(getCanvasPixelRatio() * 1000);
+    if (cell.state === 'locked') {
+        return `locked@${pixelRatioKey}`;
+    }
+
     return [
         cell.state,
-        cell.task.tier || '',
-        (cell.nameLines || []).join('|'),
-        imageKey
+        pixelRatioKey,
+        imageKey,
+        (cell.nameLines || []).join('|')
     ].join('::');
 }
 
-function drawCellSprite(spriteContext, cell, imageState) {
-    const state = cell.state || 'hidden';
+function getBackgroundSpriteKey(state) {
+    return `${state}@${Math.round(getCanvasPixelRatio() * 1000)}`;
+}
+
+function drawCellBackgroundSprite(spriteContext, state) {
     const x = 0;
     const y = 0;
 
@@ -492,7 +536,12 @@ function drawCellSprite(spriteContext, cell, imageState) {
         spriteContext.textBaseline = 'middle';
         spriteContext.fillText(label, badgeX + (badgeWidth / 2), badgeY + (badgeHeight / 2));
     }
+}
 
+function drawCellSpriteForeground(spriteContext, cell, palette, imageState) {
+    const state = cell.state || 'hidden';
+    const x = 0;
+    const y = 0;
     const imageSize = state === 'locked' ? 42 : 30;
     const imageX = x + ((CELL_SIZE - imageSize) / 2);
     const imageY = y + (state === 'locked' ? 22 : 14);
@@ -527,11 +576,33 @@ function drawCellSprite(spriteContext, cell, imageState) {
             spriteContext.fillText(line, x + (CELL_SIZE / 2), startY + (lineIndex * lineHeight));
         });
     }
+}
 
-    spriteContext.beginPath();
-    spriteContext.arc(x + CELL_SIZE - 8, y + 8, 4, 0, Math.PI * 2);
-    spriteContext.fillStyle = getTierColor(cell.task.tier);
-    spriteContext.fill();
+function ensureBackgroundSprite(state) {
+    if (!state || state === 'hidden') {
+        return null;
+    }
+
+    const spriteKey = getBackgroundSpriteKey(state);
+    if (backgroundSpriteCache.has(spriteKey)) {
+        return backgroundSpriteCache.get(spriteKey);
+    }
+
+    const pixelRatio = getCanvasPixelRatio();
+    const spriteCanvas = document.createElement('canvas');
+    spriteCanvas.width = Math.max(1, Math.round(CELL_SIZE * pixelRatio));
+    spriteCanvas.height = Math.max(1, Math.round(CELL_SIZE * pixelRatio));
+    const spriteContext = spriteCanvas.getContext('2d');
+    if (!spriteContext) {
+        return null;
+    }
+
+    spriteContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+    spriteContext.imageSmoothingEnabled = false;
+    drawCellBackgroundSprite(spriteContext, state);
+
+    backgroundSpriteCache.set(spriteKey, spriteCanvas);
+    return spriteCanvas;
 }
 
 function ensureCellSprite(cell) {
@@ -545,25 +616,65 @@ function ensureCellSprite(cell) {
     const imageState = getCellImageDrawState(imageSource);
     const spriteKey = getCellSpriteKey(cell, imageState.key);
 
+    if (cell.state === 'locked' && backgroundSpriteCache.has(spriteKey)) {
+        return backgroundSpriteCache.get(spriteKey);
+    }
+
     if (cell.spriteCanvas && cell.spriteKey === spriteKey) {
         return cell.spriteCanvas;
     }
 
+    const pixelRatio = getCanvasPixelRatio();
     const spriteCanvas = cell.spriteCanvas || document.createElement('canvas');
-    spriteCanvas.width = CELL_SIZE;
-    spriteCanvas.height = CELL_SIZE;
+    spriteCanvas.width = Math.max(1, Math.round(CELL_SIZE * pixelRatio));
+    spriteCanvas.height = Math.max(1, Math.round(CELL_SIZE * pixelRatio));
     const spriteContext = spriteCanvas.getContext('2d');
     if (!spriteContext) {
         return null;
     }
 
-    spriteContext.clearRect(0, 0, CELL_SIZE, CELL_SIZE);
+    spriteContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
     spriteContext.imageSmoothingEnabled = false;
-    drawCellSprite(spriteContext, cell, imageState);
+    spriteContext.clearRect(0, 0, CELL_SIZE, CELL_SIZE);
+
+    const palette = {
+        locked: { text: '#e2e8f0' },
+        incomplete: { text: '#4a2d00' },
+        complete: { text: '#14532d' },
+        hidden: { text: '#e2e8f0' }
+    }[cell.state] || { text: '#e2e8f0' };
+
+    drawCellBackgroundSprite(spriteContext, cell.state);
+    drawCellSpriteForeground(spriteContext, cell, palette, imageState);
 
     cell.spriteCanvas = spriteCanvas;
     cell.spriteKey = spriteKey;
+
+    if (cell.state === 'locked') {
+        backgroundSpriteCache.set(spriteKey, spriteCanvas);
+    }
+
     return spriteCanvas;
+}
+
+function prewarmCellSprites() {
+    idToCell.forEach(cell => {
+        if (cell.state !== 'hidden') {
+            ensureCellSprite(cell);
+        }
+    });
+}
+
+function scheduleSpritePrewarm(delay = 0) {
+    if (spritePrewarmTimer) {
+        clearTimeout(spritePrewarmTimer);
+    }
+
+    spritePrewarmTimer = setTimeout(() => {
+        spritePrewarmTimer = null;
+        prewarmCellSprites();
+        queueCanvasRender();
+    }, delay);
 }
 
 function drawCanvasCell(context, cell, now) {
@@ -659,6 +770,11 @@ function drawCanvasCell(context, cell, now) {
     if (sprite) {
         context.drawImage(sprite, x, y, CELL_SIZE, CELL_SIZE);
     }
+
+    context.beginPath();
+    context.arc(x + CELL_SIZE - 8, y + 8, 4, 0, Math.PI * 2);
+    context.fillStyle = getTierColor(cell.task.tier);
+    context.fill();
 
     context.restore();
     return keepAnimating;
@@ -1461,6 +1577,7 @@ function updateGridScale() {
     }
 
     currentScale = clamp(currentScale, getMinScale(), MAX_SCALE);
+    syncCanvasResolution();
     grid.style.transform = `scale(${currentScale})`;
     stage.style.width = `${grid.scrollWidth * currentScale}px`;
     stage.style.height = `${grid.scrollHeight * currentScale}px`;
@@ -1529,6 +1646,7 @@ function setCellState(cell, nextState) {
         };
     }
 
+    scheduleSpritePrewarm(0);
     queueCanvasRender();
 }
 
@@ -1950,16 +2068,9 @@ function render(tasks) {
     gridPixelWidth = Math.max(1, (size * CELL_SIZE) + ((size - 1) * CELL_GAP));
     gridPixelHeight = gridPixelWidth;
 
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = Math.max(1, Math.floor(gridPixelWidth * dpr));
-    canvas.height = Math.max(1, Math.floor(gridPixelHeight * dpr));
-    canvas.style.width = `${gridPixelWidth}px`;
-    canvas.style.height = `${gridPixelHeight}px`;
-
     grid.style.width = `${gridPixelWidth}px`;
     grid.style.height = `${gridPixelHeight}px`;
-    gridContext.setTransform(dpr, 0, 0, dpr, 0, 0);
-    gridContext.imageSmoothingEnabled = false;
+    syncCanvasResolution();
 
     const cells = [];
 
@@ -1992,6 +2103,7 @@ function render(tasks) {
     refreshHiddenEdges({ animate: true, center, revealDelayByCoord, staggerMs: revealStagger });
     updateGridScale();
     updateUnlockHud();
+    scheduleSpritePrewarm(0);
     queueCanvasRender();
 
     if (tasks.length > 0) {
