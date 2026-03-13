@@ -19,10 +19,10 @@ const STORAGE_KEY = 'taskGridOrder';
 const MIN_SCALE = 0.5;
 const MAX_SCALE = 2.5;
 const ZOOM_FACTOR = 1.1;
-const POP_STAGGER_MS = 50;
-const POP_DURATION_MS = 400;
+const POP_STAGGER_MS = 30;
+const POP_DURATION_MS = 500;
 const EDGE_POP_OFFSET_MS = 120;
-const INITIAL_REVEAL_DURATION_MS = 2000;
+const INITIAL_REVEAL_DURATION_MS = 3000;
 const ZOOM_RENDER_DEBOUNCE_MS = 120;
 const MAX_CANVAS_PIXEL_RATIO = 3;
 const CANVAS_PIXEL_RATIO_STEP = 0.25;
@@ -2825,7 +2825,7 @@ const tierWeights = {
     pets: 1
 };
 
-function preloadTaskImages(tasks) {
+async function preloadTaskImages(tasks) {
     const sources = new Set([LOCKED_TILE_IMAGE, QUESTION_MARK_ICON]);
 
     tasks.forEach(task => {
@@ -2835,17 +2835,57 @@ function preloadTaskImages(tasks) {
         }
     });
 
-    return Promise.all(Array.from(sources).map(source => new Promise(resolve => {
+    await Promise.all(Array.from(sources).map(source => new Promise(resolve => {
         const asset = getImageAsset(source);
-        if (asset.status === 'ready' || asset.status === 'error') {
+        const decodeReadyImage = async () => {
+            if (asset.status === 'ready' && typeof asset.image?.decode === 'function') {
+                try {
+                    await asset.image.decode();
+                } catch {
+                    // ignore decode failures; draw path still handles ready/error states
+                }
+            }
+
             resolve();
+        };
+
+        if (asset.status === 'ready' || asset.status === 'error') {
+            void decodeReadyImage();
             return;
         }
 
-        const onDone = () => resolve();
-        asset.image.addEventListener('load', onDone, { once: true });
-        asset.image.addEventListener('error', onDone, { once: true });
+        const onDone = () => {
+            asset.image.removeEventListener('load', onDone);
+            asset.image.removeEventListener('error', onDone);
+            void decodeReadyImage();
+        };
+        asset.image.addEventListener('load', onDone);
+        asset.image.addEventListener('error', onDone);
     })));
+}
+
+function waitForAnimationFrames(frameCount = 1) {
+    const totalFrames = Math.max(1, Math.floor(frameCount));
+    return new Promise(resolve => {
+        let remaining = totalFrames;
+        const onFrame = () => {
+            remaining -= 1;
+            if (remaining <= 0) {
+                resolve();
+                return;
+            }
+
+            requestAnimationFrame(onFrame);
+        };
+
+        requestAnimationFrame(onFrame);
+    });
+}
+
+async function prewarmInitialCanvasSprites() {
+    prewarmVisibleCellSprites();
+    queueCanvasRender();
+    await waitForAnimationFrames(2);
 }
 
 function startApp() {
@@ -2924,26 +2964,28 @@ function startApp() {
         image.src = icon.src;
     });
 
-    let preloadDone = false;
-    const preloadPromise = preloadTaskImages(all).then(() => {
-        preloadDone = true;
-    });
+    const preloadPromise = preloadTaskImages(all);
 
     function animateIcons(index) {
         if (index >= loadingIcons.length) {
-            const finish = () => setTimeout(() => {
+            const finish = async () => {
+                await Promise.all([preloadPromise, wait(500)]);
                 render(all);
+                await prewarmInitialCanvasSprites();
+
                 const loader = document.getElementById('loading');
                 if (loader) {
                     loader.style.display = 'none';
                 }
-            }, 500);
+            };
 
-            if (preloadDone) {
-                finish();
-            } else {
-                preloadPromise.then(finish);
-            }
+            finish().catch(() => {
+                render(all);
+                const fallbackLoader = document.getElementById('loading');
+                if (fallbackLoader) {
+                    fallbackLoader.style.display = 'none';
+                }
+            });
             return;
         }
 
