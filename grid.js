@@ -258,9 +258,13 @@ loadAll().then(data => {
     // preload images for all tasks to avoid jank
     function preload(tasks) {
         const promises = tasks.map(t => new Promise(resolve => {
-            const img = new Image();
-            img.onload = img.onerror = () => resolve();
-            img.src = t.imageLink;
+            if (getState(t.id) !== 'hidden') {
+                const img = new Image();
+                img.onload = img.onerror = () => resolve();
+                img.src = t.imageLink;
+            } else {
+                resolve();
+            }
         }));
         return Promise.all(promises);
     }
