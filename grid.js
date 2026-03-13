@@ -2733,20 +2733,40 @@ function getTaskObtainedCount(task) {
 }
 
 function getCollectionLogSeriesKey(task) {
-    if (task?.verification?.method !== 'collection-log') {
-        return '';
+    if (task?.verification?.method === 'collection-log') {
+        const itemIds = getTaskVerificationItemIds(task)
+            .map(id => Number(id))
+            .filter(Number.isFinite)
+            .sort((a, b) => a - b);
+
+        if (itemIds.length === 0) {
+            return '';
+        }
+
+        return `cl:${itemIds.join(',')}`;
     }
 
-    const itemIds = getTaskVerificationItemIds(task)
-        .map(id => Number(id))
-        .filter(Number.isFinite)
-        .sort((a, b) => a - b);
+    if (task?.verification?.method === 'skill') {
+        const requirements = getTaskSkillExperienceRequirements(task)
+            .slice()
+            .sort((requirementA, requirementB) => {
+                const nameDelta = requirementA.skillName.localeCompare(requirementB.skillName);
+                if (nameDelta !== 0) {
+                    return nameDelta;
+                }
 
-    if (itemIds.length === 0) {
-        return '';
+                return requirementA.requiredExperience - requirementB.requiredExperience;
+            })
+            .map(requirement => `${requirement.skillName}:${Math.floor(requirement.requiredExperience)}`);
+
+        if (requirements.length === 0) {
+            return '';
+        }
+
+        return `skill:${requirements.join('|')}`;
     }
 
-    return itemIds.join(',');
+    return '';
 }
 
 function isSeriesSwapCandidateState(state) {
