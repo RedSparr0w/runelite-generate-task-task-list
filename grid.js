@@ -29,7 +29,10 @@ const CANVAS_PIXEL_RATIO_STEP = 0.25;
 const HOVER_LERP_FACTOR = 0.25;
 const HOVER_SCALE_BOOST = 0.04;
 const HOVER_LIFT_PX = 2;
-const COMPLETE_CELL_OPACITY = 0.50;
+const COMPLETE_OPACITY_KEY = 'completeCellOpacity';
+const DEFAULT_COMPLETE_CELL_OPACITY = 0.2;
+const MIN_COMPLETE_CELL_OPACITY = 0.2;
+const MAX_COMPLETE_CELL_OPACITY = 1;
 const UNLOCK_TOAST_DURATION_MS = 4500;
 const SYNC_BATCH_SIZE = 3;
 const SYNC_BATCH_DELAY_MS = 45;
@@ -124,6 +127,13 @@ let zoomRenderDebounceTimer = null;
 let isZooming = false;
 let hoveredCellId = '';
 let activeTheme = 'osrs';
+let completeCellOpacity = DEFAULT_COMPLETE_CELL_OPACITY;
+
+try {
+    completeCellOpacity = normalizeCompleteOpacity(localStorage.getItem(COMPLETE_OPACITY_KEY));
+} catch {
+    completeCellOpacity = DEFAULT_COMPLETE_CELL_OPACITY;
+}
 
 try {
     activeTheme = normalizeTheme(localStorage.getItem(THEME_KEY));
@@ -133,6 +143,10 @@ try {
 
 if (typeof document !== 'undefined' && document.body) {
     document.body.dataset.theme = activeTheme;
+}
+
+if (typeof document !== 'undefined' && document.documentElement) {
+    document.documentElement.style.setProperty('--state-complete-opacity', String(completeCellOpacity));
 }
 
 const idToCoords = new Map();
@@ -231,6 +245,95 @@ function getCellById(id) {
 function normalizeTheme(value) {
     const normalized = String(value || '').trim().toLowerCase();
     return THEMES.has(normalized) ? normalized : 'osrs';
+}
+
+function normalizeCompleteOpacity(value) {
+    const parsed = Number.parseFloat(String(value ?? ''));
+    if (!Number.isFinite(parsed)) {
+        return DEFAULT_COMPLETE_CELL_OPACITY;
+    }
+
+    return clamp(parsed, MIN_COMPLETE_CELL_OPACITY, MAX_COMPLETE_CELL_OPACITY);
+}
+
+function getCompleteOpacityPercent(value = completeCellOpacity) {
+    return Math.round(value * 100);
+}
+
+function updateCompleteOpacityControls() {
+    const slider = document.getElementById('complete-opacity-input');
+    const valueLabel = document.getElementById('complete-opacity-value');
+    const percent = getCompleteOpacityPercent();
+
+    if (slider && document.activeElement !== slider) {
+        slider.value = String(percent);
+    }
+
+    if (valueLabel) {
+        valueLabel.textContent = `${percent}%`;
+    }
+}
+
+function applyCompleteOpacity(value, options = {}) {
+    const { persist = true, rerender = true } = options;
+    const nextOpacity = normalizeCompleteOpacity(value);
+
+    completeCellOpacity = nextOpacity;
+
+    if (document.documentElement) {
+        document.documentElement.style.setProperty('--state-complete-opacity', String(nextOpacity));
+    }
+
+    updateCompleteOpacityControls();
+
+    if (persist) {
+        try {
+            localStorage.setItem(COMPLETE_OPACITY_KEY, String(nextOpacity));
+        } catch {
+            // ignore localStorage failures
+        }
+    }
+
+    if (rerender) {
+        queueCanvasRender();
+    }
+}
+
+function setOptionsPopoverOpen(isOpen) {
+    const popover = document.getElementById('options-popover');
+    const button = document.getElementById('options-button');
+    if (!popover || !button) {
+        return;
+    }
+
+    popover.classList.toggle('open', isOpen);
+    button.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+}
+
+function closeOptionsPopover() {
+    setOptionsPopoverOpen(false);
+}
+
+function initOptionsMenu() {
+    applyCompleteOpacity(completeCellOpacity, { persist: false, rerender: false });
+
+    const optionsButton = document.getElementById('options-button');
+    const optionsPopover = document.getElementById('options-popover');
+    const opacityInput = document.getElementById('complete-opacity-input');
+    if (!optionsButton || !optionsPopover || !opacityInput) {
+        return;
+    }
+
+    optionsButton.addEventListener('click', e => {
+        e.preventDefault();
+        const isOpen = optionsPopover.classList.contains('open');
+        setOptionsPopoverOpen(!isOpen);
+    });
+
+    opacityInput.addEventListener('input', e => {
+        const value = Number.parseFloat(e.currentTarget.value);
+        applyCompleteOpacity(value / 100, { persist: true, rerender: true });
+    });
 }
 
 function getActiveTierColors() {
@@ -1018,7 +1121,7 @@ function drawCanvasCell(context, cell, now) {
     }
 
     if (state === 'complete') {
-        alpha *= COMPLETE_CELL_OPACITY;
+        alpha *= completeCellOpacity;
     }
 
     const x = cell.pixelX;
@@ -2602,6 +2705,7 @@ window.addEventListener('DOMContentLoaded', () => {
     const currentTasksButton = document.getElementById('current-tasks-button');
 
     initThemeToggle();
+    initOptionsMenu();
 
     close.addEventListener('click', hideModal);
 
@@ -2654,6 +2758,11 @@ window.addEventListener('DOMContentLoaded', () => {
         if (currentTasksWrap && !currentTasksWrap.contains(e.target)) {
             closeCurrentTasksPopover();
         }
+
+        const optionsWrap = document.getElementById('options-wrap');
+        if (optionsWrap && !optionsWrap.contains(e.target)) {
+            closeOptionsPopover();
+        }
     });
 
     document.addEventListener('keydown', e => {
@@ -2661,6 +2770,7 @@ window.addEventListener('DOMContentLoaded', () => {
             hideModal();
             hideTierTasksModal();
             closeCurrentTasksPopover();
+            closeOptionsPopover();
         }
     });
 
@@ -2673,23 +2783,23 @@ window.addEventListener('DOMContentLoaded', () => {
             }
 
             syncButton.disabled = true;
-            syncButton.textContent = 'Syncing...';
+            syncButton.textContent = 'Wiki syncing...';
 
             try {
                 const completedCount = await syncPlayerProgress();
                 syncButton.disabled = false;
                 syncButton.textContent = completedCount === 1
-                    ? 'Synced 1 task'
-                    : `Synced ${completedCount} tasks`;
+                    ? 'Wiki synced 1 task'
+                    : `Wiki synced ${completedCount} tasks`;
                 syncButtonStatusTimer = setTimeout(() => {
-                    syncButton.textContent = 'Sync';
+                    syncButton.textContent = 'Wiki Sync';
                     syncButtonStatusTimer = null;
                 }, SYNC_STATUS_DURATION_MS);
             } catch {
                 syncButton.disabled = false;
-                syncButton.textContent = 'Sync failed';
+                syncButton.textContent = 'Wiki sync failed';
                 syncButtonStatusTimer = setTimeout(() => {
-                    syncButton.textContent = 'Sync';
+                    syncButton.textContent = 'Wiki Sync';
                     syncButtonStatusTimer = null;
                 }, SYNC_STATUS_DURATION_MS);
             }

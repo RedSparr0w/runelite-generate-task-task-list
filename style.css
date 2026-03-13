@@ -33,6 +33,7 @@
     --state-incomplete-border: var(--theme-border-strong);
     --state-complete-bg: #797774;
     --state-complete-border: rgba(98, 94, 88, 0.9);
+    --state-complete-opacity: 0.5;
 
     --radius-large: 8px;
     --radius-medium: 6px;
@@ -97,16 +98,13 @@ body {
 }
 
 #theme-toggle {
-    position: fixed;
-    top: 16px;
-    right: 104px;
-    z-index: 900;
     display: inline-flex;
+    width: 100%;
     border: 1px solid var(--theme-border);
     border-radius: var(--radius-medium);
     overflow: hidden;
     background: var(--theme-surface);
-    box-shadow: 0 8px 18px var(--theme-shadow);
+    box-shadow: none;
 }
 
 .theme-option {
@@ -116,7 +114,9 @@ body {
     background: transparent;
     color: var(--text-main);
     padding: 8px 12px;
+    flex: 1;
     font-size: 11px;
+    text-align: center;
     letter-spacing: 0.04em;
     font-weight: 700;
     cursor: pointer;
@@ -314,21 +314,18 @@ body {
 }
 
 #sync-button {
-    position: fixed;
-    top: 16px;
-    right: 16px;
-    z-index: 900;
+    width: 100%;
     border: 1px solid var(--theme-border-strong);
     border-radius: var(--radius-medium);
-    padding: 10px 14px;
+    padding: 8px 12px;
     background: var(--theme-surface);
     color: var(--text-main);
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 800;
     letter-spacing: 0.04em;
     cursor: pointer;
-    backdrop-filter: blur(6px);
-    box-shadow: 0 10px 24px var(--theme-shadow);
+    backdrop-filter: none;
+    box-shadow: none;
 }
 
 #sync-button:hover:not(:disabled),
@@ -339,6 +336,72 @@ body {
 #sync-button:disabled {
     cursor: wait;
     opacity: 0.65;
+}
+
+#options-wrap {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 900;
+}
+
+#options-button {
+    border: 1px solid var(--theme-border-strong);
+    border-radius: var(--radius-medium);
+    padding: 8px 12px;
+    background: var(--theme-surface);
+    color: var(--text-main);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    backdrop-filter: blur(6px);
+    box-shadow: 0 8px 18px var(--theme-shadow);
+}
+
+#options-button:hover,
+#options-button:focus-visible,
+#options-button[aria-expanded="true"] {
+    background: var(--theme-surface-hover);
+}
+
+.options-popover {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: calc(100% + 8px);
+    width: min(240px, calc(100vw - 24px));
+    border: 1px solid var(--theme-border);
+    border-radius: var(--radius-medium);
+    background: var(--theme-panel);
+    box-shadow: 0 16px 30px var(--theme-shadow);
+    padding: 10px;
+}
+
+.options-popover.open {
+    display: grid;
+    gap: 8px;
+}
+
+.options-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    color: var(--text-main);
+    font-size: 11px;
+    font-weight: 700;
+}
+
+#complete-opacity-value {
+    color: var(--text-info);
+    font-weight: 800;
+}
+
+#complete-opacity-input {
+    width: 100%;
+    margin: 0;
+    accent-color: var(--text-info);
 }
 
 #username-gate {
@@ -1064,7 +1127,7 @@ body::-webkit-scrollbar {
     color: var(--text-main);
 }
 .state-complete {
-    opacity: 0.92 !important;
+    opacity: var(--state-complete-opacity) !important;
     background: var(--state-complete-bg);
     border-width: 2px;
     border-color: var(--state-complete-border);
