@@ -31,6 +31,7 @@ const HOVER_LERP_FACTOR = 0.25;
 const HOVER_SCALE_BOOST = 0.04;
 const HOVER_LIFT_PX = 2;
 const COMPLETE_OPACITY_KEY = 'completeCellOpacity';
+const HIDE_TIER_HINT_KEY = 'hideTierHintOnLocked';
 const DEFAULT_COMPLETE_CELL_OPACITY = 0.2;
 const MIN_COMPLETE_CELL_OPACITY = 0.2;
 const MAX_COMPLETE_CELL_OPACITY = 1;
@@ -129,11 +130,18 @@ let isZooming = false;
 let hoveredCellId = '';
 let activeTheme = 'osrs';
 let completeCellOpacity = DEFAULT_COMPLETE_CELL_OPACITY;
+let hideTierHintOnLocked = false;
 
 try {
     completeCellOpacity = normalizeCompleteOpacity(localStorage.getItem(COMPLETE_OPACITY_KEY));
 } catch {
     completeCellOpacity = DEFAULT_COMPLETE_CELL_OPACITY;
+}
+
+try {
+    hideTierHintOnLocked = normalizeTierHintSetting(localStorage.getItem(HIDE_TIER_HINT_KEY));
+} catch {
+    hideTierHintOnLocked = false;
 }
 
 try {
@@ -257,8 +265,19 @@ function normalizeCompleteOpacity(value) {
     return clamp(parsed, MIN_COMPLETE_CELL_OPACITY, MAX_COMPLETE_CELL_OPACITY);
 }
 
+function normalizeTierHintSetting(value) {
+    return value === true || value === 'true' || value === '1';
+}
+
 function getCompleteOpacityPercent(value = completeCellOpacity) {
     return Math.round(value * 100);
+}
+
+function updateTierHintControls() {
+    const checkbox = document.getElementById('hide-tier-hint-input');
+    if (checkbox) {
+        checkbox.checked = hideTierHintOnLocked;
+    }
 }
 
 function updateCompleteOpacityControls() {
@@ -300,6 +319,25 @@ function applyCompleteOpacity(value, options = {}) {
     }
 }
 
+function applyHideTierHintOnLocked(value, options = {}) {
+    const { persist = true, rerender = true } = options;
+    hideTierHintOnLocked = Boolean(value);
+    updateTierHintControls();
+
+    if (persist) {
+        try {
+            localStorage.setItem(HIDE_TIER_HINT_KEY, hideTierHintOnLocked ? '1' : '0');
+        } catch {
+            // ignore localStorage failures
+        }
+    }
+
+    if (rerender) {
+        queueCanvasRender();
+        refreshOpenModal();
+    }
+}
+
 function setOptionsPopoverOpen(isOpen) {
     const popover = document.getElementById('options-popover');
     const button = document.getElementById('options-button');
@@ -317,11 +355,13 @@ function closeOptionsPopover() {
 
 function initOptionsMenu() {
     applyCompleteOpacity(completeCellOpacity, { persist: false, rerender: false });
+    applyHideTierHintOnLocked(hideTierHintOnLocked, { persist: false, rerender: false });
 
     const optionsButton = document.getElementById('options-button');
     const optionsPopover = document.getElementById('options-popover');
     const opacityInput = document.getElementById('complete-opacity-input');
-    if (!optionsButton || !optionsPopover || !opacityInput) {
+    const hideTierHintInput = document.getElementById('hide-tier-hint-input');
+    if (!optionsButton || !optionsPopover || !opacityInput || !hideTierHintInput) {
         return;
     }
 
@@ -334,6 +374,10 @@ function initOptionsMenu() {
     opacityInput.addEventListener('input', e => {
         const value = Number.parseFloat(e.currentTarget.value);
         applyCompleteOpacity(value / 100, { persist: true, rerender: true });
+    });
+
+    hideTierHintInput.addEventListener('change', e => {
+        applyHideTierHintOnLocked(Boolean(e.currentTarget.checked), { persist: true, rerender: true });
     });
 }
 
@@ -1161,10 +1205,12 @@ function drawCanvasCell(context, cell, now) {
         context.drawImage(sprite, x, y, CELL_SIZE, CELL_SIZE);
     }
 
-    context.beginPath();
-    context.arc(x + CELL_SIZE - 8, y + 8, 4, 0, Math.PI * 2);
-    context.fillStyle = getTierColor(cell.task.tier);
-    context.fill();
+    if (!(hideTierHintOnLocked && state === 'locked')) {
+        context.beginPath();
+        context.arc(x + CELL_SIZE - 8, y + 8, 4, 0, Math.PI * 2);
+        context.fillStyle = getTierColor(cell.task.tier);
+        context.fill();
+    }
 
     if (hoverProgress > 0.001) {
         context.save();
@@ -2532,12 +2578,17 @@ function showModal(task, anchor) {
 
     if (tierBadge) {
         const tier = task.tier || '';
-        const bgColor = getTierColor(tier);
-        const textColor = getReadableTextColor(bgColor);
-        tierBadge.textContent = formatTierName(tier) || 'Unknown';
-        tierBadge.style.background = bgColor;
-        tierBadge.style.color = textColor;
-        tierBadge.style.display = tier ? 'inline-block' : 'none';
+        const shouldHideTierBadge = hideTierHintOnLocked && state === 'locked';
+        if (tier && !shouldHideTierBadge) {
+            const bgColor = getTierColor(tier);
+            const textColor = getReadableTextColor(bgColor);
+            tierBadge.textContent = formatTierName(tier) || 'Unknown';
+            tierBadge.style.background = bgColor;
+            tierBadge.style.color = textColor;
+            tierBadge.style.display = 'inline-block';
+        } else {
+            tierBadge.style.display = 'none';
+        }
     }
 
     const itemsEl = document.getElementById('modal-items');
