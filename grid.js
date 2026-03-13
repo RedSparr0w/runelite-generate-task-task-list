@@ -132,4 +132,34 @@ loadAll().then(data => {
     // sort by priority so that weighted tiers (easy) are earlier
     all.sort((a, b) => a.priority - b.priority);
     render(all);
+
+    // enable middle-button drag scrolling
+    const container = document.getElementById('grid-container');
+    let isDragging = false;
+    let lastX, lastY;
+    container.addEventListener('mousedown', e => {
+        if (e.button === 1) { // middle button
+            isDragging = true;
+            lastX = e.clientX;
+            lastY = e.clientY;
+            e.preventDefault();
+        }
+    });
+    window.addEventListener('mousemove', e => {
+        if (isDragging) {
+            const dx = e.clientX - lastX;
+            const dy = e.clientY - lastY;
+            container.scrollLeft -= dx;
+            container.scrollTop -= dy;
+            lastX = e.clientX;
+            lastY = e.clientY;
+            e.preventDefault();
+        }
+    });
+    window.addEventListener('mouseup', e => {
+        if (e.button === 1 && isDragging) {
+            isDragging = false;
+            e.preventDefault();
+        }
+    });
 }).catch(err => console.error(err));
