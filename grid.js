@@ -38,6 +38,7 @@ const CL_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 const USERNAME_KEY = 'playerUsername';
 const PLAYER_CL_CACHE_PREFIX = 'playerCollectionLogCache';
 const PLAYER_CL_CACHE_TTL = 15 * 60 * 1000; // 15 minutes
+const DIARY_DIFFICULTIES = new Set(['easy', 'medium', 'hard', 'elite']);
 const TIER_DISPLAY_ORDER = ['easy', 'medium', 'hard', 'elite', 'master', 'master-tedious', 'extra', 'pets'];
 const TASK_STATE_LABELS = {
     complete: 'Completed',
@@ -68,6 +69,7 @@ let stateMap = loadStates();
 let playerUsername = '';
 let hasStartedApp = false;
 let obtainedItemIds = new Set();
+let completedAchievementDiaryKeys = new Set();
 let syncButtonStatusTimer = null;
 let activeTierTab = '';
 let gridCanvas = null;
@@ -1116,11 +1118,71 @@ function getPlayerCacheKey(username) {
     return `${PLAYER_CL_CACHE_PREFIX}:${normalizeUsername(username).toLowerCase()}`;
 }
 
+function normalizeAchievementDiaryRegion(value) {
+    const raw = String(value || '').trim().toLowerCase();
+    if (!raw) {
+        return '';
+    }
+
+    const slug = raw
+        .replace(/_/g, ' ')
+        .replace(/&/g, ' and ')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .replace(/-+/g, '-');
+
+    if (slug === 'kourend-kebos') {
+        return 'kourend-and-kebos';
+    }
+    if (slug === 'lumbridge-draynor') {
+        return 'lumbridge-and-draynor';
+    }
+
+    return slug;
+}
+
+function normalizeAchievementDiaryDifficulty(value) {
+    const difficulty = String(value || '').trim().toLowerCase();
+    return DIARY_DIFFICULTIES.has(difficulty) ? difficulty : '';
+}
+
+function getAchievementDiaryKey(region, difficulty) {
+    return `${region}|${difficulty}`;
+}
+
+function extractCompletedAchievementDiaryKeys(achievementDiaries) {
+    const completedKeys = new Set();
+    if (!achievementDiaries || typeof achievementDiaries !== 'object') {
+        return completedKeys;
+    }
+
+    Object.entries(achievementDiaries).forEach(([rawRegion, regionData]) => {
+        const region = normalizeAchievementDiaryRegion(rawRegion);
+        if (!region || !regionData || typeof regionData !== 'object') {
+            return;
+        }
+
+        Object.entries(regionData).forEach(([rawDifficulty, difficultyData]) => {
+            const difficulty = normalizeAchievementDiaryDifficulty(rawDifficulty);
+            if (!difficulty || !difficultyData || typeof difficultyData !== 'object') {
+                return;
+            }
+
+            if (difficultyData.complete === true) {
+                completedKeys.add(getAchievementDiaryKey(region, difficulty));
+            }
+        });
+    });
+
+    return completedKeys;
+}
+
 async function loadPlayerCollectionLog(username, options = {}) {
     const { forceRefresh = false } = options;
     const normalized = normalizeUsername(username);
     if (!normalized) {
         obtainedItemIds = new Set();
+        completedAchievementDiaryKeys = new Set();
         return;
     }
 
@@ -1129,9 +1191,14 @@ async function loadPlayerCollectionLog(username, options = {}) {
         try {
             const raw = localStorage.getItem(cacheKey);
             if (raw) {
-                const { ts, ids } = JSON.parse(raw);
+                const { ts, ids, achievementDiaryKeys } = JSON.parse(raw);
                 if (Date.now() - ts < PLAYER_CL_CACHE_TTL && Array.isArray(ids)) {
                     obtainedItemIds = new Set(ids.map(id => Number(id)).filter(id => Number.isInteger(id) && id > 0));
+                    completedAchievementDiaryKeys = new Set(
+                        Array.isArray(achievementDiaryKeys)
+                            ? achievementDiaryKeys.map(value => String(value))
+                            : []
+                    );
                     return;
                 }
             }
@@ -1152,11 +1219,17 @@ async function loadPlayerCollectionLog(username, options = {}) {
         const ids = Array.isArray(payload.collection_log)
             ? payload.collection_log.map(id => Number(id)).filter(id => Number.isInteger(id) && id > 0)
             : [];
+        const diaryKeys = extractCompletedAchievementDiaryKeys(payload.achievement_diaries);
 
         obtainedItemIds = new Set(ids);
+        completedAchievementDiaryKeys = diaryKeys;
 
         try {
-            localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), ids }));
+            localStorage.setItem(cacheKey, JSON.stringify({
+                ts: Date.now(),
+                ids,
+                achievementDiaryKeys: Array.from(diaryKeys)
+            }));
         } catch {
             // ignore localStorage failures
         }
@@ -1596,10 +1669,20 @@ function toggleCurrentTasksPopover() {
 }
 
 function getTaskVerificationItemIds(task) {
-    return task?.verification?.itemIds || [];
+    if (task?.verification?.method !== 'collection-log') {
+        return [];
+    }
+
+    return Array.isArray(task?.verification?.itemIds)
+        ? task.verification.itemIds
+        : [];
 }
 
 function getTaskRequiredCount(task) {
+    if (task?.verification?.method === 'achievement-diary') {
+        return 1;
+    }
+
     const totalItems = getTaskVerificationItemIds(task).length;
     if (totalItems === 0) {
         return 0;
@@ -1612,6 +1695,16 @@ function getTaskRequiredCount(task) {
 }
 
 function getTaskObtainedCount(task) {
+    if (task?.verification?.method === 'achievement-diary') {
+        const region = normalizeAchievementDiaryRegion(task?.verification?.region);
+        const difficulty = normalizeAchievementDiaryDifficulty(task?.verification?.difficulty);
+        if (!region || !difficulty) {
+            return 0;
+        }
+
+        return completedAchievementDiaryKeys.has(getAchievementDiaryKey(region, difficulty)) ? 1 : 0;
+    }
+
     return getTaskVerificationItemIds(task).reduce((count, id) => {
         return count + (obtainedItemIds.has(Number(id)) ? 1 : 0);
     }, 0);
