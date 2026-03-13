@@ -22,6 +22,8 @@ const POP_STAGGER_MS = 50;
 const POP_DURATION_MS = 400;
 const EDGE_POP_OFFSET_MS = 120;
 const UNLOCK_TOAST_DURATION_MS = 4500;
+const CL_CACHE_KEY = 'collectionLogCache';
+const CL_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
 let suppressTaskClick = false;
 let tasksGlobal = [];
@@ -30,6 +32,55 @@ let activePopoverAnchor = null;
 let stateMap = loadStates();
 
 const idToCoords = new Map();
+
+// collection log item map: id -> { name, category, wikiLink, imageUrl }
+let collectionLogMap = new Map();
+
+async function loadCollectionLogItems() {
+    try {
+        const raw = localStorage.getItem(CL_CACHE_KEY);
+        if (raw) {
+            const { ts, data } = JSON.parse(raw);
+            if (Date.now() - ts < CL_CACHE_TTL) {
+                data.forEach(item => {
+                    collectionLogMap.set(item.id, buildClEntry(item.name, item.category));
+                });
+                return;
+            }
+        }
+    } catch { /* ignore corrupt cache */ }
+
+    try {
+        const url = 'https://oldschool.runescape.wiki/api.php?action=query&titles=Module:Collection_log%2Fdata.json&prop=revisions&rvprop=content&rvslots=main&format=json&formatversion=2&origin=*';
+        const resp = await fetch(url);
+        const json = await resp.json();
+        const content = json.query.pages[0].revisions[0].slots.main.content;
+        const items = JSON.parse(content);
+
+        const cacheData = [];
+        items.forEach(item => {
+            const category = item.tabs?.[0] || '';
+            collectionLogMap.set(item.id, buildClEntry(item.name, category));
+            cacheData.push({ id: item.id, name: item.name, category });
+        });
+
+        try {
+            localStorage.setItem(CL_CACHE_KEY, JSON.stringify({ ts: Date.now(), data: cacheData }));
+        } catch { /* ignore localStorage failures */ }
+    } catch (e) {
+        console.warn('Failed to load collection log data', e);
+    }
+}
+
+function buildClEntry(name, category) {
+    const encoded = encodeURIComponent(name.replace(/ /g, '_'));
+    return {
+        name,
+        category,
+        wikiLink: `https://oldschool.runescape.wiki/w/${encoded}`,
+        imageUrl: `https://oldschool.runescape.wiki/w/Special:Redirect/file/${encoded}.png`
+    };
+}
 
 async function loadAll() {
     const promises = tiers.map(name => fetch(`./tiers/${name}.json`).then(r => r.json()));
@@ -576,6 +627,41 @@ function showModal(task, anchor) {
         button.onclick = null;
     }
 
+    const itemsEl = document.getElementById('modal-items');
+    if (itemsEl) {
+        const itemIds = state !== 'locked' ? (task.verification?.itemIds || []) : [];
+        itemsEl.innerHTML = '';
+        if (itemIds.length > 0) {
+            itemsEl.classList.toggle('is-scrollable', itemIds.length > 20);
+            itemIds.forEach(id => {
+                const info = collectionLogMap.get(id);
+                const link = document.createElement('a');
+                link.href = info ? info.wikiLink : '#';
+                link.target = '_blank';
+                link.rel = 'noopener noreferrer';
+                link.title = info ? `${info.name}${info.category ? ` (${info.category})` : ''}` : `Item ID: ${id}`;
+                link.className = 'modal-item-icon';
+                const img = document.createElement('img');
+                img.width = 32;
+                img.height = 32;
+                img.loading = 'lazy';
+                img.decoding = 'async';
+                if (info) {
+                    img.src = info.imageUrl;
+                    img.alt = info.name;
+                } else {
+                    img.alt = `Item ${id}`;
+                }
+                link.appendChild(img);
+                itemsEl.appendChild(link);
+            });
+            itemsEl.style.display = 'grid';
+        } else {
+            itemsEl.classList.remove('is-scrollable');
+            itemsEl.style.display = 'none';
+        }
+    }
+
     activePopoverAnchor = anchor || cell;
     modal.classList.add('open');
     requestAnimationFrame(() => {
@@ -728,7 +814,7 @@ function preloadTaskImages(tasks) {
     })));
 }
 
-loadAll().then(data => {
+Promise.all([loadAll(), loadCollectionLogItems()]).then(([data]) => {
     let all = [];
 
     const saved = localStorage.getItem(STORAGE_KEY);
