@@ -11,7 +11,7 @@ const tiers = [
 ];
 
 const LOCKED_TILE_IMAGE = 'https://oldschool.runescape.wiki/images/thumb/Cake_of_guidance_detail.png/260px-Cake_of_guidance_detail.png?c3595';
-const QUESTION_MARK_ICON = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="10" fill="#1f2937"/><text x="32" y="44" font-size="42" text-anchor="middle" fill="#f8fafc" font-family="sans-serif" font-weight="700">?</text></svg>')}`;
+const QUESTION_MARK_ICON = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="10" fill="#46433A"/><text x="32" y="44" font-size="42" text-anchor="middle" fill="#FFCF3F" font-family="sans-serif" font-weight="700">?</text></svg>')}`;
 const STATES = ['hidden', 'locked', 'incomplete', 'complete'];
 const DRAG_THRESHOLD = 6;
 const STATE_KEY = 'taskStates';
@@ -38,6 +38,8 @@ const CL_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 const USERNAME_KEY = 'playerUsername';
 const PLAYER_CL_CACHE_PREFIX = 'playerCollectionLogCache';
 const PLAYER_CL_CACHE_TTL = 15 * 60 * 1000; // 15 minutes
+const THEME_KEY = 'uiTheme';
+const THEMES = new Set(['osrs', 'dark']);
 const DIARY_DIFFICULTIES = new Set(['easy', 'medium', 'hard', 'elite']);
 const TIER_DISPLAY_ORDER = ['easy', 'medium', 'hard', 'elite', 'master', 'master-tedious', 'extra', 'pets'];
 const TASK_STATE_LABELS = {
@@ -50,15 +52,52 @@ const CELL_SIZE = 80;
 const CELL_GAP = 15;
 const CELL_STEP = CELL_SIZE + CELL_GAP;
 const CELL_RADIUS = 14;
-const TIER_COLORS = {
-    easy: '#4caf50',
-    medium: '#2196f3',
-    hard: '#ffeb3b',
-    elite: '#f44336',
-    master: '#9c27b0',
-    'master-tedious': '#9c27b0',
-    extra: '#607d8b',
-    pets: '#ff6fff'
+const TIER_COLORS_BY_THEME = {
+    osrs: {
+        easy: '#6c5a43',
+        medium: '#5e5040',
+        hard: '#826646',
+        elite: '#77524a',
+        master: '#5f4b45',
+        'master-tedious': '#585753',
+        extra: '#74573f',
+        pets: '#6a5b50'
+    },
+    dark: {
+        easy: '#5f646d',
+        medium: '#5a606a',
+        hard: '#726457',
+        elite: '#6d5b59',
+        master: '#5f5a66',
+        'master-tedious': '#58606b',
+        extra: '#6a5f52',
+        pets: '#675f67'
+    }
+};
+
+const CELL_PALETTES_BY_THEME = {
+    osrs: {
+        locked: { fill: '#3e362f', border: 'rgba(132, 118, 100, 0.62)', text: '#f1e8d4' },
+        incomplete: { fill: '#5f5247', border: 'rgba(148, 134, 109, 0.62)', text: '#f1e8d4' },
+        complete: { fill: '#4f453d', border: 'rgba(132, 118, 100, 0.62)', text: '#f1e8d4' },
+        hidden: { fill: '#2E2C29', border: 'rgba(96, 88, 77, 0.56)', text: '#b79d7e' },
+        badgeFill: 'rgba(15, 15, 15, 0.84)',
+        badgeBorder: 'rgba(96, 88, 77, 0.8)',
+        badgeText: '#f1e8d4',
+        imageShadow: 'rgba(15, 15, 15, 0.34)',
+        placeholderFill: 'rgba(24, 20, 12, 0.4)'
+    },
+    dark: {
+        locked: { fill: '#2b3038', border: 'rgba(96, 103, 116, 0.68)', text: '#e6ebf3' },
+        incomplete: { fill: '#3a3f48', border: 'rgba(118, 126, 142, 0.66)', text: '#e6ebf3' },
+        complete: { fill: '#343a43', border: 'rgba(110, 118, 132, 0.66)', text: '#e6ebf3' },
+        hidden: { fill: '#1f2329', border: 'rgba(80, 88, 100, 0.58)', text: '#b5becb' },
+        badgeFill: 'rgba(10, 12, 16, 0.88)',
+        badgeBorder: 'rgba(96, 103, 116, 0.8)',
+        badgeText: '#e6ebf3',
+        imageShadow: 'rgba(6, 8, 10, 0.4)',
+        placeholderFill: 'rgba(24, 28, 36, 0.45)'
+    }
 };
 
 let suppressTaskClick = false;
@@ -83,6 +122,17 @@ let spritePrewarmTimer = null;
 let zoomRenderDebounceTimer = null;
 let isZooming = false;
 let hoveredCellId = '';
+let activeTheme = 'osrs';
+
+try {
+    activeTheme = normalizeTheme(localStorage.getItem(THEME_KEY));
+} catch {
+    activeTheme = 'osrs';
+}
+
+if (typeof document !== 'undefined' && document.body) {
+    document.body.dataset.theme = activeTheme;
+}
 
 const idToCoords = new Map();
 const idToCell = new Map();
@@ -177,8 +227,101 @@ function getCellById(id) {
     return idToCell.get(String(id)) || null;
 }
 
+function normalizeTheme(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    return THEMES.has(normalized) ? normalized : 'osrs';
+}
+
+function getActiveTierColors() {
+    return TIER_COLORS_BY_THEME[activeTheme] || TIER_COLORS_BY_THEME.osrs;
+}
+
+function getActiveCellPalette() {
+    return CELL_PALETTES_BY_THEME[activeTheme] || CELL_PALETTES_BY_THEME.osrs;
+}
+
 function getTierColor(tier) {
-    return TIER_COLORS[tier] || '#94a3b8';
+    return getActiveTierColors()[tier] || '#736559';
+}
+
+function getReadableTextColor(backgroundHex) {
+    const match = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(String(backgroundHex || ''));
+    if (!match) {
+        return '#f9f1de';
+    }
+
+    const red = Number.parseInt(match[1], 16) / 255;
+    const green = Number.parseInt(match[2], 16) / 255;
+    const blue = Number.parseInt(match[3], 16) / 255;
+    const luminance = (0.2126 * red) + (0.7152 * green) + (0.0722 * blue);
+
+    return luminance > 0.52 ? '#0F0F0F' : '#f9f1de';
+}
+
+function updateThemeToggleButtons() {
+    document.querySelectorAll('#theme-toggle .theme-option').forEach(button => {
+        button.classList.toggle('active', button.dataset.theme === activeTheme);
+    });
+}
+
+function applyTheme(theme, options = {}) {
+    const { persist = true } = options;
+    const nextTheme = normalizeTheme(theme);
+    const changed = nextTheme !== activeTheme || document.body?.dataset.theme !== nextTheme;
+
+    activeTheme = nextTheme;
+    if (document.body) {
+        document.body.dataset.theme = nextTheme;
+    }
+
+    if (persist) {
+        try {
+            localStorage.setItem(THEME_KEY, nextTheme);
+        } catch {
+            // ignore localStorage failures
+        }
+    }
+
+    updateThemeToggleButtons();
+
+    if (!changed) {
+        return;
+    }
+
+    backgroundSpriteCache.clear();
+    idToCell.forEach(cell => {
+        cell.spriteKey = '';
+    });
+
+    queueCanvasRender();
+
+    if (document.getElementById('task-modal')?.classList.contains('open')) {
+        refreshOpenModal();
+    }
+
+    if (document.getElementById('tier-tasks-modal')?.classList.contains('open')) {
+        renderTierTasksModal();
+    }
+
+    updateCurrentTasksPopover();
+}
+
+function initThemeToggle() {
+    applyTheme(activeTheme, { persist: false });
+
+    const toggle = document.getElementById('theme-toggle');
+    if (!toggle) {
+        return;
+    }
+
+    toggle.addEventListener('click', e => {
+        const button = e.target.closest('.theme-option');
+        if (!button) {
+            return;
+        }
+
+        applyTheme(button.dataset.theme);
+    });
 }
 
 function isAnchorConnected(anchor) {
@@ -509,10 +652,11 @@ function getContainedImageRect(image, boxX, boxY, boxWidth, boxHeight) {
 function getCellSpriteKey(cell, imageKey) {
     const pixelRatioKey = Math.round(getSpritePixelRatio() * 1000);
     if (cell.state === 'locked') {
-        return `locked::${pixelRatioKey}::${imageKey}`;
+        return `locked::${activeTheme}::${pixelRatioKey}::${imageKey}`;
     }
 
     return [
+        activeTheme,
         cell.state,
         pixelRatioKey,
         imageKey,
@@ -521,7 +665,7 @@ function getCellSpriteKey(cell, imageKey) {
 }
 
 function getBackgroundSpriteKey(state) {
-    return `bg::${state}@${Math.round(getSpritePixelRatio() * 1000)}`;
+    return `bg::${activeTheme}::${state}@${Math.round(getSpritePixelRatio() * 1000)}`;
 }
 
 function drawCellBackgroundSprite(spriteContext, state, options = {}) {
@@ -529,53 +673,15 @@ function drawCellBackgroundSprite(spriteContext, state, options = {}) {
     const x = 0;
     const y = 0;
 
-    const palettes = {
-        locked: {
-            fillTop: '#1a2434',
-            fillBottom: '#070d16',
-            border: 'rgba(100, 116, 139, 0.36)',
-            text: '#94a3b8'
-        },
-        incomplete: {
-            fillTop: '#fff8d6',
-            fillBottom: '#fde68a',
-            border: 'rgba(251, 191, 36, 0.9)',
-            text: '#4a2d00'
-        },
-        complete: {
-            fillTop: '#dcfce7',
-            fillBottom: '#86efac',
-            border: 'rgba(34, 197, 94, 0.88)',
-            text: '#14532d'
-        },
-        hidden: {
-            fillTop: '#1e293b',
-            fillBottom: '#1e293b',
-            border: 'rgba(148, 163, 184, 0.2)',
-            text: '#e2e8f0'
-        }
-    };
+    const themePalette = getActiveCellPalette();
+    const palette = themePalette[state] || themePalette.hidden;
 
-    const palette = palettes[state] || palettes.hidden;
     drawRoundedRect(spriteContext, x, y, CELL_SIZE, CELL_SIZE, CELL_RADIUS);
-    const gradient = spriteContext.createLinearGradient(0, y, 0, y + CELL_SIZE);
-    gradient.addColorStop(0, palette.fillTop);
-    gradient.addColorStop(1, palette.fillBottom);
-    spriteContext.fillStyle = gradient;
+    spriteContext.fillStyle = palette.fill;
     spriteContext.fill();
     spriteContext.strokeStyle = palette.border;
     spriteContext.lineWidth = 1;
     spriteContext.stroke();
-
-    drawRoundedRect(spriteContext, x, y, CELL_SIZE, CELL_SIZE, CELL_RADIUS);
-    spriteContext.save();
-    spriteContext.clip();
-    const highlight = spriteContext.createLinearGradient(0, y, 0, y + 24);
-    highlight.addColorStop(0, 'rgba(255,255,255,0.22)');
-    highlight.addColorStop(1, 'rgba(255,255,255,0)');
-    spriteContext.fillStyle = highlight;
-    spriteContext.fillRect(x, y, CELL_SIZE, 24);
-    spriteContext.restore();
 
     if (state === 'locked' && !skipBadge) {
         const label = 'LOCKED';
@@ -587,13 +693,13 @@ function drawCellBackgroundSprite(spriteContext, state, options = {}) {
         const badgeY = y + 7;
 
         drawRoundedRect(spriteContext, badgeX, badgeY, badgeWidth, badgeHeight, 7);
-        spriteContext.fillStyle = 'rgba(15, 23, 42, 0.8)';
+        spriteContext.fillStyle = themePalette.badgeFill;
         spriteContext.fill();
-        spriteContext.strokeStyle = 'rgba(148, 163, 184, 0.32)';
+        spriteContext.strokeStyle = themePalette.badgeBorder;
         spriteContext.lineWidth = 1;
         spriteContext.stroke();
 
-        spriteContext.fillStyle = '#e2e8f0';
+        spriteContext.fillStyle = themePalette.badgeText;
         spriteContext.textAlign = 'center';
         spriteContext.textBaseline = 'middle';
         spriteContext.fillText(label, badgeX + (badgeWidth / 2), badgeY + (badgeHeight / 2));
@@ -611,14 +717,14 @@ function drawCellSpriteForeground(spriteContext, cell, palette, imageState) {
     if (imageState.image) {
         const imageRect = getContainedImageRect(imageState.image, imageX, imageY, imageSize, imageSize);
         spriteContext.save();
-        spriteContext.shadowColor = 'rgba(15, 23, 42, 0.24)';
+        spriteContext.shadowColor = getActiveCellPalette().imageShadow;
         spriteContext.shadowBlur = 6;
         spriteContext.shadowOffsetY = 2;
         spriteContext.drawImage(imageState.image, imageRect.x, imageRect.y, imageRect.width, imageRect.height);
         spriteContext.restore();
     } else if (imageState.hasImageSource) {
         drawRoundedRect(spriteContext, imageX + 2, imageY + 2, imageSize - 4, imageSize - 4, 8);
-        spriteContext.fillStyle = 'rgba(15, 23, 42, 0.26)';
+        spriteContext.fillStyle = getActiveCellPalette().placeholderFill;
         spriteContext.fill();
         spriteContext.fillStyle = palette.text;
         spriteContext.font = '700 16px sans-serif';
@@ -702,12 +808,8 @@ function ensureCellSprite(cell) {
     spriteContext.imageSmoothingEnabled = false;
     spriteContext.clearRect(0, 0, CELL_SIZE, CELL_SIZE);
 
-    const palette = {
-        locked: { text: '#e2e8f0' },
-        incomplete: { text: '#4a2d00' },
-        complete: { text: '#14532d' },
-        hidden: { text: '#e2e8f0' }
-    }[cell.state] || { text: '#e2e8f0' };
+    const themePalette = getActiveCellPalette();
+    const palette = themePalette[cell.state] || themePalette.hidden;
 
     drawCellBackgroundSprite(spriteContext, cell.state);
     drawCellSpriteForeground(spriteContext, cell, palette, imageState);
@@ -729,7 +831,7 @@ function getEdgeCellSpriteKey(edgeSides) {
     const r = edgeSides.right ? 1 : 0;
     const b = edgeSides.bottom ? 1 : 0;
     const l = edgeSides.left ? 1 : 0;
-    return `edge::${t}${r}${b}${l}@${pixelRatioKey}`;
+    return `edge::${activeTheme}::${t}${r}${b}${l}@${pixelRatioKey}`;
 }
 
 function ensureEdgeCellSprite(edgeSides) {
@@ -938,8 +1040,8 @@ function drawCanvasCell(context, cell, now) {
         context.save();
         drawRoundedRect(context, x + 0.75, y + 0.75, CELL_SIZE - 1.5, CELL_SIZE - 1.5, CELL_RADIUS - 1);
         context.lineWidth = 1.5;
-        context.strokeStyle = `rgba(255, 255, 255, ${0.28 * hoverProgress})`;
-        context.shadowColor = `rgba(125, 211, 252, ${0.36 * hoverProgress})`;
+        context.strokeStyle = `rgba(255, 207, 63, ${0.26 * hoverProgress})`;
+        context.shadowColor = `rgba(147, 96, 57, ${0.3 * hoverProgress})`;
         context.shadowBlur = 12 * hoverProgress;
         context.stroke();
         context.restore();
@@ -2289,8 +2391,8 @@ function showModal(task, anchor) {
 
     if (tierBadge) {
         const tier = task.tier || '';
-        const bgColor = TIER_COLORS[tier] || '#475569';
-        const textColor = tier === 'hard' ? '#4a2d00' : '#ffffff';
+        const bgColor = getTierColor(tier);
+        const textColor = getReadableTextColor(bgColor);
         tierBadge.textContent = formatTierName(tier) || 'Unknown';
         tierBadge.style.background = bgColor;
         tierBadge.style.color = textColor;
@@ -2481,6 +2583,8 @@ window.addEventListener('DOMContentLoaded', () => {
     const tierTasksClose = document.getElementById('tier-tasks-close');
     const tierProgressButton = document.getElementById('tier-progress-button');
     const currentTasksButton = document.getElementById('current-tasks-button');
+
+    initThemeToggle();
 
     close.addEventListener('click', hideModal);
 
