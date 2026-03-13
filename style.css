@@ -715,14 +715,16 @@ body::-webkit-scrollbar {
 }
 
 #grid {
-    display: grid;
-    grid-template-columns: repeat(var(--grid-size), 80px);
-    grid-auto-rows: 80px;
-    gap: 15px; /* larger gaps between items */
+    position: relative;
     background: #333;
     width: max-content;
+    height: max-content;
     transform-origin: top left;
     will-change: transform;
+}
+
+#grid-canvas {
+    display: block;
 }
 
 .cell {

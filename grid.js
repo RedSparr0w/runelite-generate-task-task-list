@@ -38,6 +38,20 @@ const TASK_STATE_LABELS = {
     locked: 'Locked',
     hidden: 'Hidden'
 };
+const CELL_SIZE = 80;
+const CELL_GAP = 15;
+const CELL_STEP = CELL_SIZE + CELL_GAP;
+const CELL_RADIUS = 14;
+const TIER_COLORS = {
+    easy: '#4caf50',
+    medium: '#2196f3',
+    hard: '#ffeb3b',
+    elite: '#f44336',
+    master: '#9c27b0',
+    'master-tedious': '#607d8b',
+    extra: '#ff9800',
+    pets: '#8bc34a'
+};
 
 let suppressTaskClick = false;
 let tasksGlobal = [];
@@ -49,9 +63,16 @@ let hasStartedApp = false;
 let obtainedItemIds = new Set();
 let syncButtonStatusTimer = null;
 let activeTierTab = '';
+let gridCanvas = null;
+let gridContext = null;
+let canvasFrameId = null;
+let gridPixelWidth = 0;
+let gridPixelHeight = 0;
 
 const idToCoords = new Map();
 const idToCell = new Map();
+const coordToTaskId = new Map();
+const imageAssetCache = new Map();
 
 // collection log item map: id -> { name, category, wikiLink, imageUrl }
 let collectionLogMap = new Map();
@@ -138,6 +159,521 @@ function wait(ms) {
 
 function getCellById(id) {
     return idToCell.get(String(id)) || null;
+}
+
+function getTierColor(tier) {
+    return TIER_COLORS[tier] || '#94a3b8';
+}
+
+function isAnchorConnected(anchor) {
+    if (!anchor) {
+        return false;
+    }
+
+    if (anchor.__virtualAnchor) {
+        return Boolean(getCellById(anchor.taskId));
+    }
+
+    return anchor instanceof Node ? document.body.contains(anchor) : false;
+}
+
+function createCellAnchor(cell) {
+    return {
+        __virtualAnchor: true,
+        taskId: String(cell.id),
+        _task: cell.task,
+        getBoundingClientRect() {
+            const currentCell = getCellById(this.taskId);
+            const grid = document.getElementById('grid');
+            if (!currentCell || !grid) {
+                return {
+                    left: 0,
+                    top: 0,
+                    right: 0,
+                    bottom: 0,
+                    width: 0,
+                    height: 0
+                };
+            }
+
+            const gridRect = grid.getBoundingClientRect();
+            const scaledSize = CELL_SIZE * currentScale;
+            const left = gridRect.left + (currentCell.pixelX * currentScale);
+            const top = gridRect.top + (currentCell.pixelY * currentScale);
+
+            return {
+                left,
+                top,
+                right: left + scaledSize,
+                bottom: top + scaledSize,
+                width: scaledSize,
+                height: scaledSize
+            };
+        }
+    };
+}
+
+function ensureGridCanvas() {
+    const grid = document.getElementById('grid');
+    if (!grid) {
+        return null;
+    }
+
+    let canvas = grid.querySelector('#grid-canvas');
+    if (!canvas) {
+        canvas = document.createElement('canvas');
+        canvas.id = 'grid-canvas';
+        grid.appendChild(canvas);
+    }
+
+    bindCanvasInteractions(canvas);
+
+    gridCanvas = canvas;
+    gridContext = canvas.getContext('2d');
+    return canvas;
+}
+
+function getImageAsset(source) {
+    const src = source || QUESTION_MARK_ICON;
+    if (imageAssetCache.has(src)) {
+        return imageAssetCache.get(src);
+    }
+
+    const image = new Image();
+    const asset = {
+        image,
+        status: 'loading',
+        fallback: null
+    };
+
+    image.onload = () => {
+        asset.status = 'ready';
+        queueCanvasRender();
+    };
+
+    image.onerror = () => {
+        asset.status = 'error';
+        if (src !== QUESTION_MARK_ICON) {
+            asset.fallback = getImageAsset(QUESTION_MARK_ICON);
+        }
+        queueCanvasRender();
+    };
+
+    image.src = src;
+    imageAssetCache.set(src, asset);
+    return asset;
+}
+
+function resolveImageForDraw(source) {
+    const asset = getImageAsset(source);
+    const fallbackAsset = getImageAsset(QUESTION_MARK_ICON);
+
+    if (asset.status === 'loading' && asset.image.complete) {
+        if (asset.image.naturalWidth > 0) {
+            asset.status = 'ready';
+        } else {
+            asset.status = 'error';
+            if (!asset.fallback && source !== QUESTION_MARK_ICON) {
+                asset.fallback = fallbackAsset;
+            }
+        }
+    }
+
+    if (asset.status === 'ready') {
+        return asset.image;
+    }
+
+    if (asset.status === 'error' && source !== QUESTION_MARK_ICON && !asset.fallback) {
+        asset.fallback = fallbackAsset;
+    }
+
+    if (asset.fallback?.status === 'ready') {
+        return asset.fallback.image;
+    }
+
+    if (fallbackAsset.status === 'ready') {
+        return fallbackAsset.image;
+    }
+
+    return null;
+}
+
+function queueCanvasRender() {
+    if (!gridContext || canvasFrameId !== null) {
+        return;
+    }
+
+    canvasFrameId = requestAnimationFrame(drawCanvasFrame);
+}
+
+function drawCanvasFrame(timestamp) {
+    canvasFrameId = null;
+    const keepAnimating = renderGridCanvas(timestamp);
+    if (keepAnimating) {
+        queueCanvasRender();
+    }
+}
+
+function drawRoundedRect(context, x, y, width, height, radius) {
+    context.beginPath();
+    context.moveTo(x + radius, y);
+    context.lineTo(x + width - radius, y);
+    context.quadraticCurveTo(x + width, y, x + width, y + radius);
+    context.lineTo(x + width, y + height - radius);
+    context.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+    context.lineTo(x + radius, y + height);
+    context.quadraticCurveTo(x, y + height, x, y + height - radius);
+    context.lineTo(x, y + radius);
+    context.quadraticCurveTo(x, y, x + radius, y);
+    context.closePath();
+}
+
+function buildTaskNameLines(name, options = {}) {
+    const { maxCharsPerLine = 14, maxLines = 2 } = options;
+    const raw = String(name || '').trim();
+    if (!raw) {
+        return [''];
+    }
+
+    const words = raw.split(/\s+/);
+    const lines = [];
+    let current = '';
+
+    const pushCurrent = () => {
+        if (current) {
+            lines.push(current);
+            current = '';
+        }
+    };
+
+    for (const word of words) {
+        if (!current) {
+            if (word.length <= maxCharsPerLine) {
+                current = word;
+            } else {
+                lines.push(`${word.slice(0, Math.max(1, maxCharsPerLine - 1))}…`);
+            }
+            continue;
+        }
+
+        const next = `${current} ${word}`;
+        if (next.length <= maxCharsPerLine) {
+            current = next;
+        } else {
+            pushCurrent();
+            if (word.length <= maxCharsPerLine) {
+                current = word;
+            } else {
+                lines.push(`${word.slice(0, Math.max(1, maxCharsPerLine - 1))}…`);
+            }
+        }
+    }
+
+    pushCurrent();
+
+    if (lines.length <= maxLines) {
+        return lines;
+    }
+
+    const clipped = lines.slice(0, maxLines);
+    const last = clipped[maxLines - 1];
+    clipped[maxLines - 1] = last.endsWith('…') ? last : `${last.slice(0, Math.max(1, maxCharsPerLine - 1))}…`;
+    return clipped;
+}
+
+function drawCanvasCell(context, cell, now) {
+    const state = cell.state || 'hidden';
+    const hasEdge = state === 'hidden' && cell.edgeVisible && (cell.edgeSides.top || cell.edgeSides.right || cell.edgeSides.bottom || cell.edgeSides.left);
+    let keepAnimating = false;
+
+    if (state === 'hidden' && !hasEdge && !cell.popAnimation) {
+        return false;
+    }
+
+    let scale = 1;
+    let alpha = 1;
+
+    if (cell.popAnimation) {
+        const elapsed = now - cell.popAnimation.startTime;
+        if (elapsed < 0) {
+            return true;
+        }
+
+        const progress = clamp(elapsed / POP_DURATION_MS, 0, 1);
+        if (progress >= 1) {
+            cell.popAnimation = null;
+        } else {
+            keepAnimating = true;
+            if (progress < 0.5) {
+                const up = progress / 0.5;
+                scale = 1.2 * up;
+                alpha = clamp(up * 1.2, 0, 1);
+            } else {
+                const down = (progress - 0.5) / 0.5;
+                scale = 1.2 - (0.2 * down);
+                alpha = 1;
+            }
+        }
+    }
+
+    const x = cell.pixelX;
+    const y = cell.pixelY;
+    const centerX = x + (CELL_SIZE / 2);
+    const centerY = y + (CELL_SIZE / 2);
+
+    context.save();
+    context.globalAlpha = alpha;
+    context.translate(centerX, centerY);
+    context.scale(scale, scale);
+    context.translate(-centerX, -centerY);
+
+    if (hasEdge) {
+        context.lineCap = 'round';
+
+        const drawEdgePath = () => {
+            context.beginPath();
+            if (cell.edgeSides.top) {
+                context.moveTo(x + 5, y + 2);
+                context.lineTo(x + CELL_SIZE - 5, y + 2);
+            }
+            if (cell.edgeSides.right) {
+                context.moveTo(x + CELL_SIZE - 2, y + 5);
+                context.lineTo(x + CELL_SIZE - 2, y + CELL_SIZE - 5);
+            }
+            if (cell.edgeSides.bottom) {
+                context.moveTo(x + 5, y + CELL_SIZE - 2);
+                context.lineTo(x + CELL_SIZE - 5, y + CELL_SIZE - 2);
+            }
+            if (cell.edgeSides.left) {
+                context.moveTo(x + 2, y + 5);
+                context.lineTo(x + 2, y + CELL_SIZE - 5);
+            }
+        };
+
+        drawEdgePath();
+        context.lineWidth = 4;
+        context.strokeStyle = 'rgba(15, 23, 42, 0.95)';
+        context.stroke();
+
+        drawEdgePath();
+        context.lineWidth = 2;
+        context.strokeStyle = 'rgba(148, 163, 184, 0.42)';
+        context.stroke();
+
+        drawEdgePath();
+        context.lineWidth = 1;
+        context.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+        context.stroke();
+
+        context.lineCap = 'butt';
+        context.restore();
+        return keepAnimating;
+    }
+
+    const palettes = {
+        locked: {
+            fillTop: '#334155',
+            fillBottom: '#0f172a',
+            border: 'rgba(148, 163, 184, 0.42)',
+            text: '#e2e8f0'
+        },
+        incomplete: {
+            fillTop: '#fff8d6',
+            fillBottom: '#fde68a',
+            border: 'rgba(251, 191, 36, 0.9)',
+            text: '#4a2d00'
+        },
+        complete: {
+            fillTop: '#dcfce7',
+            fillBottom: '#86efac',
+            border: 'rgba(34, 197, 94, 0.88)',
+            text: '#14532d'
+        },
+        hidden: {
+            fillTop: '#1e293b',
+            fillBottom: '#1e293b',
+            border: 'rgba(148, 163, 184, 0.2)',
+            text: '#e2e8f0'
+        }
+    };
+
+    const palette = palettes[state] || palettes.hidden;
+    drawRoundedRect(context, x, y, CELL_SIZE, CELL_SIZE, CELL_RADIUS);
+    const gradient = context.createLinearGradient(0, y, 0, y + CELL_SIZE);
+    gradient.addColorStop(0, palette.fillTop);
+    gradient.addColorStop(1, palette.fillBottom);
+    context.fillStyle = gradient;
+    context.fill();
+    context.strokeStyle = palette.border;
+    context.lineWidth = 1;
+    context.stroke();
+
+    drawRoundedRect(context, x, y, CELL_SIZE, CELL_SIZE, CELL_RADIUS);
+    context.save();
+    context.clip();
+    const highlight = context.createLinearGradient(0, y, 0, y + 24);
+    highlight.addColorStop(0, 'rgba(255,255,255,0.22)');
+    highlight.addColorStop(1, 'rgba(255,255,255,0)');
+    context.fillStyle = highlight;
+    context.fillRect(x, y, CELL_SIZE, 24);
+    context.restore();
+
+    if (state === 'locked') {
+        const label = 'LOCKED';
+        context.font = '700 8px sans-serif';
+        const badgePaddingX = 5;
+        const badgeWidth = Math.ceil(context.measureText(label).width) + (badgePaddingX * 2);
+        const badgeHeight = 14;
+        const badgeX = x + 7;
+        const badgeY = y + 7;
+
+        drawRoundedRect(context, badgeX, badgeY, badgeWidth, badgeHeight, 7);
+        context.fillStyle = 'rgba(15, 23, 42, 0.8)';
+        context.fill();
+        context.strokeStyle = 'rgba(148, 163, 184, 0.32)';
+        context.lineWidth = 1;
+        context.stroke();
+
+        context.fillStyle = '#e2e8f0';
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+        context.fillText(label, badgeX + (badgeWidth / 2), badgeY + (badgeHeight / 2));
+    }
+
+    const imageSource = state === 'locked'
+        ? LOCKED_TILE_IMAGE
+        : (state === 'incomplete' || state === 'complete' ? cell.task.imageLink : null);
+    const image = imageSource ? resolveImageForDraw(imageSource) : null;
+    const imageSize = state === 'locked' ? 42 : 30;
+    const imageX = x + ((CELL_SIZE - imageSize) / 2);
+    const imageY = y + (state === 'locked' ? 22 : 14);
+
+    if (image) {
+        context.save();
+        context.shadowColor = 'rgba(15, 23, 42, 0.24)';
+        context.shadowBlur = 6;
+        context.shadowOffsetY = 2;
+        context.drawImage(image, imageX, imageY, imageSize, imageSize);
+        context.restore();
+    } else if (imageSource) {
+        drawRoundedRect(context, imageX + 2, imageY + 2, imageSize - 4, imageSize - 4, 8);
+        context.fillStyle = 'rgba(15, 23, 42, 0.26)';
+        context.fill();
+        context.fillStyle = palette.text;
+        context.font = '700 16px sans-serif';
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+        context.fillText('?', x + (CELL_SIZE / 2), imageY + (imageSize / 2));
+    }
+
+    if (state === 'incomplete' || state === 'complete') {
+        context.fillStyle = palette.text;
+        context.font = '700 8.5px sans-serif';
+        context.textAlign = 'center';
+        context.textBaseline = 'alphabetic';
+        const lines = cell.nameLines || [];
+        const lineHeight = 9;
+        const startY = y + CELL_SIZE - 8 - ((lines.length - 1) * lineHeight);
+        lines.forEach((line, lineIndex) => {
+            context.fillText(line, x + (CELL_SIZE / 2), startY + (lineIndex * lineHeight));
+        });
+    }
+
+    context.beginPath();
+    context.arc(x + CELL_SIZE - 8, y + 8, 4, 0, Math.PI * 2);
+    context.fillStyle = getTierColor(cell.task.tier);
+    context.fill();
+
+    context.restore();
+    return keepAnimating;
+}
+
+function renderGridCanvas(now = performance.now()) {
+    if (!gridContext || !gridCanvas) {
+        return false;
+    }
+
+    gridContext.clearRect(0, 0, gridPixelWidth, gridPixelHeight);
+
+    let keepAnimating = false;
+    idToCell.forEach(cell => {
+        const cellAnimating = drawCanvasCell(gridContext, cell, now);
+        keepAnimating = keepAnimating || cellAnimating;
+    });
+
+    return keepAnimating;
+}
+
+function getCellAtClientPoint(clientX, clientY) {
+    if (!gridCanvas) {
+        return null;
+    }
+
+    const canvasRect = gridCanvas.getBoundingClientRect();
+    if (
+        clientX < canvasRect.left ||
+        clientY < canvasRect.top ||
+        clientX > canvasRect.right ||
+        clientY > canvasRect.bottom
+    ) {
+        return null;
+    }
+
+    const localX = (clientX - canvasRect.left) / currentScale;
+    const localY = (clientY - canvasRect.top) / currentScale;
+    if (localX < 0 || localY < 0) {
+        return null;
+    }
+
+    const coordX = Math.floor(localX / CELL_STEP);
+    const coordY = Math.floor(localY / CELL_STEP);
+    const withinCellX = localX - (coordX * CELL_STEP);
+    const withinCellY = localY - (coordY * CELL_STEP);
+    if (withinCellX < 0 || withinCellY < 0 || withinCellX >= CELL_SIZE || withinCellY >= CELL_SIZE) {
+        return null;
+    }
+
+    const taskId = coordToTaskId.get(`${coordX},${coordY}`);
+    return taskId ? getCellById(taskId) : null;
+}
+
+function bindCanvasInteractions(canvas) {
+    if (!canvas || canvas.dataset.bound === '1') {
+        return;
+    }
+
+    canvas.dataset.bound = '1';
+
+    canvas.addEventListener('click', e => {
+        if (suppressTaskClick || e.button !== 0) {
+            return;
+        }
+
+        const cell = getCellAtClientPoint(e.clientX, e.clientY);
+        if (!cell) {
+            return;
+        }
+
+        const state = getState(cell.id) || 'hidden';
+        if (state === 'hidden') {
+            return;
+        }
+
+        showModal(cell.task, createCellAnchor(cell));
+    });
+
+    canvas.addEventListener('contextmenu', e => {
+        const cell = getCellAtClientPoint(e.clientX, e.clientY);
+        if (!cell) {
+            return;
+        }
+
+        const state = getState(cell.id) || 'hidden';
+        if (state === 'incomplete' || state === 'complete') {
+            e.preventDefault();
+            window.open(cell.task.wikiLink, '_blank');
+        }
+    });
 }
 
 function normalizeUsername(value) {
@@ -344,6 +880,10 @@ function normalizeUnlockStates() {
     const incompleteTasks = tasksGlobal.filter(task => getState(task.id) === 'incomplete');
     incompleteTasks.slice(unlockLimit).forEach(task => {
         setState(task.id, 'locked');
+        const cell = getCellById(task.id);
+        if (cell) {
+            setCellState(cell, 'locked');
+        }
     });
 }
 
@@ -530,15 +1070,13 @@ function centerTaskInView(taskId, options = {}) {
         return false;
     }
 
-    const containerRect = container.getBoundingClientRect();
-    const cellRect = cell.getBoundingClientRect();
-    const deltaX = (cellRect.left + (cellRect.width / 2)) - (containerRect.left + (containerRect.width / 2));
-    const deltaY = (cellRect.top + (cellRect.height / 2)) - (containerRect.top + (containerRect.height / 2));
-
     const maxLeft = Math.max(0, container.scrollWidth - container.clientWidth);
     const maxTop = Math.max(0, container.scrollHeight - container.clientHeight);
-    const nextLeft = clamp(container.scrollLeft + deltaX, 0, maxLeft);
-    const nextTop = clamp(container.scrollTop + deltaY, 0, maxTop);
+    const scaledCellSize = CELL_SIZE * currentScale;
+    const targetLeft = (cell.pixelX * currentScale) - ((container.clientWidth - scaledCellSize) / 2);
+    const targetTop = (cell.pixelY * currentScale) - ((container.clientHeight - scaledCellSize) / 2);
+    const nextLeft = clamp(targetLeft, 0, maxLeft);
+    const nextTop = clamp(targetTop, 0, maxTop);
 
     container.scrollTo({
         left: nextLeft,
@@ -679,7 +1217,12 @@ function applyTaskCompletion(task) {
 
 function refreshOpenModal() {
     const modal = document.getElementById('task-modal');
-    if (!modal?.classList.contains('open') || !activePopoverAnchor || !document.body.contains(activePopoverAnchor)) {
+    if (!modal?.classList.contains('open') || !activePopoverAnchor) {
+        return;
+    }
+
+    if (!isAnchorConnected(activePopoverAnchor)) {
+        hideModal();
         return;
     }
 
@@ -797,7 +1340,7 @@ function updateGridScale() {
 }
 
 function refreshPopoverPosition() {
-    if (activePopoverAnchor && document.body.contains(activePopoverAnchor)) {
+    if (activePopoverAnchor && isAnchorConnected(activePopoverAnchor)) {
         positionPopover(activePopoverAnchor);
     } else if (activePopoverAnchor) {
         hideModal();
@@ -841,79 +1384,54 @@ function bindWheelZoom(container) {
     });
 }
 
-function applyCellContent(cell, state) {
-    const task = cell._task;
-    const img = cell.querySelector('img');
-    const name = cell.querySelector('.task-name');
-    if (!task || !img || !name) {
-        return;
-    }
-
-    if (state === 'locked') {
-        setImageWithFallback(img, LOCKED_TILE_IMAGE, 'Locked task');
-        name.textContent = '';
-        return;
-    }
-
-    if (state === 'hidden') {
-        img.removeAttribute('src');
-        img.alt = '';
-        name.textContent = '';
-        return;
-    }
-
-    setImageWithFallback(img, task.imageLink, task.name);
-    name.textContent = task.name;
-}
-
 function setCellState(cell, nextState) {
-    cell.classList.remove(...STATES.map(state => `state-${state}`));
-    cell.classList.add(`state-${nextState}`);
-    applyCellContent(cell, nextState);
+    if (!cell) {
+        return;
+    }
+
+    cell.state = nextState;
+    if (nextState !== 'hidden') {
+        cell.edgeVisible = false;
+        cell.edgeSides = {
+            top: false,
+            right: false,
+            bottom: false,
+            left: false
+        };
+    }
+
+    queueCanvasRender();
 }
 
-function createCell(task) {
-    const el = document.createElement('div');
+function createCell(task, coord) {
     const state = getState(task.id) || 'incomplete';
-
-    el.className = 'cell';
-    el.dataset.id = task.id;
-    el._task = task;
-    el.classList.add(`tier-${task.tier}`);
-    el.classList.add(`state-${state}`);
-
-    const img = document.createElement('img');
-    img._src = task.imageLink;
-    img.width = 48;
-    img.height = 48;
-
-    const name = document.createElement('div');
-    name.className = 'task-name';
-
-    el.appendChild(img);
-    el.appendChild(name);
-    applyCellContent(el, state);
-
-    el.addEventListener('click', e => {
-        if (e.button !== 0 || suppressTaskClick) {
-            return;
-        }
-        const currentState = getState(task.id) || 'hidden';
-        if (currentState === 'hidden') {
-            return;
-        }
-        showModal(task, el);
+    const nameLines = buildTaskNameLines(task.name, {
+        maxCharsPerLine: 15,
+        maxLines: 2
     });
 
-    el.addEventListener('contextmenu', e => {
-        e.preventDefault();
-        const currentState = getState(task.id) || 'hidden';
-        if (currentState === 'incomplete' || currentState === 'complete') {
-            window.open(task.wikiLink, '_blank');
+    return {
+        id: String(task.id),
+        task,
+        _task: task,
+        __virtualAnchor: true,
+        taskId: String(task.id),
+        state,
+        pixelX: coord.x * CELL_STEP,
+        pixelY: coord.y * CELL_STEP,
+        nameLines,
+        popAnimation: null,
+        edgeVisible: false,
+        edgeSides: {
+            top: false,
+            right: false,
+            bottom: false,
+            left: false
+        },
+        getBoundingClientRect() {
+            return createCellAnchor(this).getBoundingClientRect();
         }
-    });
-
-    return el;
+    };
 }
 
 function positionPopover(anchor) {
@@ -955,32 +1473,19 @@ function revealNeighborAsLocked(id) {
     }
 
     setCellState(cell, 'locked');
-    playPopReveal(cell, { addVisible: true });
+    playPopReveal(cell);
 }
 
 function playPopReveal(cell, options = {}) {
-    const { addVisible = false, delay = 0 } = options;
+    const { delay = 0 } = options;
     if (!cell) {
         return;
     }
 
-    const run = () => {
-        cell.classList.remove('reveal');
-        void cell.offsetWidth;
-        cell.classList.add('reveal');
-        setTimeout(() => {
-            cell.classList.remove('reveal');
-            if (addVisible) {
-                cell.classList.add('visible');
-            }
-        }, POP_DURATION_MS);
+    cell.popAnimation = {
+        startTime: performance.now() + delay
     };
-
-    if (delay > 0) {
-        setTimeout(run, delay);
-    } else {
-        run();
-    }
+    queueCanvasRender();
 }
 
 function refreshHiddenEdges(options = {}) {
@@ -988,7 +1493,6 @@ function refreshHiddenEdges(options = {}) {
     const stateByCoord = new Map();
     const isFrontierState = state => state === 'incomplete' || state === 'locked';
     const newlyVisibleEdges = [];
-    const hiddenEdgeClasses = ['state-hidden-edge', 'hidden-edge-top', 'hidden-edge-right', 'hidden-edge-bottom', 'hidden-edge-left'];
 
     idToCoords.forEach((coord, id) => {
         stateByCoord.set(`${coord.x},${coord.y}`, getState(id));
@@ -1001,25 +1505,29 @@ function refreshHiddenEdges(options = {}) {
         }
 
         const state = stateByCoord.get(`${coord.x},${coord.y}`);
-        const hasEdgeClass =
-            cell.classList.contains('state-hidden-edge') ||
-            cell.classList.contains('hidden-edge-top') ||
-            cell.classList.contains('hidden-edge-right') ||
-            cell.classList.contains('hidden-edge-bottom') ||
-            cell.classList.contains('hidden-edge-left');
+        const hadVisibleEdge = cell.edgeVisible;
 
         if (state !== 'hidden') {
-            if (hasEdgeClass) {
-                cell.classList.remove(...hiddenEdgeClasses);
+            if (cell.edgeVisible || cell.edgeSides.top || cell.edgeSides.right || cell.edgeSides.bottom || cell.edgeSides.left) {
+                cell.edgeVisible = false;
+                cell.edgeSides = {
+                    top: false,
+                    right: false,
+                    bottom: false,
+                    left: false
+                };
             }
             return;
         }
 
-        const hadVisibleEdge = cell.classList.contains('state-hidden-edge');
-        cell.classList.remove(...hiddenEdgeClasses);
-
         let hasVisibleEdge = false;
         let minAdjacentDelay = Number.POSITIVE_INFINITY;
+        const nextEdgeSides = {
+            top: false,
+            right: false,
+            bottom: false,
+            left: false
+        };
 
         const noteAdjacentDelay = (x, y) => {
             if (!revealDelayByCoord) {
@@ -1032,25 +1540,27 @@ function refreshHiddenEdges(options = {}) {
         };
 
         if (isFrontierState(stateByCoord.get(`${coord.x},${coord.y - 1}`))) {
-            cell.classList.add('hidden-edge-top');
+            nextEdgeSides.top = true;
             hasVisibleEdge = true;
             noteAdjacentDelay(coord.x, coord.y - 1);
         }
         if (isFrontierState(stateByCoord.get(`${coord.x + 1},${coord.y}`))) {
-            cell.classList.add('hidden-edge-right');
+            nextEdgeSides.right = true;
             hasVisibleEdge = true;
             noteAdjacentDelay(coord.x + 1, coord.y);
         }
         if (isFrontierState(stateByCoord.get(`${coord.x},${coord.y + 1}`))) {
-            cell.classList.add('hidden-edge-bottom');
+            nextEdgeSides.bottom = true;
             hasVisibleEdge = true;
             noteAdjacentDelay(coord.x, coord.y + 1);
         }
         if (isFrontierState(stateByCoord.get(`${coord.x - 1},${coord.y}`))) {
-            cell.classList.add('hidden-edge-left');
+            nextEdgeSides.left = true;
             hasVisibleEdge = true;
             noteAdjacentDelay(coord.x - 1, coord.y);
         }
+
+        cell.edgeSides = nextEdgeSides;
 
         if (hasVisibleEdge) {
             if (animate && !hadVisibleEdge) {
@@ -1061,12 +1571,15 @@ function refreshHiddenEdges(options = {}) {
                     startDelay: hasTimedNeighbor ? minAdjacentDelay + edgeDelayOffset : edgeDelayOffset
                 });
             } else {
-                cell.classList.add('state-hidden-edge');
+                cell.edgeVisible = true;
             }
+        } else {
+            cell.edgeVisible = false;
         }
     });
 
     if (!animate || newlyVisibleEdges.length === 0) {
+        queueCanvasRender();
         return;
     }
 
@@ -1083,22 +1596,24 @@ function refreshHiddenEdges(options = {}) {
     orderedEdges.forEach((item, index) => {
         const startDelay = Math.max(item.startDelay ?? edgeDelayOffset, index * POP_STAGGER_MS);
         setTimeout(() => {
-            const cellId = item.cell.dataset.id;
+            const cellId = item.cell.id;
             if (getState(cellId) !== 'hidden') {
                 return;
             }
             const stillHasEdgeSide =
-                item.cell.classList.contains('hidden-edge-top') ||
-                item.cell.classList.contains('hidden-edge-right') ||
-                item.cell.classList.contains('hidden-edge-bottom') ||
-                item.cell.classList.contains('hidden-edge-left');
+                item.cell.edgeSides.top ||
+                item.cell.edgeSides.right ||
+                item.cell.edgeSides.bottom ||
+                item.cell.edgeSides.left;
             if (!stillHasEdgeSide) {
                 return;
             }
-            item.cell.classList.add('state-hidden-edge');
+            item.cell.edgeVisible = true;
             playPopReveal(item.cell);
         }, startDelay);
     });
+
+    queueCanvasRender();
 }
 
 function showModal(task, anchor) {
@@ -1279,30 +1794,46 @@ function updateTaskCoordinates(tasks) {
 
 function render(tasks) {
     const grid = document.getElementById('grid');
+    if (!grid) {
+        return;
+    }
+
     hideModal();
     grid.innerHTML = '';
     idToCell.clear();
+    coordToTaskId.clear();
 
     const { size, coords, center } = updateTaskCoordinates(tasks);
-    const cells = [];
-    let firstCell = null;
+    const canvas = ensureGridCanvas();
+    if (!canvas || !gridContext) {
+        return;
+    }
 
-    grid.style.setProperty('--grid-size', size);
+    gridPixelWidth = Math.max(1, (size * CELL_SIZE) + ((size - 1) * CELL_GAP));
+    gridPixelHeight = gridPixelWidth;
+
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.max(1, Math.floor(gridPixelWidth * dpr));
+    canvas.height = Math.max(1, Math.floor(gridPixelHeight * dpr));
+    canvas.style.width = `${gridPixelWidth}px`;
+    canvas.style.height = `${gridPixelHeight}px`;
+
+    grid.style.width = `${gridPixelWidth}px`;
+    grid.style.height = `${gridPixelHeight}px`;
+    gridContext.setTransform(dpr, 0, 0, dpr, 0, 0);
+    gridContext.imageSmoothingEnabled = false;
+
+    const cells = [];
 
     tasks.forEach((task, index) => {
         const [x, y] = coords[index];
-        const cell = createCell(task);
-        cell.style.gridColumnStart = x + 1;
-        cell.style.gridRowStart = y + 1;
-        grid.appendChild(cell);
+        const cell = createCell(task, { x, y });
         idToCell.set(String(task.id), cell);
+        coordToTaskId.set(`${x},${y}`, String(task.id));
         cells.push({ cell, x, y });
-        if (index === 0) {
-            firstCell = cell;
-        }
     });
 
-    const visibleCells = cells.filter(item => getState(item.cell.dataset.id) !== 'hidden');
+    const visibleCells = cells.filter(item => getState(item.cell.id) !== 'hidden');
     const sortedVisibleCells = visibleCells
         .sort((a, b) => {
             const distanceA = Math.abs(a.x - center.x) + Math.abs(a.y - center.y);
@@ -1314,15 +1845,16 @@ function render(tasks) {
     sortedVisibleCells.forEach((item, index) => {
         const revealDelay = index * POP_STAGGER_MS;
         revealDelayByCoord.set(`${item.x},${item.y}`, revealDelay);
-        playPopReveal(item.cell, { addVisible: true, delay: revealDelay });
+        playPopReveal(item.cell, { delay: revealDelay });
     });
 
     refreshHiddenEdges({ animate: true, center, revealDelayByCoord });
     updateGridScale();
     updateUnlockHud();
+    queueCanvasRender();
 
-    if (firstCell) {
-        firstCell.scrollIntoView({ block: 'center', inline: 'center' });
+    if (tasks.length > 0) {
+        centerTaskInView(tasks[0].id, { smooth: false });
     }
 }
 
@@ -1370,8 +1902,8 @@ window.addEventListener('DOMContentLoaded', () => {
 
     document.addEventListener('mousedown', e => {
         const clickedPopover = e.target.closest('#task-modal .modal-content');
-        const clickedTile = e.target.closest('.cell');
-        if (modal.classList.contains('open') && !clickedPopover && !clickedTile) {
+        const clickedGridCanvas = e.target.closest('#grid-canvas');
+        if (modal.classList.contains('open') && !clickedPopover && !clickedGridCanvas) {
             hideModal();
         }
 
@@ -1438,15 +1970,25 @@ const tierWeights = {
 };
 
 function preloadTaskImages(tasks) {
-    return Promise.all(tasks.map(task => new Promise(resolve => {
+    const sources = new Set([LOCKED_TILE_IMAGE, QUESTION_MARK_ICON]);
+
+    tasks.forEach(task => {
         const state = getState(task.id);
-        if (state === 'incomplete' || state === 'complete') {
-            const image = new Image();
-            image.onload = image.onerror = () => resolve();
-            image.src = task.imageLink;
+        if (state === 'incomplete' || state === 'complete' || state === 'locked') {
+            sources.add(task.imageLink);
+        }
+    });
+
+    return Promise.all(Array.from(sources).map(source => new Promise(resolve => {
+        const asset = getImageAsset(source);
+        if (asset.status === 'ready' || asset.status === 'error') {
+            resolve();
             return;
         }
-        resolve();
+
+        const onDone = () => resolve();
+        asset.image.addEventListener('load', onDone, { once: true });
+        asset.image.addEventListener('error', onDone, { once: true });
     })));
 }
 
