@@ -295,6 +295,10 @@ function createCell(task) {
         if (e.button !== 0 || suppressTaskClick) {
             return;
         }
+        const currentState = getState(task.id) || 'hidden';
+        if (currentState === 'hidden') {
+            return;
+        }
         showModal(task, el);
     });
 
@@ -355,6 +359,51 @@ function revealNeighborAsLocked(id) {
     }, 400);
 }
 
+function refreshHiddenEdges() {
+    const stateByCoord = new Map();
+    const isFrontierState = state => state === 'incomplete' || state === 'locked';
+
+    idToCoords.forEach((coord, id) => {
+        stateByCoord.set(`${coord.x},${coord.y}`, getState(id));
+    });
+
+    idToCoords.forEach((coord, id) => {
+        const cell = document.querySelector(`.cell[data-id="${id}"]`);
+        if (!cell) {
+            return;
+        }
+
+        cell.classList.remove('state-hidden-edge', 'hidden-edge-top', 'hidden-edge-right', 'hidden-edge-bottom', 'hidden-edge-left');
+
+        if (getState(id) !== 'hidden') {
+            return;
+        }
+
+        let hasVisibleEdge = false;
+
+        if (isFrontierState(stateByCoord.get(`${coord.x},${coord.y - 1}`))) {
+            cell.classList.add('hidden-edge-top');
+            hasVisibleEdge = true;
+        }
+        if (isFrontierState(stateByCoord.get(`${coord.x + 1},${coord.y}`))) {
+            cell.classList.add('hidden-edge-right');
+            hasVisibleEdge = true;
+        }
+        if (isFrontierState(stateByCoord.get(`${coord.x},${coord.y + 1}`))) {
+            cell.classList.add('hidden-edge-bottom');
+            hasVisibleEdge = true;
+        }
+        if (isFrontierState(stateByCoord.get(`${coord.x - 1},${coord.y}`))) {
+            cell.classList.add('hidden-edge-left');
+            hasVisibleEdge = true;
+        }
+
+        if (hasVisibleEdge) {
+            cell.classList.add('state-hidden-edge');
+        }
+    });
+}
+
 function showModal(task, anchor) {
     const modal = document.getElementById('task-modal');
     const title = document.getElementById('modal-title');
@@ -406,6 +455,7 @@ function showModal(task, anchor) {
             }
 
             updateUnlockHud();
+            refreshHiddenEdges();
             hideModal();
         };
     } else if (state === 'locked') {
@@ -426,6 +476,7 @@ function showModal(task, anchor) {
                 setCellState(cell, 'incomplete');
             }
             updateUnlockHud();
+            refreshHiddenEdges();
             hideModal();
         } : null;
     } else {
@@ -490,6 +541,7 @@ function render(tasks) {
             }, index * 50);
         });
 
+    refreshHiddenEdges();
     updateGridScale();
     updateUnlockHud();
 

@@ -396,7 +396,54 @@ body::-webkit-scrollbar {
 }
 
 /* state styling */
-.state-hidden { visibility: hidden; }
+.state-hidden {
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+.state-hidden::before,
+.state-hidden::after,
+.state-hidden img,
+.state-hidden .task-name {
+    opacity: 0 !important;
+}
+
+.state-hidden.state-hidden-edge {
+    opacity: 1 !important;
+    transform: scale(1) !important;
+    background: transparent !important;
+    border: 1px solid transparent;
+    box-shadow: none;
+    cursor: default;
+    pointer-events: none !important;
+}
+
+.state-hidden.state-hidden-edge::before,
+.state-hidden.state-hidden-edge::after {
+    display: none !important;
+}
+
+.state-hidden.state-hidden-edge img,
+.state-hidden.state-hidden-edge .task-name {
+    display: none !important;
+}
+
+.state-hidden.state-hidden-edge.hidden-edge-top {
+    border-top: 1px dashed rgba(255, 255, 255, 0.42);
+}
+
+.state-hidden.state-hidden-edge.hidden-edge-right {
+    border-right: 1px dashed rgba(255, 255, 255, 0.42);
+}
+
+.state-hidden.state-hidden-edge.hidden-edge-bottom {
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.42);
+}
+
+.state-hidden.state-hidden-edge.hidden-edge-left {
+    border-left: 1px dashed rgba(255, 255, 255, 0.42);
+}
+
 .state-locked {
     opacity: 1 !important;
     background:
@@ -407,15 +454,19 @@ body::-webkit-scrollbar {
         0 14px 30px rgba(2, 6, 23, 0.45),
         inset 0 1px 0 rgba(255,255,255,0.08);
 }
+
 .state-locked::before {
+    border: 1px solid transparent;
     display: block;
     content: 'LOCKED';
     color: #e2e8f0;
     background: rgba(15, 23, 42, 0.78);
 }
+
 .state-locked .task-name {
     display: none;
 }
+
 .state-locked img {
     max-width: 44px;
     max-height: 44px;
