@@ -531,10 +531,10 @@ function drawCellBackgroundSprite(spriteContext, state, options = {}) {
 
     const palettes = {
         locked: {
-            fillTop: '#334155',
-            fillBottom: '#0f172a',
-            border: 'rgba(148, 163, 184, 0.42)',
-            text: '#e2e8f0'
+            fillTop: '#1a2434',
+            fillBottom: '#070d16',
+            border: 'rgba(100, 116, 139, 0.36)',
+            text: '#94a3b8'
         },
         incomplete: {
             fillTop: '#fff8d6',
@@ -761,9 +761,8 @@ function ensureEdgeCellSprite(edgeSides) {
 
     const drawFade = (x0, y0, x1, y1, rX, rY, rW, rH) => {
         const grad = maskCtx.createLinearGradient(x0, y0, x1, y1);
-        grad.addColorStop(0,       'rgba(0,0,0,1)');
-        grad.addColorStop(midStop, 'rgba(0,0,0,0.5)');
-        grad.addColorStop(1,       'rgba(0,0,0,0)');
+        grad.addColorStop(0, 'rgba(0,0,0,1)');
+        grad.addColorStop(1, 'rgba(0,0,0,0)');
         maskCtx.fillStyle = grad;
         maskCtx.fillRect(rX, rY, rW, rH);
     };
