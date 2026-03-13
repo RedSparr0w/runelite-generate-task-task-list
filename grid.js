@@ -327,11 +327,35 @@ loadAll().then(data => {
     tasksGlobal = all;
 
     // ensure images cached before rendering (wait for them)
-    preload(all).then(() => {
-        render(all);
-        const loader = document.getElementById('loading');
-        if (loader) loader.style.display = 'none';
-    });
+    // preload loading icons themselves so they animate instantly
+    const loadingIcons = Array.from(document.querySelectorAll('#loading .loading-icon'));
+    loadingIcons.forEach(i => { const img=new Image(); img.src=i.src; });
+
+    // animate loader icons in sequence; when finished and data loaded, show grid
+    const icons = loadingIcons;
+    let preloadDone = false;
+    const preloadPromise = preload(all).then(() => { preloadDone = true; });
+    function animateIcons(seqIndex) {
+        if (seqIndex >= icons.length) {
+            // after cycle pause briefly then render if preload done, otherwise wait
+            const finish = () => setTimeout(() => {
+                        render(all);
+                        const loader = document.getElementById('loading');
+                        if (loader) loader.style.display = 'none';
+                    }, 500);
+            if (preloadDone) finish(); else preloadPromise.then(finish);
+            return;
+        }
+        const ic = icons[seqIndex];
+        ic.classList.add('reveal'); // show with pop animation
+        setTimeout(() => {
+            ic.classList.remove('reveal');
+            ic.classList.add('visible');
+            animateIcons(seqIndex + 1);
+        }, 400);
+    }
+    // kick off animation immediately
+    animateIcons(0);
 
     // save order after rendering (just store ids)
     const saveIds = all.map(t => t.id);
