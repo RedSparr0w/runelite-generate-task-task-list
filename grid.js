@@ -22,6 +22,7 @@ const ZOOM_FACTOR = 1.1;
 const POP_STAGGER_MS = 50;
 const POP_DURATION_MS = 400;
 const EDGE_POP_OFFSET_MS = 120;
+const INITIAL_REVEAL_DURATION_MS = 2000;
 const UNLOCK_TOAST_DURATION_MS = 4500;
 const SYNC_BATCH_SIZE = 3;
 const SYNC_BATCH_DELAY_MS = 45;
@@ -588,15 +589,50 @@ function drawCanvasCell(context, cell, now) {
     return keepAnimating;
 }
 
+function getVisibleWorldBounds() {
+    const container = document.getElementById('grid-container');
+    if (!container || currentScale <= 0) {
+        return null;
+    }
+
+    const margin = CELL_STEP;
+    return {
+        left: (container.scrollLeft / currentScale) - margin,
+        top: (container.scrollTop / currentScale) - margin,
+        right: ((container.scrollLeft + container.clientWidth) / currentScale) + margin,
+        bottom: ((container.scrollTop + container.clientHeight) / currentScale) + margin
+    };
+}
+
+function isCellInVisibleBounds(cell, bounds) {
+    if (!bounds) {
+        return true;
+    }
+
+    const cellRight = cell.pixelX + CELL_SIZE;
+    const cellBottom = cell.pixelY + CELL_SIZE;
+    return (
+        cellRight >= bounds.left &&
+        cell.pixelX <= bounds.right &&
+        cellBottom >= bounds.top &&
+        cell.pixelY <= bounds.bottom
+    );
+}
+
 function renderGridCanvas(now = performance.now()) {
     if (!gridContext || !gridCanvas) {
         return false;
     }
 
     gridContext.clearRect(0, 0, gridPixelWidth, gridPixelHeight);
+    const visibleBounds = getVisibleWorldBounds();
 
     let keepAnimating = false;
     idToCell.forEach(cell => {
+        if (!isCellInVisibleBounds(cell, visibleBounds)) {
+            return;
+        }
+
         const cellAnimating = drawCanvasCell(gridContext, cell, now);
         keepAnimating = keepAnimating || cellAnimating;
     });
@@ -1337,6 +1373,7 @@ function updateGridScale() {
     grid.style.transform = `scale(${currentScale})`;
     stage.style.width = `${grid.scrollWidth * currentScale}px`;
     stage.style.height = `${grid.scrollHeight * currentScale}px`;
+    queueCanvasRender();
 }
 
 function refreshPopoverPosition() {
@@ -1489,7 +1526,13 @@ function playPopReveal(cell, options = {}) {
 }
 
 function refreshHiddenEdges(options = {}) {
-    const { animate = false, center = null, revealDelayByCoord = null, edgeDelayOffset = EDGE_POP_OFFSET_MS } = options;
+    const {
+        animate = false,
+        center = null,
+        revealDelayByCoord = null,
+        edgeDelayOffset = EDGE_POP_OFFSET_MS,
+        staggerMs = POP_STAGGER_MS
+    } = options;
     const stateByCoord = new Map();
     const isFrontierState = state => state === 'incomplete' || state === 'locked';
     const newlyVisibleEdges = [];
@@ -1594,7 +1637,7 @@ function refreshHiddenEdges(options = {}) {
         : newlyVisibleEdges;
 
     orderedEdges.forEach((item, index) => {
-        const startDelay = Math.max(item.startDelay ?? edgeDelayOffset, index * POP_STAGGER_MS);
+        const startDelay = Math.max(item.startDelay ?? edgeDelayOffset, index * staggerMs);
         setTimeout(() => {
             const cellId = item.cell.id;
             if (getState(cellId) !== 'hidden') {
@@ -1840,15 +1883,18 @@ function render(tasks) {
             const distanceB = Math.abs(b.x - center.x) + Math.abs(b.y - center.y);
             return distanceA - distanceB;
         });
+    const revealStagger = sortedVisibleCells.length > 1
+        ? INITIAL_REVEAL_DURATION_MS / (sortedVisibleCells.length - 1)
+        : 0;
     const revealDelayByCoord = new Map();
 
     sortedVisibleCells.forEach((item, index) => {
-        const revealDelay = index * POP_STAGGER_MS;
+        const revealDelay = index * revealStagger;
         revealDelayByCoord.set(`${item.x},${item.y}`, revealDelay);
         playPopReveal(item.cell, { delay: revealDelay });
     });
 
-    refreshHiddenEdges({ animate: true, center, revealDelayByCoord });
+    refreshHiddenEdges({ animate: true, center, revealDelayByCoord, staggerMs: revealStagger });
     updateGridScale();
     updateUnlockHud();
     queueCanvasRender();
@@ -2118,6 +2164,7 @@ function startApp() {
     bindWheelZoom(container);
 
     container.addEventListener('scroll', () => {
+        queueCanvasRender();
         refreshPopoverPosition();
     }, { passive: true });
 
