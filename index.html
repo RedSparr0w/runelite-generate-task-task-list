@@ -36,14 +36,18 @@
 
     <!-- modal for task details -->
     <div id="task-modal" class="modal">
-        <div class="modal-content card">
-            <div class="card-body">
-                <button type="button" class="btn-close modal-close float-end" aria-label="Close"></button>
-                <h5 id="modal-title" class="card-title"></h5>
-                <img id="modal-image" src="" alt="" class="img-fluid my-2" style="max-height:64px;">
-                <p id="modal-tip" class="card-text"></p>
-                <a id="modal-wiki" href="#" target="_blank" class="btn btn-sm btn-primary">Wiki page</a>
-                <button id="modal-complete" class="btn btn-sm btn-success mt-2" style="display:none;">Mark complete</button>
+        <div class="modal-content">
+            <button type="button" class="modal-close" aria-label="Close">×</button>
+            <div class="modal-header-row">
+                <img id="modal-image" src="" alt="">
+                <div class="modal-copy">
+                    <h5 id="modal-title"></h5>
+                    <p id="modal-tip"></p>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <a id="modal-wiki" href="#" target="_blank">Wiki page</a>
+                <button id="modal-complete" style="display:none;">Mark complete</button>
             </div>
         </div>
     </div>

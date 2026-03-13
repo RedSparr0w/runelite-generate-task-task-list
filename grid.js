@@ -11,11 +11,25 @@ const tiers = [
 ];
 
 const LOCKED_TILE_IMAGE = 'https://oldschool.runescape.wiki/images/thumb/Cake_of_guidance_detail.png/260px-Cake_of_guidance_detail.png?c3595';
+const STATES = ['hidden', 'locked', 'incomplete', 'complete'];
+const DRAG_THRESHOLD = 6;
+const STATE_KEY = 'taskStates';
+const STORAGE_KEY = 'taskGridOrder';
+const MIN_SCALE = 0.5;
+const MAX_SCALE = 2.5;
+const ZOOM_FACTOR = 1.1;
+
+let suppressTaskClick = false;
+let tasksGlobal = [];
+let currentScale = 1;
+let activePopoverAnchor = null;
+let stateMap = loadStates();
+
+const idToCoords = new Map();
 
 async function loadAll() {
     const promises = tiers.map(name => fetch(`./tiers/${name}.json`).then(r => r.json()));
-    const data = await Promise.all(promises);
-    return data;
+    return Promise.all(promises);
 }
 
 function shuffle(array) {
@@ -27,100 +41,57 @@ function shuffle(array) {
 
 function computeGridSize(count) {
     let size = Math.ceil(Math.sqrt(count));
-    if (size % 2 === 0) size += 1; // make odd so there is a true centre
+    if (size % 2 === 0) {
+        size += 1;
+    }
     return size;
 }
 
 function generateSpiral(count, size) {
-    const cx = Math.floor(size / 2);
-    const cy = Math.floor(size / 2);
+    const centerX = Math.floor(size / 2);
+    const centerY = Math.floor(size / 2);
     const coords = [];
-    let x = cx, y = cy;
+    let x = centerX;
+    let y = centerY;
     coords.push([x, y]);
     let step = 1;
+
     while (coords.length < count) {
-        // move right step
         for (let i = 0; i < step && coords.length < count; i++) {
             x++;
             coords.push([x, y]);
         }
-        // move down step
         for (let i = 0; i < step && coords.length < count; i++) {
             y++;
             coords.push([x, y]);
         }
         step++;
-        // move left step
         for (let i = 0; i < step && coords.length < count; i++) {
             x--;
             coords.push([x, y]);
         }
-        // move up step
         for (let i = 0; i < step && coords.length < count; i++) {
             y--;
             coords.push([x, y]);
         }
         step++;
     }
+
     return coords;
 }
 
-// valid states for tasks
-const STATES = ['hidden', 'locked', 'incomplete', 'complete'];
-const DRAG_THRESHOLD = 6;
-
-let suppressTaskClick = false;
-
-function createCell(task) {
-    const el = document.createElement('div');
-    el.className = 'cell';
-    el.dataset.id = task.id;
-    el._task = task;
-    el.classList.add(`tier-${task.tier}`); // used only for indicator
-    // apply stored state class
-    const state = getState(task.id) || 'incomplete';
-    el.classList.add(`state-${state}`);
-
-    const img = document.createElement('img');
-    img._src = task.imageLink;
-    img.width = 48;
-    img.height = 48;
-    const name = document.createElement('div');
-    name.className = 'task-name';
-    el.appendChild(img);
-    el.appendChild(name);
-
-    applyCellContent(el, state);
-
-    el.addEventListener('click', e => {
-        if (e.button === 0) {
-            if (suppressTaskClick) {
-                return;
-            }
-            showModal(task);
-        }
-    });
-
-    el.oncontextmenu = e => {
-        e.preventDefault();
-        const currentState = getState(task.id) || 'hidden';
-        if (currentState === 'incomplete' || currentState === 'complete') {
-            window.open(task.wikiLink, '_blank');
-        }
-    };
-    return el;
+function clamp(value, min, max) {
+    return Math.min(Math.max(value, min), max);
 }
 
-// state storage helpers
-const STATE_KEY = 'taskStates';
 function loadStates() {
     try {
-        const s = localStorage.getItem(STATE_KEY);
-        if (!s) {
+        const raw = localStorage.getItem(STATE_KEY);
+        if (!raw) {
             return {};
         }
 
-        const parsed = JSON.parse(s);
+        const parsed = JSON.parse(raw);
         Object.keys(parsed).forEach(id => {
             if (parsed[id] === 'current') {
                 parsed[id] = 'incomplete';
@@ -131,85 +102,22 @@ function loadStates() {
         return {};
     }
 }
+
 function saveStates(map) {
-    try { localStorage.setItem(STATE_KEY, JSON.stringify(map)); } catch {}
-}
-let stateMap = loadStates();
-function getState(id) { return stateMap[id]; }
-function setState(id, state) { stateMap[id] = state; saveStates(stateMap); }
-
-// keep copy of tasks for re-rendering when neighbours change
-let tasksGlobal = [];
-let currentScale = 1;
-
-const MIN_SCALE = 0.5;
-const MAX_SCALE = 2.5;
-const ZOOM_FACTOR = 1.1;
-
-function clamp(value, min, max) {
-    return Math.min(Math.max(value, min), max);
-}
-
-function getMinScale() {
-    const grid = document.getElementById('grid');
-    const container = document.getElementById('grid-container');
-    if (!grid || !container || !grid.scrollWidth || !grid.scrollHeight) {
-        return MIN_SCALE;
+    try {
+        localStorage.setItem(STATE_KEY, JSON.stringify(map));
+    } catch {
+        // ignore localStorage failures
     }
-
-    const widthFit = container.clientWidth / grid.scrollWidth;
-    const heightFit = container.clientHeight / grid.scrollHeight;
-    return clamp(Math.max(widthFit, heightFit), MIN_SCALE, MAX_SCALE);
 }
 
-function updateGridScale() {
-    const grid = document.getElementById('grid');
-    const stage = document.getElementById('grid-stage');
-    if (!grid || !stage) {
-        return;
-    }
-
-    currentScale = clamp(currentScale, getMinScale(), MAX_SCALE);
-
-    grid.style.transform = `scale(${currentScale})`;
-    stage.style.width = `${grid.scrollWidth * currentScale}px`;
-    stage.style.height = `${grid.scrollHeight * currentScale}px`;
+function getState(id) {
+    return stateMap[id];
 }
 
-function bindWheelZoom(container) {
-    container.addEventListener('wheel', e => {
-        e.preventDefault();
-
-        const minScale = getMinScale();
-
-        const nextScale = clamp(
-            e.deltaY < 0 ? currentScale * ZOOM_FACTOR : currentScale / ZOOM_FACTOR,
-            minScale,
-            MAX_SCALE
-        );
-
-        if (nextScale === currentScale) {
-            return;
-        }
-
-        const rect = container.getBoundingClientRect();
-        const pointerX = e.clientX - rect.left;
-        const pointerY = e.clientY - rect.top;
-        const contentX = container.scrollLeft + pointerX;
-        const contentY = container.scrollTop + pointerY;
-        const worldX = contentX / currentScale;
-        const worldY = contentY / currentScale;
-
-        currentScale = nextScale;
-        updateGridScale();
-
-        container.scrollLeft = worldX * currentScale - pointerX;
-        container.scrollTop = worldY * currentScale - pointerY;
-    }, { passive: false });
-
-    window.addEventListener('resize', () => {
-        updateGridScale();
-    });
+function setState(id, state) {
+    stateMap[id] = state;
+    saveStates(stateMap);
 }
 
 function getCompletedCount() {
@@ -253,9 +161,78 @@ function updateUnlockHud() {
 function normalizeUnlockStates() {
     const unlockLimit = getUnlockLimit();
     const incompleteTasks = tasksGlobal.filter(task => getState(task.id) === 'incomplete');
-
     incompleteTasks.slice(unlockLimit).forEach(task => {
         setState(task.id, 'locked');
+    });
+}
+
+function getMinScale() {
+    const grid = document.getElementById('grid');
+    const container = document.getElementById('grid-container');
+    if (!grid || !container || !grid.scrollWidth || !grid.scrollHeight) {
+        return MIN_SCALE;
+    }
+
+    const widthFit = container.clientWidth / grid.scrollWidth;
+    const heightFit = container.clientHeight / grid.scrollHeight;
+    return clamp(Math.max(widthFit, heightFit), MIN_SCALE, MAX_SCALE);
+}
+
+function updateGridScale() {
+    const grid = document.getElementById('grid');
+    const stage = document.getElementById('grid-stage');
+    if (!grid || !stage) {
+        return;
+    }
+
+    currentScale = clamp(currentScale, getMinScale(), MAX_SCALE);
+    grid.style.transform = `scale(${currentScale})`;
+    stage.style.width = `${grid.scrollWidth * currentScale}px`;
+    stage.style.height = `${grid.scrollHeight * currentScale}px`;
+}
+
+function refreshPopoverPosition() {
+    if (activePopoverAnchor && document.body.contains(activePopoverAnchor)) {
+        positionPopover(activePopoverAnchor);
+    } else if (activePopoverAnchor) {
+        hideModal();
+    }
+}
+
+function bindWheelZoom(container) {
+    container.addEventListener('wheel', e => {
+        e.preventDefault();
+
+        const minScale = getMinScale();
+        const nextScale = clamp(
+            e.deltaY < 0 ? currentScale * ZOOM_FACTOR : currentScale / ZOOM_FACTOR,
+            minScale,
+            MAX_SCALE
+        );
+
+        if (nextScale === currentScale) {
+            return;
+        }
+
+        const rect = container.getBoundingClientRect();
+        const pointerX = e.clientX - rect.left;
+        const pointerY = e.clientY - rect.top;
+        const contentX = container.scrollLeft + pointerX;
+        const contentY = container.scrollTop + pointerY;
+        const worldX = contentX / currentScale;
+        const worldY = contentY / currentScale;
+
+        currentScale = nextScale;
+        updateGridScale();
+
+        container.scrollLeft = worldX * currentScale - pointerX;
+        container.scrollTop = worldY * currentScale - pointerY;
+        refreshPopoverPosition();
+    }, { passive: false });
+
+    window.addEventListener('resize', () => {
+        updateGridScale();
+        refreshPopoverPosition();
     });
 }
 
@@ -287,71 +264,147 @@ function applyCellContent(cell, state) {
 }
 
 function setCellState(cell, nextState) {
-    cell.classList.remove('state-hidden', 'state-locked', 'state-incomplete', 'state-complete');
+    cell.classList.remove(...STATES.map(state => `state-${state}`));
     cell.classList.add(`state-${nextState}`);
     applyCellContent(cell, nextState);
 }
 
-// modal helpers
-function showModal(task) {
+function createCell(task) {
+    const el = document.createElement('div');
+    const state = getState(task.id) || 'incomplete';
+
+    el.className = 'cell';
+    el.dataset.id = task.id;
+    el._task = task;
+    el.classList.add(`tier-${task.tier}`);
+    el.classList.add(`state-${state}`);
+
+    const img = document.createElement('img');
+    img._src = task.imageLink;
+    img.width = 48;
+    img.height = 48;
+
+    const name = document.createElement('div');
+    name.className = 'task-name';
+
+    el.appendChild(img);
+    el.appendChild(name);
+    applyCellContent(el, state);
+
+    el.addEventListener('click', e => {
+        if (e.button !== 0 || suppressTaskClick) {
+            return;
+        }
+        showModal(task, el);
+    });
+
+    el.addEventListener('contextmenu', e => {
+        e.preventDefault();
+        const currentState = getState(task.id) || 'hidden';
+        if (currentState === 'incomplete' || currentState === 'complete') {
+            window.open(task.wikiLink, '_blank');
+        }
+    });
+
+    return el;
+}
+
+function positionPopover(anchor) {
+    const modal = document.getElementById('task-modal');
+    const content = modal.querySelector('.modal-content');
+    if (!anchor || !content || !modal.classList.contains('open')) {
+        return;
+    }
+
+    const gap = 14;
+    const pad = 12;
+    const anchorRect = anchor.getBoundingClientRect();
+    const contentRect = content.getBoundingClientRect();
+
+    let top = anchorRect.bottom + gap;
+    let side = 'bottom';
+    if (top + contentRect.height > window.innerHeight - pad && anchorRect.top - gap - contentRect.height >= pad) {
+        top = anchorRect.top - gap - contentRect.height;
+        side = 'top';
+    }
+
+    top = clamp(top, pad, window.innerHeight - contentRect.height - pad);
+
+    let left = anchorRect.left + (anchorRect.width / 2) - (contentRect.width / 2);
+    left = clamp(left, pad, window.innerWidth - contentRect.width - pad);
+
+    const arrowX = clamp(anchorRect.left + (anchorRect.width / 2) - left, 24, contentRect.width - 24);
+    content.style.top = `${top}px`;
+    content.style.left = `${left}px`;
+    content.style.setProperty('--popover-arrow-x', `${arrowX}px`);
+    modal.dataset.side = side;
+}
+
+function revealNeighborAsLocked(id) {
+    setState(id, 'locked');
+    const cell = document.querySelector(`.cell[data-id="${id}"]`);
+    if (!cell) {
+        return;
+    }
+
+    setCellState(cell, 'locked');
+    cell.classList.add('reveal');
+    setTimeout(() => {
+        cell.classList.remove('reveal');
+        cell.classList.add('visible');
+    }, 400);
+}
+
+function showModal(task, anchor) {
     const modal = document.getElementById('task-modal');
     const title = document.getElementById('modal-title');
-    const img = document.getElementById('modal-image');
+    const image = document.getElementById('modal-image');
     const tip = document.getElementById('modal-tip');
     const wiki = document.getElementById('modal-wiki');
+    const button = document.getElementById('modal-complete');
     const cell = document.querySelector(`.cell[data-id="${task.id}"]`);
-    const btn = document.getElementById('modal-complete');
     const state = getState(task.id) || 'incomplete';
 
     if (state === 'locked') {
         title.textContent = 'Locked Task';
-        img.src = LOCKED_TILE_IMAGE;
-        img.alt = 'Locked task';
+        image.src = LOCKED_TILE_IMAGE;
+        image.alt = 'Locked task';
         tip.textContent = 'Unlock this tile to reveal what task is here.';
         wiki.style.display = 'none';
     } else {
         title.textContent = task.name;
-        img.src = task.imageLink;
-        img.alt = task.name;
+        image.src = task.imageLink;
+        image.alt = task.name;
         tip.textContent = task.tip || '';
         wiki.href = task.wikiLink || '#';
         wiki.style.display = 'inline-block';
     }
 
     if (state === 'incomplete') {
-        btn.type = 'button';
-        btn.disabled = false;
-        btn.textContent = 'Mark complete';
-        btn.style.display = 'block';
-        btn.onclick = e => {
+        button.type = 'button';
+        button.disabled = false;
+        button.textContent = 'Mark complete';
+        button.style.display = 'block';
+        button.onclick = e => {
             e.preventDefault();
             setState(task.id, 'complete');
             if (cell) {
                 setCellState(cell, 'complete');
             }
 
-            // reveal four-direction neighbours as locked
             const coords = idToCoords.get(task.id);
             if (coords) {
                 const { x, y } = coords;
-                idToCoords.forEach((c, id) => {
-                    if ((c.x === x && (c.y === y - 1 || c.y === y + 1)) ||
-                        (c.y === y && (c.x === x - 1 || c.x === x + 1))) {
-                        if (getState(id) === 'hidden') {
-                            setState(id, 'locked');
-                            const ncell = document.querySelector(`.cell[data-id="${id}"]`);
-                            if (ncell) {
-                                setCellState(ncell, 'locked');
-                                ncell.classList.add('reveal');
-                                setTimeout(() => {
-                                    ncell.classList.remove('reveal');
-                                    ncell.classList.add('visible');
-                                }, 400);
-                            }
-                        }
+                idToCoords.forEach((coord, id) => {
+                    const isNeighbor =
+                        (coord.x === x && (coord.y === y - 1 || coord.y === y + 1)) ||
+                        (coord.y === y && (coord.x === x - 1 || coord.x === x + 1));
+                    if (isNeighbor && getState(id) === 'hidden') {
+                        revealNeighborAsLocked(id);
                     }
                 });
             }
+
             updateUnlockHud();
             hideModal();
         };
@@ -360,13 +413,13 @@ function showModal(task) {
         const unlockedCount = getUnlockedCount();
         const unlockAvailable = canUnlockMore();
 
-        btn.type = 'button';
-        btn.style.display = 'block';
-        btn.disabled = !unlockAvailable;
-        btn.textContent = unlockAvailable
+        button.type = 'button';
+        button.style.display = 'block';
+        button.disabled = !unlockAvailable;
+        button.textContent = unlockAvailable
             ? `Unlock task (${unlockedCount}/${unlockLimit})`
             : `Unlock limit reached (${unlockedCount}/${unlockLimit})`;
-        btn.onclick = unlockAvailable ? e => {
+        button.onclick = unlockAvailable ? e => {
             e.preventDefault();
             setState(task.id, 'incomplete');
             if (cell) {
@@ -376,210 +429,225 @@ function showModal(task) {
             hideModal();
         } : null;
     } else {
-        btn.style.display = 'none';
-        btn.disabled = false;
-        btn.onclick = null;
+        button.style.display = 'none';
+        button.disabled = false;
+        button.onclick = null;
     }
-    modal.style.display = 'block';
+
+    activePopoverAnchor = anchor || cell;
+    modal.classList.add('open');
+    requestAnimationFrame(() => {
+        refreshPopoverPosition();
+    });
 }
 
 function hideModal() {
     const modal = document.getElementById('task-modal');
-    modal.style.display = 'none';
+    modal.classList.remove('open');
+    activePopoverAnchor = null;
 }
 
-// attach close handler on load
-window.addEventListener('DOMContentLoaded', () => {
-    const modal = document.getElementById('task-modal');
-    const close = modal.querySelector('.modal-close');
-    close.addEventListener('click', hideModal);
-    modal.addEventListener('click', e => {
-        if (e.target === modal) hideModal();
-    });
-});
-
-// maps for neighbor lookup
-const idToCoords = new Map();
 function render(tasks) {
     const grid = document.getElementById('grid');
+    hideModal();
     grid.innerHTML = '';
+
     const size = computeGridSize(tasks.length);
-    grid.style.setProperty('--grid-size', size);
     const coords = generateSpiral(tasks.length, size);
-    idToCoords.clear();
+    const center = { x: coords[0][0], y: coords[0][1] };
+    const cells = [];
     let firstCell = null;
 
-    // create cells and keep track for later reveal
-    const cells = [];
-    tasks.forEach((t, idx) => {
-        const [x, y] = coords[idx];
-        idToCoords.set(t.id, {x,y});
-        const cell = createCell(t);
+    grid.style.setProperty('--grid-size', size);
+    idToCoords.clear();
+
+    tasks.forEach((task, index) => {
+        const [x, y] = coords[index];
+        const cell = createCell(task);
+        idToCoords.set(task.id, { x, y });
         cell.style.gridColumnStart = x + 1;
         cell.style.gridRowStart = y + 1;
         grid.appendChild(cell);
-        cells.push({cell, x, y});
-        if (idx === 0) firstCell = cell;
+        cells.push({ cell, x, y });
+        if (index === 0) {
+            firstCell = cell;
+        }
     });
-    // reveal centre first, then by increasing manhattan distance
-    const center = {x: Math.floor(coords[0][0]), y: Math.floor(coords[0][1])};
-    // only animate those that aren't hidden
-    const toAnimate = cells.filter(c => getState(c.cell.dataset.id) !== 'hidden');
-    toAnimate.sort((a,b) => (Math.abs(a.x-center.x)+Math.abs(a.y-center.y)) - (Math.abs(b.x-center.x)+Math.abs(b.y-center.y)));
-    toAnimate.forEach((c, i) => {
-        setTimeout(() => {
-            c.cell.classList.add('reveal');
-            // keep visible after animation
-            setTimeout(() => c.cell.classList.add('visible'), 300);
-        }, i * 50);
-    });
-    // hidden cells remain at opacity 0 due to state-hidden and do not delay others
+
+    const visibleCells = cells.filter(item => getState(item.cell.dataset.id) !== 'hidden');
+    visibleCells
+        .sort((a, b) => {
+            const distanceA = Math.abs(a.x - center.x) + Math.abs(a.y - center.y);
+            const distanceB = Math.abs(b.x - center.x) + Math.abs(b.y - center.y);
+            return distanceA - distanceB;
+        })
+        .forEach((item, index) => {
+            setTimeout(() => {
+                item.cell.classList.add('reveal');
+                setTimeout(() => {
+                    item.cell.classList.add('visible');
+                }, 300);
+            }, index * 50);
+        });
 
     updateGridScale();
     updateUnlockHud();
 
-    // once grid is in DOM, scroll the first (center) cell into view
     if (firstCell) {
         firstCell.scrollIntoView({ block: 'center', inline: 'center' });
     }
 }
 
-// weights used when interleaving tiers; higher means the tier tends to appear closer to the centre
+window.addEventListener('DOMContentLoaded', () => {
+    const modal = document.getElementById('task-modal');
+    const close = modal.querySelector('.modal-close');
+
+    close.addEventListener('click', hideModal);
+
+    document.addEventListener('mousedown', e => {
+        if (!modal.classList.contains('open')) {
+            return;
+        }
+
+        const clickedPopover = e.target.closest('#task-modal .modal-content');
+        const clickedTile = e.target.closest('.cell');
+        if (!clickedPopover && !clickedTile) {
+            hideModal();
+        }
+    });
+
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') {
+            hideModal();
+        }
+    });
+});
+
 const tierWeights = {
     easy: 100000,
     medium: 10000,
     hard: 100,
     elite: 10,
     master: 1,
-    // fallback weights for other tiers
-    // 'master-tedious': 1,
-    // extra: 1,
     pets: 1
 };
 
-// helper to build a unique key for storing order
-const STORAGE_KEY = 'taskGridOrder';
+function preloadTaskImages(tasks) {
+    return Promise.all(tasks.map(task => new Promise(resolve => {
+        const state = getState(task.id);
+        if (state === 'incomplete' || state === 'complete') {
+            const image = new Image();
+            image.onload = image.onerror = () => resolve();
+            image.src = task.imageLink;
+            return;
+        }
+        resolve();
+    })));
+}
 
 loadAll().then(data => {
     let all = [];
-    // preload images for all tasks to avoid jank
-    function preload(tasks) {
-        const promises = tasks.map(t => new Promise(resolve => {
-            const state = getState(t.id);
-            if (state === 'incomplete' || state === 'complete') {
-                const img = new Image();
-                img.onload = img.onerror = () => resolve();
-                img.src = t.imageLink;
-            } else {
-                resolve();
-            }
-        }));
-        return Promise.all(promises);
-    }
-    tasksGlobal = all; // keep reference for neighbour updates
 
-    // if we have a saved order, try to restore it
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
         try {
             const ids = JSON.parse(saved);
-            // build a map of tasks by id for quick lookup
             const map = {};
             data.forEach(tierObj => {
-                tierObj.tasks.forEach(t => {
-                    map[t.id] = { ...t, tier: tierObj.name };
+                tierObj.tasks.forEach(task => {
+                    map[task.id] = { ...task, tier: tierObj.name };
                 });
             });
-            // reconstruct order from saved ids; ignore missing
+
             all = ids.map(id => map[id]).filter(Boolean);
-            // append any new tasks not in saved list
             data.forEach(tierObj => {
-                tierObj.tasks.forEach(t => {
-                    if (!map[t.id] || !ids.includes(t.id)) {
-                        all.push({ ...t, tier: tierObj.name });
+                tierObj.tasks.forEach(task => {
+                    if (!ids.includes(task.id)) {
+                        all.push({ ...task, tier: tierObj.name });
                     }
                 });
             });
-        } catch (e) {
-            console.error('corrupt saved order', e);
+        } catch (error) {
+            console.error('corrupt saved order', error);
         }
     }
 
     const freshOrder = all.length === 0;
     if (freshOrder) {
-        // generate fresh list if we didn't restore
         data.forEach(tierObj => {
             const weight = tierWeights[tierObj.name] || 1;
-            const arr = tierObj.tasks.map(t => ({
-                ...t,
+            const tasks = tierObj.tasks.map(task => ({
+                ...task,
                 tier: tierObj.name,
-                priority: Math.random() / weight // lower is placed earlier
+                priority: Math.random() / weight
             }));
-            shuffle(arr); // keep some randomness within tier
-            all = all.concat(arr);
+            shuffle(tasks);
+            all = all.concat(tasks);
         });
-        // sort by priority so that weighted tiers (easy) are earlier
         all.sort((a, b) => a.priority - b.priority);
     }
 
-    // if there are new tasks added after a restore, give them hidden state by default
     all.forEach(task => {
         if (!getState(task.id)) {
             setState(task.id, 'hidden');
         }
     });
 
-    // if we just generated a fresh order, set every task hidden except first
     if (freshOrder && all.length > 0) {
-        all.forEach((t, idx) => setState(t.id, idx === 0 ? 'incomplete' : 'hidden'));
-        stateMap = loadStates(); // reload updated map
+        all.forEach((task, index) => {
+            setState(task.id, index === 0 ? 'incomplete' : 'hidden');
+        });
+        stateMap = loadStates();
     }
 
-    // keep global reference
     tasksGlobal = all;
     normalizeUnlockStates();
     updateUnlockHud();
 
-    // ensure images cached before rendering (wait for them)
-    // preload loading icons themselves so they animate instantly
     const loadingIcons = Array.from(document.querySelectorAll('#loading .loading-icon'));
-    loadingIcons.forEach(i => { const img=new Image(); img.src=i.src; });
+    loadingIcons.forEach(icon => {
+        const image = new Image();
+        image.src = icon.src;
+    });
 
-    // animate loader icons in sequence; when finished and data loaded, show grid
-    const icons = loadingIcons;
     let preloadDone = false;
-    const preloadPromise = preload(all).then(() => { preloadDone = true; });
-    function animateIcons(seqIndex) {
-        if (seqIndex >= icons.length) {
-            // after cycle pause briefly then render if preload done, otherwise wait
+    const preloadPromise = preloadTaskImages(all).then(() => {
+        preloadDone = true;
+    });
+
+    function animateIcons(index) {
+        if (index >= loadingIcons.length) {
             const finish = () => setTimeout(() => {
-                        render(all);
-                        const loader = document.getElementById('loading');
-                        if (loader) loader.style.display = 'none';
-                    }, 500);
-            if (preloadDone) finish(); else preloadPromise.then(finish);
+                render(all);
+                const loader = document.getElementById('loading');
+                if (loader) {
+                    loader.style.display = 'none';
+                }
+            }, 500);
+
+            if (preloadDone) {
+                finish();
+            } else {
+                preloadPromise.then(finish);
+            }
             return;
         }
-        const ic = icons[seqIndex];
-        ic.classList.add('reveal'); // show with pop animation
+
+        const icon = loadingIcons[index];
+        icon.classList.add('visible');
         setTimeout(() => {
-            ic.classList.remove('reveal');
-            ic.classList.add('visible');
-            animateIcons(seqIndex + 1);
+            animateIcons(index + 1);
         }, 400);
     }
-    // kick off animation immediately
+
     animateIcons(0);
 
-    // save order after rendering (just store ids)
-    const saveIds = all.map(t => t.id);
     try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(saveIds));
-    } catch (e) {
-        console.warn('unable to save order', e);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(all.map(task => task.id)));
+    } catch {
+        // ignore localStorage failures
     }
 
-    // enable drag scrolling without opening task modals after a drag gesture
     const container = document.getElementById('grid-container');
     let isPointerDown = false;
     let isDragging = false;
@@ -588,9 +656,15 @@ loadAll().then(data => {
     let dragStartY = 0;
     let lastX = 0;
     let lastY = 0;
+
     bindWheelZoom(container);
+
+    container.addEventListener('scroll', () => {
+        refreshPopoverPosition();
+    }, { passive: true });
+
     container.addEventListener('mousedown', e => {
-        if (e.button === 0 || e.button === 1) { // middle button or left click
+        if (e.button === 0 || e.button === 1) {
             isPointerDown = true;
             isDragging = false;
             dragButton = e.button;
@@ -601,6 +675,7 @@ loadAll().then(data => {
             e.preventDefault();
         }
     });
+
     window.addEventListener('mousemove', e => {
         if (!isPointerDown) {
             return;
@@ -608,7 +683,6 @@ loadAll().then(data => {
 
         const totalDx = e.clientX - dragStartX;
         const totalDy = e.clientY - dragStartY;
-
         if (!isDragging && Math.hypot(totalDx, totalDy) >= DRAG_THRESHOLD) {
             isDragging = true;
         }
@@ -620,9 +694,11 @@ loadAll().then(data => {
             container.scrollTop -= dy;
             lastX = e.clientX;
             lastY = e.clientY;
+            refreshPopoverPosition();
             e.preventDefault();
         }
     });
+
     window.addEventListener('mouseup', e => {
         if (isPointerDown && e.button === dragButton) {
             if (dragButton === 0 && isDragging) {
