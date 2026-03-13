@@ -85,15 +85,11 @@ function createCell(task) {
     el.appendChild(img);
     el.appendChild(name);
 
-    el.onclick = e => {
-        // left-click cycles state
+    el.addEventListener('click', e => {
         if (e.button === 0) {
-            const next = nextState(getState(task.id));
-            setState(task.id, next);
-            el.classList.remove(`state-${state}`);
-            el.classList.add(`state-${next}`);
+            showModal(task);
         }
-    };
+    });
 
     el.oncontextmenu = e => {
         e.preventDefault();
@@ -123,6 +119,51 @@ function nextState(current) {
     const idx = STATES.indexOf(current);
     return STATES[(idx + 1) % STATES.length];
 }
+
+// modal helpers
+function showModal(task) {
+    const modal = document.getElementById('task-modal');
+    document.getElementById('modal-title').textContent = task.name;
+    const img = document.getElementById('modal-image');
+    img.src = task.imageLink;
+    img.alt = task.name;
+    document.getElementById('modal-tip').textContent = task.tip || '';
+    const wiki = document.getElementById('modal-wiki');
+    wiki.href = task.wikiLink || '#';
+    // button
+    const btn = document.getElementById('modal-complete');
+    const state = getState(task.id) || 'incomplete';
+    if (state === 'incomplete' || state === 'current') {
+        btn.style.display = 'block';
+        btn.onclick = () => {
+            setState(task.id, 'complete');
+            // update cell class
+            const cell = document.querySelector(`.cell img[alt="${task.name}"]`).parentElement;
+            cell.classList.remove(`state-${state}`);
+            cell.classList.add('state-complete');
+            hideModal();
+        };
+    } else {
+        btn.style.display = 'none';
+        btn.onclick = null;
+    }
+    modal.style.display = 'block';
+}
+
+function hideModal() {
+    const modal = document.getElementById('task-modal');
+    modal.style.display = 'none';
+}
+
+// attach close handler on load
+window.addEventListener('DOMContentLoaded', () => {
+    const modal = document.getElementById('task-modal');
+    const close = modal.querySelector('.modal-close');
+    close.addEventListener('click', hideModal);
+    modal.addEventListener('click', e => {
+        if (e.target === modal) hideModal();
+    });
+});
 
 function render(tasks) {
     const grid = document.getElementById('grid');
