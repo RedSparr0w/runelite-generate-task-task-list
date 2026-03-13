@@ -1837,18 +1837,25 @@ function renderTierTasksModal() {
     const selectedTier = tierData.find(entry => entry.tier === activeTierTab) || tierData[0];
     titleEl.textContent = `${formatTierName(selectedTier.tier)} Tasks`;
 
+    const getTierListStateGroup = (state) => {
+        if (state === 'locked' || state === 'hidden') {
+            return 'hidden';
+        }
+
+        return state;
+    };
+
     const stateOrder = {
         incomplete: 0,
-        locked: 1,
-        hidden: 2,
-        complete: 3
+        hidden: 1,
+        complete: 2
     };
 
     selectedTier.tasks
         .slice()
         .sort((taskA, taskB) => {
-            const stateA = getState(taskA.id) || 'hidden';
-            const stateB = getState(taskB.id) || 'hidden';
+            const stateA = getTierListStateGroup(getState(taskA.id) || 'hidden');
+            const stateB = getTierListStateGroup(getState(taskB.id) || 'hidden');
             const rankA = stateOrder[stateA] ?? 99;
             const rankB = stateOrder[stateB] ?? 99;
             if (rankA !== rankB) {
@@ -1857,7 +1864,7 @@ function renderTierTasksModal() {
             return taskA.name.localeCompare(taskB.name);
         })
         .forEach(task => {
-            const state = getState(task.id) || 'hidden';
+            const state = getTierListStateGroup(getState(task.id) || 'hidden');
 
             const row = document.createElement('div');
             row.className = 'tier-task-row';
