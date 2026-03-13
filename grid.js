@@ -24,12 +24,18 @@ const EDGE_POP_OFFSET_MS = 120;
 const UNLOCK_TOAST_DURATION_MS = 4500;
 const CL_CACHE_KEY = 'collectionLogCache';
 const CL_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+const USERNAME_KEY = 'playerUsername';
+const PLAYER_CL_CACHE_PREFIX = 'playerCollectionLogCache';
+const PLAYER_CL_CACHE_TTL = 15 * 60 * 1000; // 15 minutes
 
 let suppressTaskClick = false;
 let tasksGlobal = [];
 let currentScale = 1;
 let activePopoverAnchor = null;
 let stateMap = loadStates();
+let playerUsername = '';
+let hasStartedApp = false;
+let obtainedItemIds = new Set();
 
 const idToCoords = new Map();
 
@@ -80,6 +86,64 @@ function buildClEntry(name, category) {
         wikiLink: `https://oldschool.runescape.wiki/w/${encoded}`,
         imageUrl: `https://oldschool.runescape.wiki/w/Special:Redirect/file/${encoded}.png`
     };
+}
+
+function normalizeUsername(value) {
+    return (value || '').trim().replace(/\s+/g, ' ');
+}
+
+function toSyncUsername(value) {
+    return normalizeUsername(value).replace(/ /g, '_');
+}
+
+function getPlayerCacheKey(username) {
+    return `${PLAYER_CL_CACHE_PREFIX}:${normalizeUsername(username).toLowerCase()}`;
+}
+
+async function loadPlayerCollectionLog(username) {
+    const normalized = normalizeUsername(username);
+    obtainedItemIds = new Set();
+    if (!normalized) {
+        return;
+    }
+
+    const cacheKey = getPlayerCacheKey(normalized);
+    try {
+        const raw = localStorage.getItem(cacheKey);
+        if (raw) {
+            const { ts, ids } = JSON.parse(raw);
+            if (Date.now() - ts < PLAYER_CL_CACHE_TTL && Array.isArray(ids)) {
+                obtainedItemIds = new Set(ids.map(id => Number(id)).filter(id => Number.isInteger(id) && id > 0));
+                return;
+            }
+        }
+    } catch {
+        // ignore corrupt cache
+    }
+
+    try {
+        const syncName = encodeURIComponent(toSyncUsername(normalized));
+        const url = `https://sync.runescape.wiki/runelite/player/${syncName}/STANDARD`;
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`sync request failed (${response.status})`);
+        }
+
+        const payload = await response.json();
+        const ids = Array.isArray(payload.collection_log)
+            ? payload.collection_log.map(id => Number(id)).filter(id => Number.isInteger(id) && id > 0)
+            : [];
+
+        obtainedItemIds = new Set(ids);
+
+        try {
+            localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), ids }));
+        } catch {
+            // ignore localStorage failures
+        }
+    } catch (error) {
+        console.warn('Failed to load player collection log', error);
+    }
 }
 
 async function loadAll() {
@@ -639,21 +703,28 @@ function showModal(task, anchor) {
             const requiredItems = Number.isFinite(rawRequired)
                 ? clamp(Math.floor(rawRequired), 1, totalItems)
                 : totalItems;
+            const obtainedItemCount = itemIds.reduce((count, id) => {
+                return count + (obtainedItemIds.has(Number(id)) ? 1 : 0);
+            }, 0);
+            const obtainedForTask = Math.min(obtainedItemCount, requiredItems);
 
             if (requiredEl) {
-                requiredEl.textContent = `Required ${requiredItems}/${totalItems} items`;
+                requiredEl.textContent = `Obtained ${obtainedForTask}/${requiredItems} required for task`;
                 requiredEl.style.display = 'block';
             }
 
             itemsEl.classList.toggle('is-scrollable', itemIds.length > 20);
             itemIds.forEach(id => {
-                const info = collectionLogMap.get(id);
+                const numericId = Number(id);
+                const isObtained = obtainedItemIds.has(numericId);
+                const info = collectionLogMap.get(numericId);
                 const link = document.createElement('a');
                 link.href = info ? info.wikiLink : '#';
                 link.target = '_blank';
                 link.rel = 'noopener noreferrer';
                 link.title = info ? `${info.name}${info.category ? ` (${info.category})` : ''}` : `Item ID: ${id}`;
                 link.className = 'modal-item-icon';
+                link.classList.add(isObtained ? 'is-obtained' : 'is-missing');
                 const img = document.createElement('img');
                 img.width = 32;
                 img.height = 32;
@@ -831,7 +902,16 @@ function preloadTaskImages(tasks) {
     })));
 }
 
-Promise.all([loadAll(), loadCollectionLogItems()]).then(([data]) => {
+function startApp() {
+    const loader = document.getElementById('loading');
+    if (loader) {
+        loader.style.display = 'flex';
+    }
+
+    const loadingIcons = Array.from(document.querySelectorAll('#loading .loading-icon'));
+    loadingIcons.forEach(icon => icon.classList.remove('visible'));
+
+    Promise.all([loadAll(), loadCollectionLogItems(), loadPlayerCollectionLog(playerUsername)]).then(([data]) => {
     let all = [];
 
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -1000,4 +1080,63 @@ Promise.all([loadAll(), loadCollectionLogItems()]).then(([data]) => {
             e.preventDefault();
         }
     });
-}).catch(err => console.error(err));
+    }).catch(err => console.error(err));
+}
+
+function initUsernameGate() {
+    const gate = document.getElementById('username-gate');
+    const form = document.getElementById('username-form');
+    const input = document.getElementById('username-input');
+    const submit = document.getElementById('username-submit');
+    const error = document.getElementById('username-error');
+
+    const startWithUsername = username => {
+        playerUsername = normalizeUsername(username);
+        try {
+            localStorage.setItem(USERNAME_KEY, playerUsername);
+        } catch {
+            // ignore localStorage failures
+        }
+
+        if (gate) {
+            gate.style.display = 'none';
+        }
+
+        if (!hasStartedApp) {
+            hasStartedApp = true;
+            startApp();
+        }
+    };
+
+    const savedUsername = normalizeUsername(localStorage.getItem(USERNAME_KEY));
+    if (savedUsername) {
+        startWithUsername(savedUsername);
+        return;
+    }
+
+    if (!gate || !form || !input || !submit || !error) {
+        if (!hasStartedApp) {
+            hasStartedApp = true;
+            startApp();
+        }
+        return;
+    }
+
+    gate.style.display = 'flex';
+    input.focus();
+
+    form.addEventListener('submit', e => {
+        e.preventDefault();
+        const username = normalizeUsername(input.value);
+        if (!username) {
+            error.textContent = 'Please enter a username.';
+            return;
+        }
+
+        error.textContent = '';
+        submit.disabled = true;
+        startWithUsername(username);
+    });
+}
+
+initUsernameGate();

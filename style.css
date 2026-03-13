@@ -29,6 +29,78 @@ body {
     box-shadow: 0 10px 24px rgba(0,0,0,0.25);
 }
 
+#username-gate {
+    position: fixed;
+    inset: 0;
+    z-index: 3000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #333;
+}
+
+.username-card {
+    width: min(420px, calc(100vw - 28px));
+    display: grid;
+    gap: 10px;
+    padding: 20px;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: rgba(17, 24, 39, 0.9);
+    box-shadow: 0 14px 28px rgba(0,0,0,0.35);
+    color: #f8fafc;
+}
+
+.username-card h2 {
+    margin: 0;
+    font-size: 20px;
+}
+
+.username-card p {
+    margin: 0;
+    color: #cbd5e1;
+    font-size: 13px;
+}
+
+#username-input {
+    width: 100%;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    border-radius: 10px;
+    background: rgba(15, 23, 42, 0.7);
+    color: #f8fafc;
+    padding: 10px 12px;
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+#username-input:focus {
+    outline: 1px solid rgba(148, 163, 184, 0.9);
+}
+
+#username-submit {
+    width: fit-content;
+    border: 0;
+    border-radius: 999px;
+    padding: 9px 14px;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    color: #f8fafc;
+    background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+}
+
+#username-submit:disabled {
+    opacity: 0.6;
+    cursor: wait;
+}
+
+#username-error {
+    min-height: 16px;
+    font-size: 12px;
+    color: #fca5a5;
+}
+
 .hud-title {
     margin-bottom: 8px;
     font-size: 13px;
@@ -63,7 +135,7 @@ body {
     background: #333;
     z-index: 2000;
     color: #fff;
-    display: flex;
+    display: none;
     justify-content: center;
     align-items: center;
 }
@@ -319,6 +391,16 @@ body::-webkit-scrollbar {
     height: 32px;
     object-fit: contain;
     image-rendering: pixelated;
+}
+
+.modal-item-icon.is-missing img {
+    filter: grayscale(1) brightness(0.62);
+    opacity: 0.82;
+}
+
+.modal-item-icon.is-obtained img {
+    filter: none;
+    opacity: 1;
 }
 
 #grid {
