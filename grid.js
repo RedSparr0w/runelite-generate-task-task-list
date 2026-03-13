@@ -201,6 +201,8 @@ function render(tasks) {
     idToCoords.clear();
     let firstCell = null;
 
+    // create cells and keep track for later reveal
+    const cells = [];
     tasks.forEach((t, idx) => {
         const [x, y] = coords[idx];
         idToCoords.set(t.id, {x,y});
@@ -208,9 +210,18 @@ function render(tasks) {
         cell.style.gridColumnStart = x + 1;
         cell.style.gridRowStart = y + 1;
         grid.appendChild(cell);
-        // stagger visibility by index
-        setTimeout(() => cell.classList.add('visible'), idx * 50);
+        cells.push({cell, x, y});
         if (idx === 0) firstCell = cell;
+    });
+    // reveal centre first, then by increasing manhattan distance
+    const center = {x: Math.floor(coords[0][0]), y: Math.floor(coords[0][1])};
+    cells.sort((a,b) => (Math.abs(a.x-center.x)+Math.abs(a.y-center.y)) - (Math.abs(b.x-center.x)+Math.abs(b.y-center.y)));
+    cells.forEach((c, i) => {
+        setTimeout(() => {
+            c.cell.classList.add('reveal');
+            // keep visible after animation
+            setTimeout(() => c.cell.classList.add('visible'), 300);
+        }, i * 50);
     });
 
     // once grid is in DOM, scroll the first (center) cell into view
