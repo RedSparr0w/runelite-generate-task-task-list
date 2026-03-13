@@ -56,9 +56,9 @@ const TIER_COLORS = {
     hard: '#ffeb3b',
     elite: '#f44336',
     master: '#9c27b0',
-    'master-tedious': '#607d8b',
-    extra: '#ff9800',
-    pets: '#8bc34a'
+    'master-tedious': '#9c27b0',
+    extra: '#607d8b',
+    pets: '#ff6fff'
 };
 
 let suppressTaskClick = false;
@@ -2175,6 +2175,7 @@ function showModal(task, anchor) {
     const tip = document.getElementById('modal-tip');
     const wiki = document.getElementById('modal-wiki');
     const button = document.getElementById('modal-complete');
+    const tierBadge = document.getElementById('modal-tier-badge');
     const cell = getCellById(task.id);
     const state = getState(task.id) || 'incomplete';
 
@@ -2233,6 +2234,16 @@ function showModal(task, anchor) {
         button.style.display = 'none';
         button.disabled = false;
         button.onclick = null;
+    }
+
+    if (tierBadge) {
+        const tier = task.tier || '';
+        const bgColor = TIER_COLORS[tier] || '#475569';
+        const textColor = tier === 'hard' ? '#4a2d00' : '#ffffff';
+        tierBadge.textContent = formatTierName(tier) || 'Unknown';
+        tierBadge.style.background = bgColor;
+        tierBadge.style.color = textColor;
+        tierBadge.style.display = tier ? 'inline-block' : 'none';
     }
 
     const itemsEl = document.getElementById('modal-items');
