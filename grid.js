@@ -132,7 +132,7 @@ function normalizeUsername(value) {
 }
 
 function toSyncUsername(value) {
-    return normalizeUsername(value).replace(/ /g, '_');
+    return normalizeUsername(value).replace(/\W/g, '_');
 }
 
 function getPlayerCacheKey(username) {
