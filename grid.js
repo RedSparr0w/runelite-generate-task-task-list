@@ -509,7 +509,7 @@ function getContainedImageRect(image, boxX, boxY, boxWidth, boxHeight) {
 function getCellSpriteKey(cell, imageKey) {
     const pixelRatioKey = Math.round(getSpritePixelRatio() * 1000);
     if (cell.state === 'locked') {
-        return `locked@${pixelRatioKey}`;
+        return `locked::${pixelRatioKey}::${imageKey}`;
     }
 
     return [
@@ -521,7 +521,7 @@ function getCellSpriteKey(cell, imageKey) {
 }
 
 function getBackgroundSpriteKey(state) {
-    return `${state}@${Math.round(getSpritePixelRatio() * 1000)}`;
+    return `bg::${state}@${Math.round(getSpritePixelRatio() * 1000)}`;
 }
 
 function drawCellBackgroundSprite(spriteContext, state) {
@@ -687,7 +687,9 @@ function ensureCellSprite(cell) {
     }
 
     const pixelRatio = getSpritePixelRatio();
-    const spriteCanvas = cell.spriteCanvas || document.createElement('canvas');
+    const spriteCanvas = cell.state === 'locked'
+        ? document.createElement('canvas')
+        : (cell.spriteCanvas || document.createElement('canvas'));
     spriteCanvas.width = Math.max(1, Math.round(CELL_SIZE * pixelRatio));
     spriteCanvas.height = Math.max(1, Math.round(CELL_SIZE * pixelRatio));
     const spriteContext = spriteCanvas.getContext('2d');
@@ -709,12 +711,13 @@ function ensureCellSprite(cell) {
     drawCellBackgroundSprite(spriteContext, cell.state);
     drawCellSpriteForeground(spriteContext, cell, palette, imageState);
 
-    cell.spriteCanvas = spriteCanvas;
-    cell.spriteKey = spriteKey;
-
     if (cell.state === 'locked') {
         backgroundSpriteCache.set(spriteKey, spriteCanvas);
+        return spriteCanvas;
     }
+
+    cell.spriteCanvas = spriteCanvas;
+    cell.spriteKey = spriteKey;
 
     return spriteCanvas;
 }
