@@ -249,6 +249,14 @@ function getCanvasPixelRatio() {
     return Math.max(0.25, Math.round(cappedRatio / CANVAS_PIXEL_RATIO_STEP) * CANVAS_PIXEL_RATIO_STEP);
 }
 
+function getSpritePixelRatio() {
+    if (isZooming && lastCanvasPixelRatio > 0) {
+        return lastCanvasPixelRatio;
+    }
+
+    return getCanvasPixelRatio();
+}
+
 function syncCanvasResolution() {
     if (!gridCanvas || !gridContext || gridPixelWidth <= 0 || gridPixelHeight <= 0) {
         return;
@@ -493,7 +501,7 @@ function getContainedImageRect(image, boxX, boxY, boxWidth, boxHeight) {
 }
 
 function getCellSpriteKey(cell, imageKey) {
-    const pixelRatioKey = Math.round(getCanvasPixelRatio() * 1000);
+    const pixelRatioKey = Math.round(getSpritePixelRatio() * 1000);
     if (cell.state === 'locked') {
         return `locked@${pixelRatioKey}`;
     }
@@ -507,7 +515,7 @@ function getCellSpriteKey(cell, imageKey) {
 }
 
 function getBackgroundSpriteKey(state) {
-    return `${state}@${Math.round(getCanvasPixelRatio() * 1000)}`;
+    return `${state}@${Math.round(getSpritePixelRatio() * 1000)}`;
 }
 
 function drawCellBackgroundSprite(spriteContext, state) {
@@ -636,7 +644,7 @@ function ensureBackgroundSprite(state) {
         return backgroundSpriteCache.get(spriteKey);
     }
 
-    const pixelRatio = getCanvasPixelRatio();
+    const pixelRatio = getSpritePixelRatio();
     const spriteCanvas = document.createElement('canvas');
     spriteCanvas.width = Math.max(1, Math.round(CELL_SIZE * pixelRatio));
     spriteCanvas.height = Math.max(1, Math.round(CELL_SIZE * pixelRatio));
@@ -672,7 +680,7 @@ function ensureCellSprite(cell) {
         return cell.spriteCanvas;
     }
 
-    const pixelRatio = getCanvasPixelRatio();
+    const pixelRatio = getSpritePixelRatio();
     const spriteCanvas = cell.spriteCanvas || document.createElement('canvas');
     spriteCanvas.width = Math.max(1, Math.round(CELL_SIZE * pixelRatio));
     spriteCanvas.height = Math.max(1, Math.round(CELL_SIZE * pixelRatio));
@@ -1674,6 +1682,8 @@ function bindWheelZoom(container) {
     container.addEventListener('wheel', e => {
         e.preventDefault();
 
+        const previousScale = currentScale;
+
         const minScale = getMinScale();
         const nextScale = clamp(
             e.deltaY < 0 ? currentScale * ZOOM_FACTOR : currentScale / ZOOM_FACTOR,
@@ -1698,6 +1708,9 @@ function bindWheelZoom(container) {
 
         container.scrollLeft = worldX * currentScale - pointerX;
         container.scrollTop = worldY * currentScale - pointerY;
+        if (nextScale < previousScale) {
+            queueCanvasRender();
+        }
         refreshPopoverPosition();
     }, { passive: false });
 
