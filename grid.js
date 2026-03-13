@@ -54,6 +54,18 @@ const TASK_STATE_LABELS = {
     locked: 'Locked',
     hidden: 'Hidden'
 };
+const INTRO_TASK_ID = '__intro__';
+const INTRO_TASK_IMAGE = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="10" fill="#46433A"/><text x="32" y="46" font-size="40" text-anchor="middle" fill="#FFCF3F" font-family="sans-serif" font-weight="700">★</text></svg>')}`;
+const INTRO_TASK = {
+    id: INTRO_TASK_ID,
+    name: 'How to Play',
+    tier: '',
+    imageLink: INTRO_TASK_IMAGE,
+    tip: '',
+    wikiLink: null,
+    displayItemId: null,
+    verification: { method: 'none' }
+};
 const CELL_SIZE = 80;
 const CELL_GAP = 15;
 const CELL_STEP = CELL_SIZE + CELL_GAP;
@@ -1664,7 +1676,7 @@ function setState(id, state) {
 }
 
 function getCompletedCount() {
-    return tasksGlobal.filter(task => getState(task.id) === 'complete').length;
+    return tasksGlobal.filter(task => task.id !== INTRO_TASK_ID && getState(task.id) === 'complete').length;
 }
 
 function getUnlockLimit(completedCount = getCompletedCount()) {
@@ -1737,6 +1749,10 @@ function getTierProgressByTier() {
     const grouped = new Map();
 
     tasksGlobal.forEach(task => {
+        if (task.id === INTRO_TASK_ID) {
+            return;
+        }
+
         const tier = task.tier || 'other';
         if (!grouped.has(tier)) {
             grouped.set(tier, {
@@ -2672,6 +2688,56 @@ function showModal(task, anchor) {
     const cell = getCellById(task.id);
     const state = getState(task.id) || 'incomplete';
 
+    if (task.id === INTRO_TASK_ID) {
+        title.textContent = 'Welcome to the Task Grid!';
+        setImageWithFallback(image, INTRO_TASK_IMAGE, 'Task Grid');
+        tip.innerHTML =
+            'Complete randomly assigned OSRS collection log goals and work your way across the grid.<br><br>' +
+            '<strong>Unlocking tasks:</strong> Locked tiles can be revealed by spending unlock slots. ' +
+            'Complete tasks to earn more slots — the more you finish, the more you unlock.<br><br>' +
+            '<strong>Wiki Sync:</strong> In RuneLite, enable the <em>Wiki Sync</em> plugin. ' +
+            'Open your Collection Log in-game and click the Wiki Sync button. ' +
+            'Then use the Wiki Sync button here to automatically mark completed tasks.';
+        wiki.style.display = 'none';
+        if (tierBadge) {
+            tierBadge.style.display = 'none';
+        }
+        const itemsEl = document.getElementById('modal-items');
+        const requiredEl = document.getElementById('modal-items-required');
+        if (itemsEl) {
+            itemsEl.innerHTML = '';
+            itemsEl.classList.remove('is-scrollable');
+            itemsEl.style.display = 'none';
+        }
+        if (requiredEl) {
+            requiredEl.style.display = 'none';
+            requiredEl.textContent = '';
+        }
+        if (state === 'incomplete') {
+            button.type = 'button';
+            button.disabled = false;
+            button.textContent = "Let's go!";
+            button.style.display = 'block';
+            button.onclick = e => {
+                e.preventDefault();
+                applyTaskCompletion(task);
+                updateUnlockHud();
+                refreshHiddenEdges({ animate: true });
+                hideModal();
+            };
+        } else {
+            button.style.display = 'none';
+            button.disabled = false;
+            button.onclick = null;
+        }
+        activePopoverAnchor = anchor || cell;
+        modal.classList.add('open');
+        requestAnimationFrame(() => {
+            refreshPopoverPosition();
+        });
+        return;
+    }
+
     if (state === 'locked') {
         title.textContent = 'Locked Task';
         setImageWithFallback(image, LOCKED_TILE_IMAGE, 'Locked task');
@@ -3169,9 +3235,18 @@ function startApp() {
         all.sort((a, b) => a.priority - b.priority);
     }
 
+    // Ensure the intro tile is always at position 0, regardless of saved order or fresh shuffle.
+    const introIdx = all.findIndex(task => task.id === INTRO_TASK_ID);
+    if (introIdx < 0) {
+        all.unshift(INTRO_TASK);
+    } else if (introIdx !== 0) {
+        all.splice(introIdx, 1);
+        all.unshift(INTRO_TASK);
+    }
+
     all.forEach(task => {
         if (!getState(task.id)) {
-            setState(task.id, 'hidden');
+            setState(task.id, task.id === INTRO_TASK_ID ? 'incomplete' : 'hidden');
         }
     });
 
