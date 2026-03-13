@@ -272,14 +272,22 @@ body::-webkit-scrollbar {
     transform: translateY(-1px);
 }
 
+#modal-items-required {
+    display: none;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    font-size: 12px;
+    font-weight: 700;
+    color: #334155;
+}
+
 #modal-items {
     display: none;
     grid-template-columns: repeat(5, 40px);
     grid-auto-rows: 40px;
     gap: 6px;
-    margin-top: 12px;
-    padding-top: 12px;
-    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    margin-top: 8px;
 }
 
 #modal-items.is-scrollable {

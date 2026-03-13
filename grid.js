@@ -628,10 +628,23 @@ function showModal(task, anchor) {
     }
 
     const itemsEl = document.getElementById('modal-items');
+    const requiredEl = document.getElementById('modal-items-required');
     if (itemsEl) {
-        const itemIds = state !== 'locked' ? (task.verification?.itemIds || []) : [];
+        const verification = state !== 'locked' ? task.verification : null;
+        const itemIds = verification?.itemIds || [];
         itemsEl.innerHTML = '';
         if (itemIds.length > 0) {
+            const totalItems = itemIds.length;
+            const rawRequired = verification?.count;
+            const requiredItems = Number.isFinite(rawRequired)
+                ? clamp(Math.floor(rawRequired), 1, totalItems)
+                : totalItems;
+
+            if (requiredEl) {
+                requiredEl.textContent = `Required ${requiredItems}/${totalItems} items`;
+                requiredEl.style.display = 'block';
+            }
+
             itemsEl.classList.toggle('is-scrollable', itemIds.length > 20);
             itemIds.forEach(id => {
                 const info = collectionLogMap.get(id);
@@ -657,6 +670,10 @@ function showModal(task, anchor) {
             });
             itemsEl.style.display = 'grid';
         } else {
+            if (requiredEl) {
+                requiredEl.style.display = 'none';
+                requiredEl.textContent = '';
+            }
             itemsEl.classList.remove('is-scrollable');
             itemsEl.style.display = 'none';
         }
