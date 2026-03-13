@@ -19,9 +19,10 @@ const STORAGE_KEY = 'taskGridOrder';
 const MIN_SCALE = 0.5;
 const MAX_SCALE = 2.5;
 const ZOOM_FACTOR = 1.1;
-const POP_STAGGER_MS = 50;
+const POP_STAGGER_MS = 60;
 const POP_DURATION_MS = 500;
 const EDGE_POP_OFFSET_MS = 120;
+const INITIAL_REVEAL_DELAY_MS = 500;
 const INITIAL_REVEAL_DURATION_MS = 3000;
 const ZOOM_RENDER_DEBOUNCE_MS = 120;
 const MAX_CANVAS_PIXEL_RATIO = 3;
@@ -2700,7 +2701,7 @@ function render(tasks) {
     const revealDelayByCoord = new Map();
 
     sortedVisibleCells.forEach((item, index) => {
-        const revealDelay = index * revealStagger;
+        const revealDelay = INITIAL_REVEAL_DELAY_MS + (index * revealStagger);
         revealDelayByCoord.set(`${item.x},${item.y}`, revealDelay);
         playPopReveal(item.cell, { delay: revealDelay, easing: 'ease-in' });
     });
