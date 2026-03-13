@@ -11,6 +11,7 @@ const tiers = [
 ];
 
 const LOCKED_TILE_IMAGE = 'https://oldschool.runescape.wiki/images/thumb/Cake_of_guidance_detail.png/260px-Cake_of_guidance_detail.png?c3595';
+const QUESTION_MARK_ICON = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="10" fill="#1f2937"/><text x="32" y="44" font-size="42" text-anchor="middle" fill="#f8fafc" font-family="sans-serif" font-weight="700">?</text></svg>')}`;
 const STATES = ['hidden', 'locked', 'incomplete', 'complete'];
 const DRAG_THRESHOLD = 6;
 const STATE_KEY = 'taskStates';
@@ -86,6 +87,34 @@ function buildClEntry(name, category) {
         wikiLink: `https://oldschool.runescape.wiki/w/${encoded}`,
         imageUrl: `https://oldschool.runescape.wiki/w/Special:Redirect/file/${encoded}.png`
     };
+}
+
+function bindImageErrorFallback(image) {
+    if (!image || image.dataset.fallbackBound === '1') {
+        return;
+    }
+
+    image.dataset.fallbackBound = '1';
+    image.addEventListener('error', () => {
+        if (image.dataset.fallbackApplied === '1') {
+            return;
+        }
+
+        image.dataset.fallbackApplied = '1';
+        image.src = QUESTION_MARK_ICON;
+        image.alt = 'Image unavailable';
+    });
+}
+
+function setImageWithFallback(image, src, alt = '') {
+    if (!image) {
+        return;
+    }
+
+    bindImageErrorFallback(image);
+    image.dataset.fallbackApplied = '0';
+    image.alt = alt;
+    image.src = src || QUESTION_MARK_ICON;
 }
 
 function normalizeUsername(value) {
@@ -364,8 +393,7 @@ function applyCellContent(cell, state) {
     }
 
     if (state === 'locked') {
-        img.src = LOCKED_TILE_IMAGE;
-        img.alt = 'Locked task';
+        setImageWithFallback(img, LOCKED_TILE_IMAGE, 'Locked task');
         name.textContent = '';
         return;
     }
@@ -377,8 +405,7 @@ function applyCellContent(cell, state) {
         return;
     }
 
-    img.src = task.imageLink;
-    img.alt = task.name;
+    setImageWithFallback(img, task.imageLink, task.name);
     name.textContent = task.name;
 }
 
@@ -617,14 +644,12 @@ function showModal(task, anchor) {
 
     if (state === 'locked') {
         title.textContent = 'Locked Task';
-        image.src = LOCKED_TILE_IMAGE;
-        image.alt = 'Locked task';
+        setImageWithFallback(image, LOCKED_TILE_IMAGE, 'Locked task');
         tip.textContent = 'Unlock this tile to reveal what task is here.';
         wiki.style.display = 'none';
     } else {
         title.textContent = task.name;
-        image.src = task.imageLink;
-        image.alt = task.name;
+        setImageWithFallback(image, task.imageLink, task.name);
         tip.textContent = task.tip || '';
         wiki.href = task.wikiLink || '#';
         wiki.style.display = 'inline-block';
@@ -731,10 +756,9 @@ function showModal(task, anchor) {
                 img.loading = 'lazy';
                 img.decoding = 'async';
                 if (info) {
-                    img.src = info.imageUrl;
-                    img.alt = info.name;
+                    setImageWithFallback(img, info.imageUrl, info.name);
                 } else {
-                    img.alt = `Item ${id}`;
+                    setImageWithFallback(img, QUESTION_MARK_ICON, `Item ${id}`);
                 }
                 link.appendChild(img);
                 itemsEl.appendChild(link);
@@ -910,6 +934,7 @@ function startApp() {
 
     const loadingIcons = Array.from(document.querySelectorAll('#loading .loading-icon'));
     loadingIcons.forEach(icon => icon.classList.remove('visible'));
+    loadingIcons.forEach(icon => bindImageErrorFallback(icon));
 
     Promise.all([loadAll(), loadCollectionLogItems(), loadPlayerCollectionLog(playerUsername)]).then(([data]) => {
     let all = [];
