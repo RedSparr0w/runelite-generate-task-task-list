@@ -143,6 +143,9 @@ body {
 }
 
 .current-task-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     width: 100%;
     border: 1px solid rgba(148, 163, 184, 0.15);
     padding: 7px 8px;
@@ -152,6 +155,28 @@ body {
     color: #e2e8f0;
     text-align: left;
     cursor: pointer;
+}
+
+.current-task-tier-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex: 0 0 8px;
+    background: #94a3b8;
+}
+
+.tier-dot-easy { background: #4caf50; }
+.tier-dot-medium { background: #2196f3; }
+.tier-dot-hard { background: #ffeb3b; }
+.tier-dot-elite { background: #f44336; }
+.tier-dot-master { background: #9c27b0; }
+.tier-dot-master-tedious { background: #607d8b; }
+.tier-dot-extra { background: #ff9800; }
+.tier-dot-pets { background: #8bc34a; }
+
+.current-task-label {
+    min-width: 0;
+    line-height: 1.2;
 }
 
 .current-task-item:hover,
@@ -390,12 +415,16 @@ body::-webkit-scrollbar {
     width: min(720px, calc(100vw - 24px));
     max-height: min(80vh, 760px);
     overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.22);
+    background: rgba(15, 23, 42, 0.96);
+    box-shadow: 0 24px 44px rgba(2, 6, 23, 0.58);
+    color: #f8fafc;
 }
 
 #tier-tasks-title {
     margin: 2px 0 10px;
     font-size: 18px;
-    color: #0f172a;
+    color: #f8fafc;
 }
 
 .tier-tabs {
@@ -407,19 +436,25 @@ body::-webkit-scrollbar {
 
 .tier-tab {
     appearance: none;
-    border: 1px solid rgba(15, 23, 42, 0.12);
+    border: 1px solid rgba(148, 163, 184, 0.28);
     border-radius: 999px;
     padding: 7px 12px;
-    background: rgba(255,255,255,0.8);
-    color: #334155;
+    background: rgba(30, 41, 59, 0.9);
+    color: #e2e8f0;
     font-size: 12px;
     font-weight: 700;
     cursor: pointer;
 }
 
+.tier-tab:hover,
+.tier-tab:focus-visible {
+    background: rgba(51, 65, 85, 0.96);
+    border-color: rgba(148, 163, 184, 0.42);
+}
+
 .tier-tab.active {
-    background: #0f172a;
-    border-color: #0f172a;
+    background: rgba(248, 250, 252, 0.14);
+    border-color: rgba(148, 163, 184, 0.55);
     color: #f8fafc;
 }
 
@@ -437,14 +472,14 @@ body::-webkit-scrollbar {
     gap: 10px;
     align-items: center;
     border-radius: 10px;
-    border: 1px solid rgba(15, 23, 42, 0.08);
-    background: rgba(255,255,255,0.84);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    background: rgba(30, 41, 59, 0.72);
     padding: 8px 10px;
 }
 
 .tier-task-name {
     font-size: 13px;
-    color: #1e293b;
+    color: #e2e8f0;
 }
 
 .tier-task-status {
@@ -457,23 +492,35 @@ body::-webkit-scrollbar {
 }
 
 .tier-task-status.status-complete {
-    background: rgba(22, 163, 74, 0.2);
-    color: #166534;
+    background: rgba(22, 163, 74, 0.22);
+    color: #bbf7d0;
 }
 
 .tier-task-status.status-incomplete {
-    background: rgba(217, 119, 6, 0.2);
-    color: #92400e;
+    background: rgba(245, 158, 11, 0.22);
+    color: #fde68a;
 }
 
 .tier-task-status.status-locked {
-    background: rgba(51, 65, 85, 0.2);
-    color: #334155;
+    background: rgba(100, 116, 139, 0.25);
+    color: #cbd5e1;
 }
 
 .tier-task-status.status-hidden {
-    background: rgba(100, 116, 139, 0.2);
-    color: #475569;
+    background: rgba(51, 65, 85, 0.34);
+    color: #94a3b8;
+}
+
+.tier-tasks-modal-content .modal-close {
+    background: rgba(51, 65, 85, 0.82);
+    color: #e2e8f0;
+    box-shadow: none;
+}
+
+.tier-tasks-modal-content .modal-close:hover,
+.tier-tasks-modal-content .modal-close:focus {
+    background: rgba(71, 85, 105, 0.95);
+    color: #f8fafc;
 }
 
 .modal[data-side="bottom"] .modal-content::before,

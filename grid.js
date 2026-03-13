@@ -585,7 +585,17 @@ function updateCurrentTasksPopover() {
         const item = document.createElement('button');
         item.type = 'button';
         item.className = 'current-task-item';
-        item.textContent = `[${formatTierName(task.tier)}] ${task.name}`;
+
+        const tierDot = document.createElement('span');
+        tierDot.className = `current-task-tier-dot tier-dot-${task.tier || 'other'}`;
+        tierDot.ariaHidden = 'true';
+
+        const taskLabel = document.createElement('span');
+        taskLabel.className = 'current-task-label';
+        taskLabel.textContent = task.name;
+
+        item.appendChild(tierDot);
+        item.appendChild(taskLabel);
         item.addEventListener('click', () => {
             const centered = centerTaskInView(task.id, { smooth: true });
             if (centered) {
