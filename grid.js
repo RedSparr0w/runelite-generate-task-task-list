@@ -23,6 +23,7 @@ const POP_STAGGER_MS = 50;
 const POP_DURATION_MS = 400;
 const EDGE_POP_OFFSET_MS = 120;
 const INITIAL_REVEAL_DURATION_MS = 2000;
+const ZOOM_RENDER_DEBOUNCE_MS = 120;
 const UNLOCK_TOAST_DURATION_MS = 4500;
 const SYNC_BATCH_SIZE = 3;
 const SYNC_BATCH_DELAY_MS = 45;
@@ -72,6 +73,8 @@ let gridPixelHeight = 0;
 let gridCellCount = 0;
 let lastCanvasPixelRatio = 0;
 let spritePrewarmTimer = null;
+let zoomRenderDebounceTimer = null;
+let isZooming = false;
 
 const idToCoords = new Map();
 const idToCell = new Map();
@@ -269,6 +272,31 @@ function syncCanvasResolution() {
         lastCanvasPixelRatio = pixelRatio;
         scheduleSpritePrewarm(60);
     }
+}
+
+function scheduleZoomRender() {
+    isZooming = true;
+    if (zoomRenderDebounceTimer) {
+        clearTimeout(zoomRenderDebounceTimer);
+    }
+
+    zoomRenderDebounceTimer = setTimeout(() => {
+        zoomRenderDebounceTimer = null;
+        isZooming = false;
+        syncCanvasResolution();
+        queueCanvasRender();
+    }, ZOOM_RENDER_DEBOUNCE_MS);
+}
+
+function flushZoomRender() {
+    if (zoomRenderDebounceTimer) {
+        clearTimeout(zoomRenderDebounceTimer);
+        zoomRenderDebounceTimer = null;
+    }
+
+    isZooming = false;
+    syncCanvasResolution();
+    queueCanvasRender();
 }
 
 function getImageAsset(source) {
@@ -1569,7 +1597,8 @@ function getMinScale() {
     return clamp(Math.max(widthFit, heightFit), MIN_SCALE, MAX_SCALE);
 }
 
-function updateGridScale() {
+function updateGridScale(options = {}) {
+    const { deferCanvasRender = false } = options;
     const grid = document.getElementById('grid');
     const stage = document.getElementById('grid-stage');
     if (!grid || !stage) {
@@ -1577,11 +1606,16 @@ function updateGridScale() {
     }
 
     currentScale = clamp(currentScale, getMinScale(), MAX_SCALE);
-    syncCanvasResolution();
     grid.style.transform = `scale(${currentScale})`;
     stage.style.width = `${grid.scrollWidth * currentScale}px`;
     stage.style.height = `${grid.scrollHeight * currentScale}px`;
-    queueCanvasRender();
+
+    if (deferCanvasRender) {
+        scheduleZoomRender();
+        return;
+    }
+
+    flushZoomRender();
 }
 
 function refreshPopoverPosition() {
@@ -1616,7 +1650,7 @@ function bindWheelZoom(container) {
         const worldY = contentY / currentScale;
 
         currentScale = nextScale;
-        updateGridScale();
+        updateGridScale({ deferCanvasRender: true });
 
         container.scrollLeft = worldX * currentScale - pointerX;
         container.scrollTop = worldY * currentScale - pointerY;
@@ -2371,7 +2405,9 @@ function startApp() {
     bindWheelZoom(container);
 
     container.addEventListener('scroll', () => {
-        queueCanvasRender();
+        if (!isZooming) {
+            queueCanvasRender();
+        }
         refreshPopoverPosition();
     }, { passive: true });
 
