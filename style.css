@@ -38,13 +38,11 @@ body {
 .loading-icon {
     width: 32px;
     height: 32px;
-    animation: spin 1s linear infinite;
     opacity: 0;
-    transform: scale(0);
 }
 .loading-icon.visible {
-    opacity: 1;
     transform: scale(1);
+    animation: pop 0.3s ease forwards, spin 1.5s linear infinite;
 }
 @keyframes spin {
     from { transform: rotate(0deg); }
