@@ -1,0 +1,40 @@
+body {
+    font-family: sans-serif;
+    padding: 1rem;
+}
+
+#grid {
+    display: grid;
+    grid-template-columns: repeat(var(--grid-size), 80px);
+    grid-auto-rows: 80px;
+    gap: 2px;
+    background: #333;
+    width: max-content;
+}
+
+.cell {
+    background: #f0f0f0;
+    border: 1px solid #ccc;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 2px;
+    font-size: 10px;
+    cursor: pointer;
+}
+.cell img {
+    display: block;
+    margin-bottom: 2px;
+}
+
+/* assign colours per tier */
+.tier-easy { background: #d4edda; }
+.tier-medium { background: #cce5ff; }
+.tier-hard { background: #fff3cd; }
+.tier-elite { background: #f8d7da; }
+.tier-master { background: #d1c4e9; }
+.tier-master-tedious { background: #e0e0e0; }
+.tier-extra { background: #ffe0b2; }
+.tier-pets { background: #f0f4c3; }
