@@ -29,6 +29,7 @@ const CANVAS_PIXEL_RATIO_STEP = 0.25;
 const HOVER_LERP_FACTOR = 0.25;
 const HOVER_SCALE_BOOST = 0.04;
 const HOVER_LIFT_PX = 2;
+const COMPLETE_CELL_OPACITY = 0.85;
 const UNLOCK_TOAST_DURATION_MS = 4500;
 const SYNC_BATCH_SIZE = 3;
 const SYNC_BATCH_DELAY_MS = 45;
@@ -78,8 +79,8 @@ const TIER_COLORS_BY_THEME = {
 const CELL_PALETTES_BY_THEME = {
     osrs: {
         locked: { fill: '#2f2822', border: 'rgba(170, 149, 119, 0.82)', borderWidth: 2, text: '#f1e8d4' },
-        incomplete: { fill: '#847161', border: 'rgba(88, 72, 53, 0.96)', borderWidth: 2, text: '#f1e8d4' },
-        complete: { fill: '#4f453d', border: 'rgba(132, 118, 100, 0.62)', borderWidth: 2, text: '#f1e8d4' },
+        incomplete: { fill: '#4a4138', border: 'rgba(170, 149, 119, 0.82)', borderWidth: 2, text: '#f1e8d4' },
+        complete: { fill: '#6f6d69', border: 'rgba(98, 94, 88, 0.9)', borderWidth: 2, text: '#f1e8d4' },
         hidden: { fill: '#2E2C29', border: 'rgba(96, 88, 77, 0.56)', borderWidth: 2, text: '#b79d7e' },
         badgeFill: 'rgba(15, 15, 15, 0.84)',
         badgeBorder: 'rgba(96, 88, 77, 0.8)',
@@ -89,8 +90,8 @@ const CELL_PALETTES_BY_THEME = {
     },
     dark: {
         locked: { fill: '#21262e', border: 'rgba(132, 142, 160, 0.84)', borderWidth: 2, text: '#e6ebf3' },
-        incomplete: { fill: '#596171', border: 'rgba(68, 76, 92, 0.96)', borderWidth: 2, text: '#e6ebf3' },
-        complete: { fill: '#343a43', border: 'rgba(110, 118, 132, 0.66)', borderWidth: 2, text: '#e6ebf3' },
+        incomplete: { fill: '#3a414d', border: 'rgba(132, 142, 160, 0.84)', borderWidth: 2, text: '#e6ebf3' },
+        complete: { fill: '#525a65', border: 'rgba(78, 86, 100, 0.9)', borderWidth: 2, text: '#e6ebf3' },
         hidden: { fill: '#1f2329', border: 'rgba(80, 88, 100, 0.58)', borderWidth: 2, text: '#b5becb' },
         badgeFill: 'rgba(10, 12, 16, 0.88)',
         badgeBorder: 'rgba(96, 103, 116, 0.8)',
@@ -1014,6 +1015,10 @@ function drawCanvasCell(context, cell, now) {
 
     if (hoverProgress > 0) {
         scale *= 1 + (HOVER_SCALE_BOOST * hoverProgress);
+    }
+
+    if (state === 'complete') {
+        alpha *= COMPLETE_CELL_OPACITY;
     }
 
     const x = cell.pixelX;

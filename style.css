@@ -29,8 +29,10 @@
     --action-bg: #3e362f;
     --action-bg-hover: #4a4138;
     --action-border: rgba(115, 101, 89, 0.56);
-    --state-incomplete-bg: #847161;
-    --state-incomplete-border: rgba(88, 72, 53, 0.96);
+    --state-incomplete-bg: var(--theme-surface-hover);
+    --state-incomplete-border: var(--theme-border-strong);
+    --state-complete-bg: #6f6d69;
+    --state-complete-border: rgba(98, 94, 88, 0.9);
 
     --radius-large: 8px;
     --radius-medium: 6px;
@@ -63,8 +65,10 @@ body[data-theme="dark"] {
     --action-bg: #2f353f;
     --action-bg-hover: #3a414d;
     --action-border: rgba(96, 103, 116, 0.58);
-    --state-incomplete-bg: #596171;
-    --state-incomplete-border: rgba(68, 76, 92, 0.96);
+    --state-incomplete-bg: var(--theme-surface-hover);
+    --state-incomplete-border: var(--theme-border-strong);
+    --state-complete-bg: #525a65;
+    --state-complete-border: rgba(78, 86, 100, 0.9);
 
     --tier-easy: #5FD46A;
     --tier-medium: #4AA8FF;
@@ -1060,10 +1064,10 @@ body::-webkit-scrollbar {
     color: var(--text-main);
 }
 .state-complete {
-    opacity: 1 !important;
-    background: var(--theme-surface-hover);
+    opacity: 0.92 !important;
+    background: var(--state-complete-bg);
     border-width: 2px;
-    border-color: var(--theme-border);
+    border-color: var(--state-complete-border);
     box-shadow:
         0 12px 28px var(--theme-shadow),
         inset 0 1px 0 rgba(255,255,255,0.05);
