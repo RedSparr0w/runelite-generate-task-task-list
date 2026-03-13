@@ -5,8 +5,8 @@ const tiers = [
     'hard',
     'elite',
     'master',
-    'master-tedious',
-    'extra',
+    // 'master-tedious',
+    // 'extra',
     'pets'
 ];
 
@@ -228,6 +228,28 @@ function canUnlockMore() {
     return getUnlockedCount() < getUnlockLimit();
 }
 
+function getTasksUntilNextUnlock(completedCount = getCompletedCount()) {
+    const currentLimit = getUnlockLimit(completedCount);
+    const nextThreshold = 5 * currentLimit * currentLimit;
+    return Math.max(0, nextThreshold - completedCount);
+}
+
+function updateUnlockHud() {
+    const unlocks = document.getElementById('hud-unlocks');
+    const nextUnlock = document.getElementById('hud-next-unlock');
+    if (!unlocks || !nextUnlock) {
+        return;
+    }
+
+    const completedCount = getCompletedCount();
+    const totalUnlocks = getUnlockLimit(completedCount);
+    const availableUnlocks = Math.max(0, totalUnlocks - getUnlockedCount());
+    const tasksUntilNext = getTasksUntilNextUnlock(completedCount);
+
+    unlocks.textContent = `${availableUnlocks} / ${totalUnlocks}`;
+    nextUnlock.textContent = tasksUntilNext === 1 ? '1 task' : `${tasksUntilNext} tasks`;
+}
+
 function normalizeUnlockStates() {
     const unlockLimit = getUnlockLimit();
     const incompleteTasks = tasksGlobal.filter(task => getState(task.id) === 'incomplete');
@@ -330,6 +352,7 @@ function showModal(task) {
                     }
                 });
             }
+            updateUnlockHud();
             hideModal();
         };
     } else if (state === 'locked') {
@@ -349,6 +372,7 @@ function showModal(task) {
             if (cell) {
                 setCellState(cell, 'incomplete');
             }
+            updateUnlockHud();
             hideModal();
         } : null;
     } else {
@@ -412,6 +436,7 @@ function render(tasks) {
     // hidden cells remain at opacity 0 due to state-hidden and do not delay others
 
     updateGridScale();
+    updateUnlockHud();
 
     // once grid is in DOM, scroll the first (center) cell into view
     if (firstCell) {
@@ -513,6 +538,7 @@ loadAll().then(data => {
     // keep global reference
     tasksGlobal = all;
     normalizeUnlockStates();
+    updateUnlockHud();
 
     // ensure images cached before rendering (wait for them)
     // preload loading icons themselves so they animate instantly

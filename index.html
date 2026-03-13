@@ -6,7 +6,17 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>Task Tier Grid</h1>
+    <div id="unlock-hud">
+        <div class="hud-title">Progress</div>
+        <div class="hud-row">
+            <span class="hud-label">Unlocks</span>
+            <span id="hud-unlocks">0 / 0</span>
+        </div>
+        <div class="hud-row">
+            <span class="hud-label">Next Unlock</span>
+            <span id="hud-next-unlock">0 tasks</span>
+        </div>
+    </div>
     <!-- loading overlay -->
     <div id="loading" class="d-flex justify-content-center align-items-center">
         <div class="loading-icons">
