@@ -26,6 +26,9 @@ const INITIAL_REVEAL_DURATION_MS = 2000;
 const ZOOM_RENDER_DEBOUNCE_MS = 120;
 const MAX_CANVAS_PIXEL_RATIO = 3;
 const CANVAS_PIXEL_RATIO_STEP = 0.25;
+const HOVER_LERP_FACTOR = 0.25;
+const HOVER_SCALE_BOOST = 0.04;
+const HOVER_LIFT_PX = 2;
 const UNLOCK_TOAST_DURATION_MS = 4500;
 const SYNC_BATCH_SIZE = 3;
 const SYNC_BATCH_DELAY_MS = 45;
@@ -77,6 +80,7 @@ let lastCanvasPixelRatio = 0;
 let spritePrewarmTimer = null;
 let zoomRenderDebounceTimer = null;
 let isZooming = false;
+let hoveredCellId = '';
 
 const idToCoords = new Map();
 const idToCell = new Map();
@@ -721,6 +725,28 @@ function prewarmCellSprites() {
     });
 }
 
+function prewarmVisibleCellSprites() {
+    const visibleBounds = getVisibleWorldBounds();
+    const visibleCoords = getVisibleCoordBounds(visibleBounds);
+    if (!visibleCoords) {
+        return;
+    }
+
+    for (let y = visibleCoords.top; y <= visibleCoords.bottom; y++) {
+        for (let x = visibleCoords.left; x <= visibleCoords.right; x++) {
+            const taskId = coordToTaskId.get(`${x},${y}`);
+            if (!taskId) {
+                continue;
+            }
+
+            const cell = getCellById(taskId);
+            if (cell && cell.state !== 'hidden') {
+                ensureCellSprite(cell);
+            }
+        }
+    }
+}
+
 function scheduleSpritePrewarm(delay = 0) {
     if (spritePrewarmTimer) {
         clearTimeout(spritePrewarmTimer);
@@ -768,14 +794,34 @@ function drawCanvasCell(context, cell, now) {
         }
     }
 
+    const hoverTarget = hoveredCellId === cell.id && isCellHoverable(cell) ? 1 : 0;
+    let hoverProgress = cell.hoverProgress ?? 0;
+    const hoverDelta = hoverTarget - hoverProgress;
+    if (Math.abs(hoverDelta) > 0.001) {
+        hoverProgress += hoverDelta * HOVER_LERP_FACTOR;
+        if (Math.abs(hoverTarget - hoverProgress) < 0.01) {
+            hoverProgress = hoverTarget;
+        }
+        cell.hoverProgress = hoverProgress;
+        keepAnimating = true;
+    } else if (hoverProgress !== hoverTarget) {
+        hoverProgress = hoverTarget;
+        cell.hoverProgress = hoverTarget;
+    }
+
+    if (hoverProgress > 0) {
+        scale *= 1 + (HOVER_SCALE_BOOST * hoverProgress);
+    }
+
     const x = cell.pixelX;
     const y = cell.pixelY;
     const centerX = x + (CELL_SIZE / 2);
     const centerY = y + (CELL_SIZE / 2);
+    const hoverLift = HOVER_LIFT_PX * hoverProgress;
 
     context.save();
     context.globalAlpha = alpha;
-    context.translate(centerX, centerY);
+    context.translate(centerX, centerY - hoverLift);
     context.scale(scale, scale);
     context.translate(-centerX, -centerY);
 
@@ -831,6 +877,17 @@ function drawCanvasCell(context, cell, now) {
     context.arc(x + CELL_SIZE - 8, y + 8, 4, 0, Math.PI * 2);
     context.fillStyle = getTierColor(cell.task.tier);
     context.fill();
+
+    if (hoverProgress > 0.001) {
+        context.save();
+        drawRoundedRect(context, x + 0.75, y + 0.75, CELL_SIZE - 1.5, CELL_SIZE - 1.5, CELL_RADIUS - 1);
+        context.lineWidth = 1.5;
+        context.strokeStyle = `rgba(255, 255, 255, ${0.28 * hoverProgress})`;
+        context.shadowColor = `rgba(125, 211, 252, ${0.36 * hoverProgress})`;
+        context.shadowBlur = 12 * hoverProgress;
+        context.stroke();
+        context.restore();
+    }
 
     context.restore();
     return keepAnimating;
@@ -960,12 +1017,60 @@ function getCellAtClientPoint(clientX, clientY) {
     return taskId ? getCellById(taskId) : null;
 }
 
+function isCellHoverable(cell) {
+    if (!cell) {
+        return false;
+    }
+
+    const state = cell.state || 'hidden';
+    return state === 'locked' || state === 'incomplete' || state === 'complete';
+}
+
+function setHoveredCellId(nextCellId) {
+    const normalized = nextCellId ? String(nextCellId) : '';
+    if (hoveredCellId === normalized) {
+        return;
+    }
+
+    const previousCell = hoveredCellId ? getCellById(hoveredCellId) : null;
+    hoveredCellId = normalized;
+    const nextCell = hoveredCellId ? getCellById(hoveredCellId) : null;
+
+    if (gridCanvas) {
+        gridCanvas.style.cursor = nextCell && isCellHoverable(nextCell) ? 'pointer' : 'default';
+    }
+
+    if (previousCell || nextCell) {
+        queueCanvasRender();
+    }
+}
+
 function bindCanvasInteractions(canvas) {
     if (!canvas || canvas.dataset.bound === '1') {
         return;
     }
 
     canvas.dataset.bound = '1';
+    canvas.style.cursor = 'default';
+
+    canvas.addEventListener('mousemove', e => {
+        if (e.buttons !== 0) {
+            setHoveredCellId('');
+            return;
+        }
+
+        const cell = getCellAtClientPoint(e.clientX, e.clientY);
+        if (!cell || !isCellHoverable(cell)) {
+            setHoveredCellId('');
+            return;
+        }
+
+        setHoveredCellId(cell.id);
+    }, { passive: true });
+
+    canvas.addEventListener('mouseleave', () => {
+        setHoveredCellId('');
+    });
 
     canvas.addEventListener('click', e => {
         if (suppressTaskClick || e.button !== 0) {
@@ -1709,6 +1814,7 @@ function bindWheelZoom(container) {
         container.scrollLeft = worldX * currentScale - pointerX;
         container.scrollTop = worldY * currentScale - pointerY;
         if (nextScale < previousScale) {
+            prewarmVisibleCellSprites();
             queueCanvasRender();
         }
         refreshPopoverPosition();
@@ -1727,6 +1833,9 @@ function setCellState(cell, nextState) {
 
     cell.state = nextState;
     cell.spriteKey = '';
+    if (hoveredCellId === cell.id && !isCellHoverable(cell)) {
+        setHoveredCellId('');
+    }
     if (nextState !== 'hidden') {
         cell.edgeVisible = false;
         cell.edgeSides = {
@@ -1759,6 +1868,7 @@ function createCell(task, coord) {
         pixelY: coord.y * CELL_STEP,
         nameLines,
         popAnimation: null,
+        hoverProgress: 0,
         spriteCanvas: null,
         spriteKey: '',
         edgeVisible: false,
@@ -2145,6 +2255,10 @@ function render(tasks) {
     }
 
     hideModal();
+    hoveredCellId = '';
+    if (gridCanvas) {
+        gridCanvas.style.cursor = 'default';
+    }
     grid.innerHTML = '';
     idToCell.clear();
     coordToTaskId.clear();
