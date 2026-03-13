@@ -72,6 +72,8 @@ const INTRO_TASK = {
 const CELL_SIZE = 80;
 const CELL_GAP = 15;
 const CELL_STEP = CELL_SIZE + CELL_GAP;
+const GRID_SAFE_PADDING_X = CELL_STEP * 2;
+const GRID_SAFE_PADDING_Y = CELL_STEP * 2;
 const CELL_RADIUS = 14;
 const TIER_COLORS_BY_THEME = {
     osrs: {
@@ -1446,10 +1448,10 @@ function getVisibleCoordBounds(bounds) {
     }
 
     const maxCoord = gridCellCount - 1;
-    const left = clamp(Math.floor(bounds.left / CELL_STEP), 0, maxCoord);
-    const right = clamp(Math.floor(bounds.right / CELL_STEP), 0, maxCoord);
-    const top = clamp(Math.floor(bounds.top / CELL_STEP), 0, maxCoord);
-    const bottom = clamp(Math.floor(bounds.bottom / CELL_STEP), 0, maxCoord);
+    const left = clamp(Math.floor((bounds.left - GRID_SAFE_PADDING_X) / CELL_STEP), 0, maxCoord);
+    const right = clamp(Math.floor((bounds.right - GRID_SAFE_PADDING_X) / CELL_STEP), 0, maxCoord);
+    const top = clamp(Math.floor((bounds.top - GRID_SAFE_PADDING_Y) / CELL_STEP), 0, maxCoord);
+    const bottom = clamp(Math.floor((bounds.bottom - GRID_SAFE_PADDING_Y) / CELL_STEP), 0, maxCoord);
 
     return {
         left,
@@ -1533,14 +1535,17 @@ function getCellAtClientPoint(clientX, clientY) {
 
     const localX = (clientX - canvasRect.left) / currentScale;
     const localY = (clientY - canvasRect.top) / currentScale;
-    if (localX < 0 || localY < 0) {
+    const gridX = localX - GRID_SAFE_PADDING_X;
+    const gridY = localY - GRID_SAFE_PADDING_Y;
+
+    if (gridX < 0 || gridY < 0) {
         return null;
     }
 
-    const coordX = Math.floor(localX / CELL_STEP);
-    const coordY = Math.floor(localY / CELL_STEP);
-    const withinCellX = localX - (coordX * CELL_STEP);
-    const withinCellY = localY - (coordY * CELL_STEP);
+    const coordX = Math.floor(gridX / CELL_STEP);
+    const coordY = Math.floor(gridY / CELL_STEP);
+    const withinCellX = gridX - (coordX * CELL_STEP);
+    const withinCellY = gridY - (coordY * CELL_STEP);
     if (withinCellX < 0 || withinCellY < 0 || withinCellX >= CELL_SIZE || withinCellY >= CELL_SIZE) {
         return null;
     }
@@ -2326,8 +2331,8 @@ function syncCellPositionsFromTaskOrder() {
             return;
         }
 
-        cell.pixelX = coord.x * CELL_STEP;
-        cell.pixelY = coord.y * CELL_STEP;
+        cell.pixelX = GRID_SAFE_PADDING_X + (coord.x * CELL_STEP);
+        cell.pixelY = GRID_SAFE_PADDING_Y + (coord.y * CELL_STEP);
     });
 
     refreshPopoverPosition();
@@ -2653,8 +2658,8 @@ function createCell(task, coord) {
         __virtualAnchor: true,
         taskId: String(task.id),
         state,
-        pixelX: coord.x * CELL_STEP,
-        pixelY: coord.y * CELL_STEP,
+        pixelX: GRID_SAFE_PADDING_X + (coord.x * CELL_STEP),
+        pixelY: GRID_SAFE_PADDING_Y + (coord.y * CELL_STEP),
         nameLines,
         popAnimation: null,
         hoverProgress: 0,
@@ -3140,8 +3145,9 @@ function render(tasks) {
         return;
     }
 
-    gridPixelWidth = Math.max(1, (size * CELL_SIZE) + ((size - 1) * CELL_GAP));
-    gridPixelHeight = gridPixelWidth;
+    const gridCoreSize = Math.max(1, (size * CELL_SIZE) + ((size - 1) * CELL_GAP));
+    gridPixelWidth = gridCoreSize + (GRID_SAFE_PADDING_X * 2);
+    gridPixelHeight = gridCoreSize + (GRID_SAFE_PADDING_Y * 2);
 
     grid.style.width = `${gridPixelWidth}px`;
     grid.style.height = `${gridPixelHeight}px`;
