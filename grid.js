@@ -132,6 +132,8 @@ let playerUsername = '';
 let hasStartedApp = false;
 let obtainedItemIds = new Set();
 let completedAchievementDiaryKeys = new Set();
+let playerSkillExperienceBySkill = new Map();
+let playerSkillLevelBySkill = new Map();
 let syncButtonStatusTimer = null;
 let activeTierTab = '';
 let gridCanvas = null;
@@ -187,6 +189,7 @@ const idToCell = new Map();
 const coordToTaskId = new Map();
 const imageAssetCache = new Map();
 const backgroundSpriteCache = new Map();
+const skillBadgeIconCache = new Map();
 
 // collection log item map: id -> { name, category, wikiLink, imageUrl }
 let collectionLogMap = new Map();
@@ -235,6 +238,77 @@ function buildClEntry(name, category) {
         wikiLink: `https://oldschool.runescape.wiki/w/${encoded}`,
         imageUrl: `https://oldschool.runescape.wiki/w/Special:Redirect/file/${encoded}.png`
     };
+}
+
+function formatSkillName(skillName) {
+    const normalized = normalizeSkillName(skillName);
+    if (!normalized) {
+        return 'Skill';
+    }
+
+    const labels = {
+        hitpoints: 'Hitpoints',
+        runecraft: 'Runecraft'
+    };
+
+    return labels[normalized] || `${normalized.charAt(0).toUpperCase()}${normalized.slice(1)}`;
+}
+
+function getSkillShortLabel(skillName) {
+    const normalized = normalizeSkillName(skillName);
+    const labels = {
+        attack: 'ATK',
+        strength: 'STR',
+        defence: 'DEF',
+        ranged: 'RNG',
+        prayer: 'PRY',
+        magic: 'MAG',
+        runecraft: 'RC',
+        hitpoints: 'HP',
+        crafting: 'CRF',
+        mining: 'MIN',
+        smithing: 'SMI',
+        fishing: 'FSH',
+        cooking: 'CKG',
+        firemaking: 'FM',
+        woodcutting: 'WC',
+        agility: 'AGI',
+        herblore: 'HER',
+        thieving: 'THV',
+        fletching: 'FLT',
+        slayer: 'SLY',
+        farming: 'FAR',
+        construction: 'CON',
+        hunter: 'HNT',
+        sailing: 'SAI'
+    };
+
+    return labels[normalized] || 'SKL';
+}
+
+function formatExperience(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || numeric < 0) {
+        return '0';
+    }
+
+    return Math.floor(numeric).toLocaleString('en-US');
+}
+
+function getSkillBadgeIcon(skillName, isObtained) {
+    const normalized = normalizeSkillName(skillName) || 'skill';
+    const cacheKey = `${normalized}:${isObtained ? '1' : '0'}`;
+    if (skillBadgeIconCache.has(cacheKey)) {
+        return skillBadgeIconCache.get(cacheKey);
+    }
+
+    const label = getSkillShortLabel(normalized);
+    const background = isObtained ? '#5a513f' : '#3a3a3a';
+    const textColor = '#f1e8d4';
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="10" fill="${background}"/><text x="32" y="41" text-anchor="middle" fill="${textColor}" font-family="sans-serif" font-size="22" font-weight="700">${label}</text></svg>`;
+    const icon = `data:image/svg+xml,${encodeURIComponent(svg)}`;
+    skillBadgeIconCache.set(cacheKey, icon);
+    return icon;
 }
 
 function bindImageErrorFallback(image) {
@@ -1685,6 +1759,313 @@ function getAchievementDiaryKey(region, difficulty) {
     return `${region}|${difficulty}`;
 }
 
+function normalizeSkillName(value) {
+    const raw = String(value || '').trim().toLowerCase();
+    if (!raw) {
+        return '';
+    }
+
+    const compact = raw.replace(/[_\s-]+/g, '');
+    const aliases = {
+        attack: 'attack',
+        strength: 'strength',
+        defence: 'defence',
+        defense: 'defence',
+        ranged: 'ranged',
+        prayer: 'prayer',
+        magic: 'magic',
+        runecraft: 'runecraft',
+        runecrafting: 'runecraft',
+        hitpoint: 'hitpoints',
+        hitpoints: 'hitpoints',
+        hp: 'hitpoints',
+        crafting: 'crafting',
+        mining: 'mining',
+        smithing: 'smithing',
+        fishing: 'fishing',
+        cooking: 'cooking',
+        firemaking: 'firemaking',
+        woodcutting: 'woodcutting',
+        agility: 'agility',
+        herblore: 'herblore',
+        thieving: 'thieving',
+        fletching: 'fletching',
+        slayer: 'slayer',
+        farming: 'farming',
+        construction: 'construction',
+        hunter: 'hunter',
+        sailing: 'sailing'
+    };
+
+    return aliases[compact] || '';
+}
+
+function levelToExperience(level) {
+    const numericLevel = Number(level);
+    if (!Number.isFinite(numericLevel) || numericLevel < 1) {
+        return Number.NaN;
+    }
+
+    const cappedLevel = Math.min(126, Math.floor(numericLevel));
+    let points = 0;
+    for (let currentLevel = 1; currentLevel < cappedLevel; currentLevel += 1) {
+        points += Math.floor(currentLevel + (300 * (2 ** (currentLevel / 7))));
+    }
+
+    return Math.floor(points / 4);
+}
+
+function experienceToLevel(experience) {
+    const numericExperience = Number(experience);
+    if (!Number.isFinite(numericExperience) || numericExperience < 0) {
+        return Number.NaN;
+    }
+
+    let level = 1;
+    while (level < 126 && levelToExperience(level + 1) <= numericExperience) {
+        level += 1;
+    }
+
+    return level;
+}
+
+function getSkillExperienceValue(skillData) {
+    const numericValue = Number(skillData);
+    if (Number.isFinite(numericValue) && numericValue >= 0) {
+        return numericValue;
+    }
+
+    if (!skillData || typeof skillData !== 'object') {
+        return Number.NaN;
+    }
+
+    const experienceCandidates = [
+        skillData.experience,
+        skillData.xp,
+        skillData.exp,
+        skillData.experience_points,
+        skillData.experiencePoints
+    ];
+    for (const candidate of experienceCandidates) {
+        const parsed = Number(candidate);
+        if (Number.isFinite(parsed) && parsed >= 0) {
+            return parsed;
+        }
+    }
+
+    const levelExperience = levelToExperience(skillData.level);
+    if (Number.isFinite(levelExperience) && levelExperience >= 0) {
+        return levelExperience;
+    }
+
+    return Number.NaN;
+}
+
+function getSkillLevelValue(skillData) {
+    const numericValue = Number(skillData);
+    if (Number.isFinite(numericValue) && numericValue >= 1) {
+        return Math.floor(numericValue);
+    }
+
+    if (!skillData || typeof skillData !== 'object') {
+        return Number.NaN;
+    }
+
+    const levelCandidates = [
+        skillData.level,
+        skillData.lvl,
+        skillData.skillLevel,
+        skillData.skill_level
+    ];
+    for (const candidate of levelCandidates) {
+        const parsed = Number(candidate);
+        if (Number.isFinite(parsed) && parsed >= 1) {
+            return Math.floor(parsed);
+        }
+    }
+
+    const experienceLevel = experienceToLevel(getSkillExperienceValue(skillData));
+    if (Number.isFinite(experienceLevel) && experienceLevel >= 1) {
+        return experienceLevel;
+    }
+
+    return Number.NaN;
+}
+
+function addSkillExperienceEntry(targetMap, rawSkillName, skillData) {
+    const skillName = normalizeSkillName(rawSkillName);
+    if (!skillName) {
+        return;
+    }
+
+    const experience = getSkillExperienceValue(skillData);
+    if (!Number.isFinite(experience) || experience < 0) {
+        return;
+    }
+
+    const existing = targetMap.get(skillName);
+    if (!Number.isFinite(existing) || experience > existing) {
+        targetMap.set(skillName, experience);
+    }
+}
+
+function addSkillLevelEntry(targetMap, rawSkillName, skillData) {
+    const skillName = normalizeSkillName(rawSkillName);
+    if (!skillName) {
+        return;
+    }
+
+    const level = getSkillLevelValue(skillData);
+    if (!Number.isFinite(level) || level < 1) {
+        return;
+    }
+
+    const existing = targetMap.get(skillName);
+    if (!Number.isFinite(existing) || level > existing) {
+        targetMap.set(skillName, level);
+    }
+}
+
+function extractSkillExperienceFromContainer(container, targetMap) {
+    if (!container) {
+        return;
+    }
+
+    if (Array.isArray(container)) {
+        container.forEach(entry => {
+            if (!entry || typeof entry !== 'object') {
+                return;
+            }
+
+            if (Array.isArray(entry) && entry.length >= 2) {
+                addSkillExperienceEntry(targetMap, entry[0], entry[1]);
+                return;
+            }
+
+            const rawSkillName = entry.skill ?? entry.name ?? entry.id ?? entry.type;
+            if (!rawSkillName) {
+                return;
+            }
+
+            addSkillExperienceEntry(targetMap, rawSkillName, entry);
+        });
+        return;
+    }
+
+    if (typeof container !== 'object') {
+        return;
+    }
+
+    Object.entries(container).forEach(([rawSkillName, skillData]) => {
+        addSkillExperienceEntry(targetMap, rawSkillName, skillData);
+    });
+}
+
+function extractSkillLevelsFromContainer(container, targetMap) {
+    if (!container) {
+        return;
+    }
+
+    if (Array.isArray(container)) {
+        container.forEach(entry => {
+            if (!entry || typeof entry !== 'object') {
+                return;
+            }
+
+            if (Array.isArray(entry) && entry.length >= 2) {
+                addSkillLevelEntry(targetMap, entry[0], entry[1]);
+                return;
+            }
+
+            const rawSkillName = entry.skill ?? entry.name ?? entry.id ?? entry.type;
+            if (!rawSkillName) {
+                return;
+            }
+
+            addSkillLevelEntry(targetMap, rawSkillName, entry);
+        });
+        return;
+    }
+
+    if (typeof container !== 'object') {
+        return;
+    }
+
+    Object.entries(container).forEach(([rawSkillName, skillData]) => {
+        addSkillLevelEntry(targetMap, rawSkillName, skillData);
+    });
+}
+
+function extractPlayerSkillExperience(payload) {
+    const skillExperience = new Map();
+    if (!payload || typeof payload !== 'object') {
+        return skillExperience;
+    }
+
+    const containers = [
+        payload.skills,
+        payload.skill_experience,
+        payload.skillExperience,
+        payload.experience,
+        payload.experience?.skills,
+        payload.player_skills,
+        payload.playerSkills,
+        payload.player?.skills,
+        payload.hiscores?.skills,
+        payload.hiscore?.skills
+    ];
+
+    containers.forEach(container => {
+        extractSkillExperienceFromContainer(container, skillExperience);
+    });
+
+    return skillExperience;
+}
+
+function extractPlayerSkillLevels(payload) {
+    const skillLevels = new Map();
+    if (!payload || typeof payload !== 'object') {
+        return skillLevels;
+    }
+
+    const containers = [
+        payload.levels,
+        payload.skill_levels,
+        payload.skillLevels,
+        payload.player_levels,
+        payload.playerLevels,
+        payload.player?.levels,
+        payload.hiscores?.levels,
+        payload.hiscore?.levels
+    ];
+
+    containers.forEach(container => {
+        extractSkillLevelsFromContainer(container, skillLevels);
+    });
+
+    return skillLevels;
+}
+
+function finalizePlayerSkillSnapshots(skillExperienceBySkill, skillLevelBySkill) {
+    skillLevelBySkill.forEach((level, skillName) => {
+        if (!Number.isFinite(skillExperienceBySkill.get(skillName))) {
+            const experience = levelToExperience(level);
+            if (Number.isFinite(experience) && experience >= 0) {
+                skillExperienceBySkill.set(skillName, experience);
+            }
+        }
+    });
+
+    skillExperienceBySkill.forEach((experience, skillName) => {
+        if (!Number.isFinite(skillLevelBySkill.get(skillName))) {
+            const level = experienceToLevel(experience);
+            if (Number.isFinite(level) && level >= 1) {
+                skillLevelBySkill.set(skillName, level);
+            }
+        }
+    });
+}
+
 function extractCompletedAchievementDiaryKeys(achievementDiaries) {
     const completedKeys = new Set();
     if (!achievementDiaries || typeof achievementDiaries !== 'object') {
@@ -1718,6 +2099,8 @@ async function loadPlayerCollectionLog(username, options = {}) {
     if (!normalized) {
         obtainedItemIds = new Set();
         completedAchievementDiaryKeys = new Set();
+        playerSkillExperienceBySkill = new Map();
+        playerSkillLevelBySkill = new Map();
         return;
     }
 
@@ -1726,7 +2109,7 @@ async function loadPlayerCollectionLog(username, options = {}) {
         try {
             const raw = localStorage.getItem(cacheKey);
             if (raw) {
-                const { ts, ids, achievementDiaryKeys } = JSON.parse(raw);
+                const { ts, ids, achievementDiaryKeys, skillExperience, skillLevels } = JSON.parse(raw);
                 if (Date.now() - ts < PLAYER_CL_CACHE_TTL && Array.isArray(ids)) {
                     obtainedItemIds = new Set(ids.map(id => Number(id)).filter(id => Number.isInteger(id) && id > 0));
                     completedAchievementDiaryKeys = new Set(
@@ -1734,6 +2117,13 @@ async function loadPlayerCollectionLog(username, options = {}) {
                             ? achievementDiaryKeys.map(value => String(value))
                             : []
                     );
+                    const cachedSkillExperience = new Map();
+                    extractSkillExperienceFromContainer(skillExperience, cachedSkillExperience);
+                    const cachedSkillLevels = new Map();
+                    extractSkillLevelsFromContainer(skillLevels, cachedSkillLevels);
+                    finalizePlayerSkillSnapshots(cachedSkillExperience, cachedSkillLevels);
+                    playerSkillExperienceBySkill = cachedSkillExperience;
+                    playerSkillLevelBySkill = cachedSkillLevels;
                     return;
                 }
             }
@@ -1755,15 +2145,22 @@ async function loadPlayerCollectionLog(username, options = {}) {
             ? payload.collection_log.map(id => Number(id)).filter(id => Number.isInteger(id) && id > 0)
             : [];
         const diaryKeys = extractCompletedAchievementDiaryKeys(payload.achievement_diaries);
+        const skillExperience = extractPlayerSkillExperience(payload);
+        const skillLevels = extractPlayerSkillLevels(payload);
+        finalizePlayerSkillSnapshots(skillExperience, skillLevels);
 
         obtainedItemIds = new Set(ids);
         completedAchievementDiaryKeys = diaryKeys;
+        playerSkillExperienceBySkill = skillExperience;
+        playerSkillLevelBySkill = skillLevels;
 
         try {
             localStorage.setItem(cacheKey, JSON.stringify({
                 ts: Date.now(),
                 ids,
-                achievementDiaryKeys: Array.from(diaryKeys)
+                achievementDiaryKeys: Array.from(diaryKeys),
+                skillExperience: Object.fromEntries(skillExperience),
+                skillLevels: Object.fromEntries(skillLevels)
             }));
         } catch {
             // ignore localStorage failures
@@ -2224,9 +2621,82 @@ function getTaskVerificationItemIds(task) {
         : [];
 }
 
+function getTaskSkillExperienceRequirements(task) {
+    if (task?.verification?.method !== 'skill') {
+        return [];
+    }
+
+    const experienceRequirements = task?.verification?.experience;
+    if (!experienceRequirements || typeof experienceRequirements !== 'object') {
+        return [];
+    }
+
+    return Object.entries(experienceRequirements)
+        .map(([rawSkillName, rawExperience]) => {
+            const skillName = normalizeSkillName(rawSkillName);
+            const requiredExperience = Number(rawExperience);
+            return { skillName, requiredExperience };
+        })
+        .filter(requirement => {
+            return Boolean(requirement.skillName)
+                && Number.isFinite(requirement.requiredExperience)
+                && requirement.requiredExperience >= 0;
+        });
+}
+
+function getRequiredSkillLevelForRequirement(requirement) {
+    const requiredLevel = experienceToLevel(requirement?.requiredExperience);
+    return Number.isFinite(requiredLevel) && requiredLevel >= 1
+        ? Math.floor(requiredLevel)
+        : 1;
+}
+
+function getPlayerSkillLevel(skillName) {
+    const normalizedSkill = normalizeSkillName(skillName);
+    if (!normalizedSkill) {
+        return Number.NaN;
+    }
+
+    const storedLevel = playerSkillLevelBySkill.get(normalizedSkill);
+    if (Number.isFinite(storedLevel) && storedLevel >= 1) {
+        return Math.floor(storedLevel);
+    }
+
+    const experience = playerSkillExperienceBySkill.get(normalizedSkill);
+    const derivedLevel = experienceToLevel(experience);
+    if (Number.isFinite(derivedLevel) && derivedLevel >= 1) {
+        return Math.floor(derivedLevel);
+    }
+
+    return Number.NaN;
+}
+
+function isSkillRequirementMet(requirement) {
+    const requiredLevel = getRequiredSkillLevelForRequirement(requirement);
+    const playerLevel = getPlayerSkillLevel(requirement?.skillName);
+    if (Number.isFinite(playerLevel)) {
+        return playerLevel >= requiredLevel;
+    }
+
+    const playerExperience = playerSkillExperienceBySkill.get(requirement?.skillName);
+    return Number.isFinite(playerExperience) && playerExperience >= requirement.requiredExperience;
+}
+
 function getTaskRequiredCount(task) {
     if (task?.verification?.method === 'achievement-diary') {
         return 1;
+    }
+
+    if (task?.verification?.method === 'skill') {
+        const requirements = getTaskSkillExperienceRequirements(task);
+        if (requirements.length === 0) {
+            return 0;
+        }
+
+        const rawRequired = task?.verification?.count;
+        return Number.isFinite(rawRequired)
+            ? clamp(Math.floor(rawRequired), 1, requirements.length)
+            : requirements.length;
     }
 
     const totalItems = getTaskVerificationItemIds(task).length;
@@ -2249,6 +2719,12 @@ function getTaskObtainedCount(task) {
         }
 
         return completedAchievementDiaryKeys.has(getAchievementDiaryKey(region, difficulty)) ? 1 : 0;
+    }
+
+    if (task?.verification?.method === 'skill') {
+        return getTaskSkillExperienceRequirements(task).reduce((count, requirement) => {
+            return count + (isSkillRequirementMet(requirement) ? 1 : 0);
+        }, 0);
     }
 
     return getTaskVerificationItemIds(task).reduce((count, id) => {
@@ -3017,7 +3493,9 @@ function showModal(task, anchor) {
     const itemsEl = document.getElementById('modal-items');
     const requiredEl = document.getElementById('modal-items-required');
     if (itemsEl) {
-        const itemIds = state !== 'locked' ? getTaskVerificationItemIds(task) : [];
+        const isLockedState = state === 'locked';
+        const itemIds = !isLockedState ? getTaskVerificationItemIds(task) : [];
+        const skillRequirements = !isLockedState ? getTaskSkillExperienceRequirements(task) : [];
         itemsEl.innerHTML = '';
         if (itemIds.length > 0) {
             const requiredItems = getTaskRequiredCount(task);
@@ -3051,6 +3529,61 @@ function showModal(task, anchor) {
                 } else {
                     setImageWithFallback(img, QUESTION_MARK_ICON, `Item ${id}`);
                 }
+                link.appendChild(img);
+                itemsEl.appendChild(link);
+            });
+            itemsEl.style.display = 'grid';
+        } else if (skillRequirements.length > 0) {
+            const requiredItems = getTaskRequiredCount(task);
+            const obtainedSkillCount = getTaskObtainedCount(task);
+            const obtainedForTask = Math.min(obtainedSkillCount, requiredItems);
+            const requiredLevels = skillRequirements
+                .map(requirement => getRequiredSkillLevelForRequirement(requirement))
+                .filter(level => Number.isFinite(level));
+            const uniformRequiredLevel = requiredLevels.length > 0 && requiredLevels.every(level => level === requiredLevels[0])
+                ? requiredLevels[0]
+                : null;
+
+            if (requiredEl) {
+                requiredEl.textContent = uniformRequiredLevel
+                    ? `Skills at level ${uniformRequiredLevel}: ${obtainedForTask}/${requiredItems}`
+                    : `Skills at required levels: ${obtainedForTask}/${requiredItems}`;
+                requiredEl.style.display = 'block';
+            }
+
+            const sortedRequirements = skillRequirements
+                .slice()
+                .sort((requirementA, requirementB) => {
+                    const requiredLevelDelta = getRequiredSkillLevelForRequirement(requirementA) - getRequiredSkillLevelForRequirement(requirementB);
+                    if (requiredLevelDelta !== 0) {
+                        return requiredLevelDelta;
+                    }
+
+                    return formatSkillName(requirementA.skillName).localeCompare(formatSkillName(requirementB.skillName));
+                });
+
+            itemsEl.classList.toggle('is-scrollable', sortedRequirements.length > 20);
+            sortedRequirements.forEach(requirement => {
+                const skillName = formatSkillName(requirement.skillName);
+                const requiredLevel = getRequiredSkillLevelForRequirement(requirement);
+                const playerLevel = getPlayerSkillLevel(requirement.skillName);
+                const normalizedLevel = Number.isFinite(playerLevel) ? Math.floor(playerLevel) : 0;
+                const isObtained = isSkillRequirementMet(requirement);
+                const link = document.createElement('a');
+                link.href = `https://oldschool.runescape.wiki/w/${encodeURIComponent(skillName.replace(/ /g, '_'))}`;
+                link.target = '_blank';
+                link.rel = 'noopener noreferrer';
+                link.title = `${skillName}: lvl ${normalizedLevel}/${requiredLevel}`;
+                link.className = 'modal-item-icon';
+                link.classList.add(isObtained ? 'is-obtained' : 'is-missing');
+
+                const img = document.createElement('img');
+                img.width = 32;
+                img.height = 32;
+                img.loading = 'lazy';
+                img.decoding = 'async';
+                setImageWithFallback(img, getSkillBadgeIcon(requirement.skillName, isObtained), skillName);
+
                 link.appendChild(img);
                 itemsEl.appendChild(link);
             });
@@ -3309,7 +3842,9 @@ const tierWeights = {
     hard: 1000,
     elite: 500,
     master: 100,
-    pets: 10
+    'master-tedious': 100,
+    extra: 100,
+    pets: 100
 };
 
 async function preloadTaskImages(tasks) {
