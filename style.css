@@ -370,17 +370,30 @@ body {
     position: absolute;
     right: 0;
     top: calc(100% + 8px);
-    width: min(300px, calc(100vw - 24px));
+    width: min(320px, calc(100vw - 24px));
+    max-height: min(72vh, 640px);
+    overflow-y: auto;
     border: 1px solid var(--theme-border);
     border-radius: var(--radius-medium);
     background: var(--theme-panel);
     box-shadow: 0 16px 30px var(--theme-shadow);
-    padding: 10px;
+    padding: 12px;
+    box-sizing: border-box;
 }
 
 .options-popover.open {
     display: grid;
+    gap: 10px;
+}
+
+.options-section {
+    display: grid;
     gap: 8px;
+}
+
+.options-section + .options-section {
+    padding-top: 10px;
+    border-top: 1px solid var(--theme-border);
 }
 
 .options-row {
@@ -393,8 +406,16 @@ body {
     font-weight: 700;
 }
 
+.options-label {
+    color: var(--text-info);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
 .options-row-inline {
-    margin-top: 2px;
+    margin-top: 0;
 }
 
 .options-inline-button {
@@ -464,7 +485,6 @@ body {
 }
 
 .options-note {
-    margin-top: -2px;
     font-size: 10px;
     line-height: 1.35;
     color: var(--text-muted);
@@ -542,6 +562,13 @@ body {
     width: 100%;
     margin: 0;
     accent-color: var(--text-info);
+}
+
+@media (max-width: 640px) {
+    .options-popover {
+        width: min(320px, calc(100vw - 16px));
+        right: -4px;
+    }
 }
 
 #username-gate {

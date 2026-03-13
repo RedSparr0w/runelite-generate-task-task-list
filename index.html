@@ -44,30 +44,42 @@
     <div id="options-wrap">
         <button id="options-button" type="button" title="Display options" aria-expanded="false" aria-controls="options-popover">Options</button>
         <div id="options-popover" class="options-popover">
-            <label class="options-row" for="complete-opacity-input">
-                <span>Completed Opacity</span>
-                <span id="complete-opacity-value">50%</span>
-            </label>
-            <input id="complete-opacity-input" type="range" min="20" max="100" step="1" value="50" aria-label="Completed item opacity">
-
-            <label class="options-toggle" for="hide-tier-hint-input">
-                <input id="hide-tier-hint-input" type="checkbox" aria-label="Hide tier hint on locked tasks">
-                <span>Hide tier hint on locked tasks</span>
-            </label>
-
-            <div class="options-row options-row-inline">
-                <span>Tier Filters</span>
-                <button id="tier-filter-clear" class="options-inline-button" type="button">Show all</button>
-            </div>
-            <div id="tier-filter-controls" class="tier-filter-controls" role="group" aria-label="Tier filters"></div>
-            <div class="options-note">Selected filters stay full opacity. Others are 20% opacity. Locked applies when "Hide tier hint on locked tasks" is enabled.</div>
-
-            <div id="theme-toggle" role="group" aria-label="Theme">
-                <button id="theme-osrs" class="theme-option" data-theme="osrs" type="button">OSRS</button>
-                <button id="theme-dark" class="theme-option" data-theme="dark" type="button">Dark</button>
+            <div class="options-section">
+                <label class="options-row" for="complete-opacity-input">
+                    <span>Completed Opacity</span>
+                    <span id="complete-opacity-value">50%</span>
+                </label>
+                <input id="complete-opacity-input" type="range" min="20" max="100" step="1" value="50" aria-label="Completed item opacity">
             </div>
 
-            <button id="sync-button" type="button" title="Reload collection log progress">Wiki Sync</button>
+            <div class="options-section">
+                <label class="options-toggle" for="hide-tier-hint-input">
+                    <input id="hide-tier-hint-input" type="checkbox" aria-label="Hide tier hint on locked tasks">
+                    <span>Hide tier hint on locked tasks</span>
+                </label>
+            </div>
+
+            <div class="options-section">
+                <div class="options-row options-row-inline">
+                    <span>Tier Filters</span>
+                    <button id="tier-filter-clear" class="options-inline-button" type="button">Show all</button>
+                </div>
+                <div id="tier-filter-controls" class="tier-filter-controls" role="group" aria-label="Tier filters"></div>
+                <div class="options-note">Selected filters stay full opacity. Others are 20% opacity. Locked applies when "Hide tier hint on locked tasks" is enabled.</div>
+            </div>
+
+            <div class="options-section">
+                <div class="options-label">Theme</div>
+                <div id="theme-toggle" role="group" aria-label="Theme">
+                    <button id="theme-osrs" class="theme-option" data-theme="osrs" type="button">OSRS</button>
+                    <button id="theme-dark" class="theme-option" data-theme="dark" type="button">Dark</button>
+                </div>
+            </div>
+
+            <div class="options-section">
+                <div class="options-label">Sync</div>
+                <button id="sync-button" type="button" title="Reload collection log progress">Wiki Sync</button>
+            </div>
         </div>
     </div>
 
