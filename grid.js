@@ -117,21 +117,64 @@ const tierWeights = {
     pets: 1
 };
 
+// helper to build a unique key for storing order
+const STORAGE_KEY = 'taskGridOrder';
+
 loadAll().then(data => {
     let all = [];
-    data.forEach(tierObj => {
-        const weight = tierWeights[tierObj.name] || 1;
-        const arr = tierObj.tasks.map(t => ({
-            ...t,
-            tier: tierObj.name,
-            priority: Math.random() / weight // lower is placed earlier
-        }));
-        shuffle(arr); // keep some randomness within tier
-        all = all.concat(arr);
-    });
-    // sort by priority so that weighted tiers (easy) are earlier
-    all.sort((a, b) => a.priority - b.priority);
+
+    // if we have a saved order, try to restore it
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+        try {
+            const ids = JSON.parse(saved);
+            // build a map of tasks by id for quick lookup
+            const map = {};
+            data.forEach(tierObj => {
+                tierObj.tasks.forEach(t => {
+                    map[t.id] = { ...t, tier: tierObj.name };
+                });
+            });
+            // reconstruct order from saved ids; ignore missing
+            all = ids.map(id => map[id]).filter(Boolean);
+            // append any new tasks not in saved list
+            data.forEach(tierObj => {
+                tierObj.tasks.forEach(t => {
+                    if (!map[t.id] || !ids.includes(t.id)) {
+                        all.push({ ...t, tier: tierObj.name });
+                    }
+                });
+            });
+        } catch (e) {
+            console.error('corrupt saved order', e);
+        }
+    }
+
+    if (all.length === 0) {
+        // generate fresh list if we didn't restore
+        data.forEach(tierObj => {
+            const weight = tierWeights[tierObj.name] || 1;
+            const arr = tierObj.tasks.map(t => ({
+                ...t,
+                tier: tierObj.name,
+                priority: Math.random() / weight // lower is placed earlier
+            }));
+            shuffle(arr); // keep some randomness within tier
+            all = all.concat(arr);
+        });
+        // sort by priority so that weighted tiers (easy) are earlier
+        all.sort((a, b) => a.priority - b.priority);
+    }
+
     render(all);
+
+    // save order after rendering (just store ids)
+    const saveIds = all.map(t => t.id);
+    try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(saveIds));
+    } catch (e) {
+        console.warn('unable to save order', e);
+    }
 
     // enable middle-button drag scrolling
     const container = document.getElementById('grid-container');
