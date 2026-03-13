@@ -327,7 +327,11 @@ loadAll().then(data => {
     tasksGlobal = all;
 
     // ensure images cached before rendering (wait for them)
-    preload(all).then(() => render(all));
+    preload(all).then(() => {
+        render(all);
+        const loader = document.getElementById('loading');
+        if (loader) loader.style.display = 'none';
+    });
 
     // save order after rendering (just store ids)
     const saveIds = all.map(t => t.id);
