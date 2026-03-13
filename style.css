@@ -8,6 +8,7 @@ html, body {
 
 body {
     font-family: sans-serif;
+    background: #333;
     /* hide scrollbars while still supporting programmatic scrolling */
     scrollbar-width: none; /* firefox */
     -ms-overflow-style: none; /* IE 10+ */
@@ -55,10 +56,17 @@ body {
     left: 0;
     right: 0;
     bottom: 0;
+    background: #333;
     overflow: auto;
     /* hide scrollbars while still supporting programmatic scrolling */
     scrollbar-width: none; /* firefox */
     -ms-overflow-style: none; /* IE 10+ */
+}
+
+#grid-stage {
+    position: relative;
+    width: max-content;
+    height: max-content;
 }
 
 #grid-container::-webkit-scrollbar,
@@ -104,6 +112,8 @@ body::-webkit-scrollbar {
     gap: 15px; /* larger gaps between items */
     background: #333;
     width: max-content;
+    transform-origin: top left;
+    will-change: transform;
 }
 
 .cell {

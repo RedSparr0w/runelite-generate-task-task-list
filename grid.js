@@ -127,6 +127,77 @@ function nextState(current) {
 
 // keep copy of tasks for re-rendering when neighbours change
 let tasksGlobal = [];
+let currentScale = 1;
+
+const MIN_SCALE = 0.5;
+const MAX_SCALE = 2.5;
+const ZOOM_FACTOR = 1.1;
+
+function clamp(value, min, max) {
+    return Math.min(Math.max(value, min), max);
+}
+
+function getMinScale() {
+    const grid = document.getElementById('grid');
+    const container = document.getElementById('grid-container');
+    if (!grid || !container || !grid.scrollWidth || !grid.scrollHeight) {
+        return MIN_SCALE;
+    }
+
+    const widthFit = container.clientWidth / grid.scrollWidth;
+    const heightFit = container.clientHeight / grid.scrollHeight;
+    return clamp(Math.max(widthFit, heightFit), MIN_SCALE, MAX_SCALE);
+}
+
+function updateGridScale() {
+    const grid = document.getElementById('grid');
+    const stage = document.getElementById('grid-stage');
+    if (!grid || !stage) {
+        return;
+    }
+
+    currentScale = clamp(currentScale, getMinScale(), MAX_SCALE);
+
+    grid.style.transform = `scale(${currentScale})`;
+    stage.style.width = `${grid.scrollWidth * currentScale}px`;
+    stage.style.height = `${grid.scrollHeight * currentScale}px`;
+}
+
+function bindWheelZoom(container) {
+    container.addEventListener('wheel', e => {
+        e.preventDefault();
+
+        const minScale = getMinScale();
+
+        const nextScale = clamp(
+            e.deltaY < 0 ? currentScale * ZOOM_FACTOR : currentScale / ZOOM_FACTOR,
+            minScale,
+            MAX_SCALE
+        );
+
+        if (nextScale === currentScale) {
+            return;
+        }
+
+        const rect = container.getBoundingClientRect();
+        const pointerX = e.clientX - rect.left;
+        const pointerY = e.clientY - rect.top;
+        const contentX = container.scrollLeft + pointerX;
+        const contentY = container.scrollTop + pointerY;
+        const worldX = contentX / currentScale;
+        const worldY = contentY / currentScale;
+
+        currentScale = nextScale;
+        updateGridScale();
+
+        container.scrollLeft = worldX * currentScale - pointerX;
+        container.scrollTop = worldY * currentScale - pointerY;
+    }, { passive: false });
+
+    window.addEventListener('resize', () => {
+        updateGridScale();
+    });
+}
 
 // modal helpers
 function showModal(task) {
@@ -204,6 +275,7 @@ window.addEventListener('DOMContentLoaded', () => {
 const idToCoords = new Map();
 function render(tasks) {
     const grid = document.getElementById('grid');
+    grid.innerHTML = '';
     const size = computeGridSize(tasks.length);
     grid.style.setProperty('--grid-size', size);
     const coords = generateSpiral(tasks.length, size);
@@ -235,6 +307,8 @@ function render(tasks) {
         }, i * 50);
     });
     // hidden cells remain at opacity 0 due to state-hidden and do not delay others
+
+    updateGridScale();
 
     // once grid is in DOM, scroll the first (center) cell into view
     if (firstCell) {
@@ -378,6 +452,7 @@ loadAll().then(data => {
     const container = document.getElementById('grid-container');
     let isDragging = false;
     let lastX, lastY;
+    bindWheelZoom(container);
     container.addEventListener('mousedown', e => {
         if (e.button === 0 || e.button === 1) { // middle button or left click
             isDragging = true;
