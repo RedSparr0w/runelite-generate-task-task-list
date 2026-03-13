@@ -21,6 +21,28 @@ body {
     bottom: 0;
     background: #333;
     z-index: 2000;
+    color: #fff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+#loading .loading-icons {
+    display: flex;
+    gap: 1rem;
+}
+
+.loading-icons {
+    display: flex;
+    gap: 1rem;
+}
+.loading-icon {
+    width: 32px;
+    height: 32px;
+    animation: spin 1s linear infinite;
+}
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
 }
 
 #grid-container {
