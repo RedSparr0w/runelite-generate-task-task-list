@@ -32,9 +32,12 @@ const HOVER_SCALE_BOOST = 0.04;
 const HOVER_LIFT_PX = 2;
 const COMPLETE_OPACITY_KEY = 'completeCellOpacity';
 const HIDE_TIER_HINT_KEY = 'hideTierHintOnLocked';
+const TIER_FILTER_KEY = 'tierFilters';
+const LOCKED_FILTER_KEY = '__locked__';
 const DEFAULT_COMPLETE_CELL_OPACITY = 0.2;
 const MIN_COMPLETE_CELL_OPACITY = 0.2;
 const MAX_COMPLETE_CELL_OPACITY = 1;
+const FILTERED_TIER_OPACITY = 0.2;
 const UNLOCK_TOAST_DURATION_MS = 4500;
 const SYNC_BATCH_SIZE = 3;
 const SYNC_BATCH_DELAY_MS = 45;
@@ -143,6 +146,7 @@ let hoveredCellId = '';
 let activeTheme = 'osrs';
 let completeCellOpacity = DEFAULT_COMPLETE_CELL_OPACITY;
 let hideTierHintOnLocked = false;
+let selectedTierFilters = new Set();
 
 try {
     completeCellOpacity = normalizeCompleteOpacity(localStorage.getItem(COMPLETE_OPACITY_KEY));
@@ -154,6 +158,12 @@ try {
     hideTierHintOnLocked = normalizeTierHintSetting(localStorage.getItem(HIDE_TIER_HINT_KEY));
 } catch {
     hideTierHintOnLocked = false;
+}
+
+try {
+    selectedTierFilters = normalizeTierFilterSelection(localStorage.getItem(TIER_FILTER_KEY));
+} catch {
+    selectedTierFilters = new Set();
 }
 
 try {
@@ -281,6 +291,140 @@ function normalizeTierHintSetting(value) {
     return value === true || value === 'true' || value === '1';
 }
 
+function normalizeTierFilterSelection(value) {
+    let parsed = value;
+
+    if (typeof parsed === 'string') {
+        const raw = parsed.trim();
+        if (!raw) {
+            return new Set();
+        }
+
+        try {
+            parsed = JSON.parse(raw);
+        } catch {
+            return new Set();
+        }
+    }
+
+    if (!Array.isArray(parsed)) {
+        return new Set();
+    }
+
+    const normalized = parsed
+        .map(item => String(item || '').trim())
+        .filter(Boolean);
+
+    return new Set(normalized);
+}
+
+function getFilterableTiers() {
+    const tierSet = new Set(tiers.map(tier => String(tier || '').trim()).filter(Boolean));
+    tierSet.add(LOCKED_FILTER_KEY);
+
+    tasksGlobal.forEach(task => {
+        const tier = String(task?.tier || '').trim();
+        if (tier) {
+            tierSet.add(tier);
+        }
+    });
+
+    return Array.from(tierSet).sort((a, b) => {
+        const sortA = getTierSortIndex(a);
+        const sortB = getTierSortIndex(b);
+        if (sortA !== sortB) {
+            return sortA - sortB;
+        }
+
+        return a.localeCompare(b);
+    });
+}
+
+function updateTierFilterControls() {
+    const controls = document.getElementById('tier-filter-controls');
+    const clearButton = document.getElementById('tier-filter-clear');
+    if (!controls) {
+        return;
+    }
+
+    const filterableTiers = getFilterableTiers();
+    controls.innerHTML = '';
+
+    filterableTiers.forEach(filterKey => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'tier-filter-button';
+        button.dataset.filterKey = filterKey;
+        const isActive = selectedTierFilters.has(filterKey);
+        button.classList.toggle('active', isActive);
+        button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+
+        const swatch = document.createElement('span');
+        swatch.className = 'tier-filter-swatch';
+        swatch.style.background = filterKey === LOCKED_FILTER_KEY
+            ? getActiveCellPalette().locked.border
+            : getTierColor(filterKey);
+
+        const text = document.createElement('span');
+        text.textContent = filterKey === LOCKED_FILTER_KEY
+            ? 'Locked'
+            : formatTierName(filterKey);
+
+        button.appendChild(swatch);
+        button.appendChild(text);
+        controls.appendChild(button);
+    });
+
+    if (clearButton) {
+        clearButton.disabled = selectedTierFilters.size === 0;
+    }
+}
+
+function applyTierFilters(nextFilters, options = {}) {
+    const { persist = true, rerender = true } = options;
+    const filterableTierSet = new Set(getFilterableTiers());
+    const normalized = normalizeTierFilterSelection(Array.from(nextFilters || []));
+
+    selectedTierFilters = new Set(Array.from(normalized).filter(tier => filterableTierSet.has(tier)));
+
+    updateTierFilterControls();
+
+    if (persist) {
+        try {
+            localStorage.setItem(TIER_FILTER_KEY, JSON.stringify(Array.from(selectedTierFilters)));
+        } catch {
+            // ignore localStorage failures
+        }
+    }
+
+    if (rerender) {
+        queueCanvasRender();
+    }
+}
+
+function getTierOpacityForCell(cell) {
+    const task = cell?.task;
+    if (!cell || !task || task.id === INTRO_TASK_ID || selectedTierFilters.size === 0) {
+        return 1;
+    }
+
+    const state = cell.state || getState(task.id) || 'hidden';
+    if (state === 'hidden') {
+        return 1;
+    }
+
+    if (state === 'locked' && hideTierHintOnLocked) {
+        return selectedTierFilters.has(LOCKED_FILTER_KEY) ? 1 : FILTERED_TIER_OPACITY;
+    }
+
+    const tier = String(task.tier || '').trim();
+    if (!tier) {
+        return 1;
+    }
+
+    return selectedTierFilters.has(tier) ? 1 : FILTERED_TIER_OPACITY;
+}
+
 function getCompleteOpacityPercent(value = completeCellOpacity) {
     return Math.round(value * 100);
 }
@@ -368,12 +512,15 @@ function closeOptionsPopover() {
 function initOptionsMenu() {
     applyCompleteOpacity(completeCellOpacity, { persist: false, rerender: false });
     applyHideTierHintOnLocked(hideTierHintOnLocked, { persist: false, rerender: false });
+    applyTierFilters(selectedTierFilters, { persist: false, rerender: false });
 
     const optionsButton = document.getElementById('options-button');
     const optionsPopover = document.getElementById('options-popover');
     const opacityInput = document.getElementById('complete-opacity-input');
     const hideTierHintInput = document.getElementById('hide-tier-hint-input');
-    if (!optionsButton || !optionsPopover || !opacityInput || !hideTierHintInput) {
+    const tierFilterControls = document.getElementById('tier-filter-controls');
+    const tierFilterClear = document.getElementById('tier-filter-clear');
+    if (!optionsButton || !optionsPopover || !opacityInput || !hideTierHintInput || !tierFilterControls || !tierFilterClear) {
         return;
     }
 
@@ -390,6 +537,31 @@ function initOptionsMenu() {
 
     hideTierHintInput.addEventListener('change', e => {
         applyHideTierHintOnLocked(Boolean(e.currentTarget.checked), { persist: true, rerender: true });
+    });
+
+    tierFilterControls.addEventListener('click', e => {
+        const button = e.target.closest('.tier-filter-button');
+        if (!button) {
+            return;
+        }
+
+        const filterKey = String(button.dataset.filterKey || '').trim();
+        if (!filterKey) {
+            return;
+        }
+
+        const nextFilters = new Set(selectedTierFilters);
+        if (nextFilters.has(filterKey)) {
+            nextFilters.delete(filterKey);
+        } else {
+            nextFilters.add(filterKey);
+        }
+
+        applyTierFilters(nextFilters, { persist: true, rerender: true });
+    });
+
+    tierFilterClear.addEventListener('click', () => {
+        applyTierFilters(new Set(), { persist: true, rerender: true });
     });
 }
 
@@ -444,6 +616,7 @@ function applyTheme(theme, options = {}) {
     }
 
     updateThemeToggleButtons();
+    updateTierFilterControls();
 
     if (!changed) {
         return;
@@ -1190,6 +1363,8 @@ function drawCanvasCell(context, cell, now) {
         alpha *= completeCellOpacity;
     }
 
+    alpha *= getTierOpacityForCell(cell);
+
     const x = cell.pixelX;
     const y = cell.pixelY;
     const centerX = x + (CELL_SIZE / 2);
@@ -1203,6 +1378,11 @@ function drawCanvasCell(context, cell, now) {
     context.translate(-centerX, -centerY);
 
     if (hasEdge) {
+        if (selectedTierFilters.size > 0) {
+            context.restore();
+            return keepAnimating;
+        }
+
         const edgeSprite = ensureEdgeCellSprite(cell.edgeSides);
         if (edgeSprite) {
             context.drawImage(edgeSprite, x, y, CELL_SIZE, CELL_SIZE);
@@ -3258,6 +3438,7 @@ function startApp() {
     }
 
     tasksGlobal = all;
+    applyTierFilters(selectedTierFilters, { persist: false, rerender: false });
     updateTaskCoordinates(all);
     normalizeUnlockStates();
     updateUnlockHud();

@@ -370,7 +370,7 @@ body {
     position: absolute;
     right: 0;
     top: calc(100% + 8px);
-    width: min(240px, calc(100vw - 24px));
+    width: min(300px, calc(100vw - 24px));
     border: 1px solid var(--theme-border);
     border-radius: var(--radius-medium);
     background: var(--theme-panel);
@@ -391,6 +391,83 @@ body {
     color: var(--text-main);
     font-size: 11px;
     font-weight: 700;
+}
+
+.options-row-inline {
+    margin-top: 2px;
+}
+
+.options-inline-button {
+    appearance: none;
+    border: 1px solid var(--theme-border);
+    border-radius: var(--radius-small);
+    padding: 4px 8px;
+    background: var(--theme-surface);
+    color: var(--text-main);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+}
+
+.options-inline-button:hover,
+.options-inline-button:focus-visible {
+    background: var(--theme-surface-hover);
+    border-color: var(--theme-border-strong);
+}
+
+.options-inline-button:disabled {
+    opacity: 0.55;
+    cursor: default;
+}
+
+.tier-filter-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.tier-filter-button {
+    appearance: none;
+    border: 1px solid var(--theme-border);
+    border-radius: var(--radius-small);
+    background: var(--theme-surface);
+    color: var(--text-main);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    padding: 5px 8px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.tier-filter-button:hover,
+.tier-filter-button:focus-visible {
+    background: var(--theme-surface-hover);
+    border-color: var(--theme-border-strong);
+}
+
+.tier-filter-button.active {
+    border-color: var(--theme-border-strong);
+    background: var(--action-bg);
+    color: var(--text-info);
+}
+
+.tier-filter-swatch {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    flex: 0 0 8px;
+}
+
+.options-note {
+    margin-top: -2px;
+    font-size: 10px;
+    line-height: 1.35;
+    color: var(--text-muted);
 }
 
 .options-toggle {
