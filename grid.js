@@ -3298,11 +3298,11 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 const tierWeights = {
-    easy: 100000,
+    easy: 50000,
     medium: 10000,
     hard: 1000,
-    elite: 100,
-    master: 10,
+    elite: 500,
+    master: 100,
     pets: 10
 };
 
