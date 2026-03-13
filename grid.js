@@ -215,14 +215,17 @@ function render(tasks) {
     });
     // reveal centre first, then by increasing manhattan distance
     const center = {x: Math.floor(coords[0][0]), y: Math.floor(coords[0][1])};
-    cells.sort((a,b) => (Math.abs(a.x-center.x)+Math.abs(a.y-center.y)) - (Math.abs(b.x-center.x)+Math.abs(b.y-center.y)));
-    cells.forEach((c, i) => {
+    // only animate those that aren't hidden
+    const toAnimate = cells.filter(c => getState(c.cell.dataset.id) !== 'hidden');
+    toAnimate.sort((a,b) => (Math.abs(a.x-center.x)+Math.abs(a.y-center.y)) - (Math.abs(b.x-center.x)+Math.abs(b.y-center.y)));
+    toAnimate.forEach((c, i) => {
         setTimeout(() => {
             c.cell.classList.add('reveal');
             // keep visible after animation
             setTimeout(() => c.cell.classList.add('visible'), 300);
         }, i * 50);
     });
+    // hidden cells remain at opacity 0 due to state-hidden and do not delay others
 
     // once grid is in DOM, scroll the first (center) cell into view
     if (firstCell) {
