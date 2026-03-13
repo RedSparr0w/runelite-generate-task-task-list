@@ -161,7 +161,11 @@ function showModal(task) {
                                 ncell.classList.remove('state-hidden');
                                 ncell.classList.add('state-incomplete');
                                 ncell.classList.add('reveal');
-                                setTimeout(() => ncell.classList.remove('reveal'), 400);
+                                // keep visible after reveal
+                                setTimeout(() => {
+                                    ncell.classList.remove('reveal');
+                                    ncell.classList.add('visible');
+                                }, 400);
                             }
                         }
                     }
