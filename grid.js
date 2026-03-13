@@ -99,14 +99,14 @@ function render(tasks) {
 
 // weights used when interleaving tiers; higher means the tier tends to appear closer to the centre
 const tierWeights = {
-    easy: 1000,
-    medium: 500,
-    hard: 250,
-    elite: 100,
-    master: 10,
+    easy: 100000,
+    medium: 10000,
+    hard: 100,
+    elite: 10,
+    master: 1,
     // fallback weights for other tiers
-    'master-tedious': 1,
-    extra: 1,
+    // 'master-tedious': 1,
+    // extra: 1,
     pets: 1
 };
 
