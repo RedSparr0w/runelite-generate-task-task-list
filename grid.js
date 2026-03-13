@@ -31,6 +31,13 @@ const CL_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 const USERNAME_KEY = 'playerUsername';
 const PLAYER_CL_CACHE_PREFIX = 'playerCollectionLogCache';
 const PLAYER_CL_CACHE_TTL = 15 * 60 * 1000; // 15 minutes
+const TIER_DISPLAY_ORDER = ['easy', 'medium', 'hard', 'elite', 'master', 'master-tedious', 'extra', 'pets'];
+const TASK_STATE_LABELS = {
+    complete: 'Completed',
+    incomplete: 'Available',
+    locked: 'Locked',
+    hidden: 'Hidden'
+};
 
 let suppressTaskClick = false;
 let tasksGlobal = [];
@@ -41,6 +48,7 @@ let playerUsername = '';
 let hasStartedApp = false;
 let obtainedItemIds = new Set();
 let syncButtonStatusTimer = null;
+let activeTierTab = '';
 
 const idToCoords = new Map();
 const idToCell = new Map();
@@ -322,6 +330,13 @@ function updateUnlockHud() {
 
     unlocks.textContent = `${availableUnlocks} / ${totalUnlocks}`;
     nextUnlock.textContent = tasksUntilNext === 1 ? '1 task' : `${tasksUntilNext} tasks`;
+    updateTierProgressMenu();
+    updateCurrentTasksPopover();
+
+    const tierTasksModal = document.getElementById('tier-tasks-modal');
+    if (tierTasksModal?.classList.contains('open')) {
+        renderTierTasksModal();
+    }
 }
 
 function normalizeUnlockStates() {
@@ -330,6 +345,244 @@ function normalizeUnlockStates() {
     incompleteTasks.slice(unlockLimit).forEach(task => {
         setState(task.id, 'locked');
     });
+}
+
+function formatTierName(tier) {
+    return String(tier || '')
+        .split('-')
+        .filter(Boolean)
+        .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(' ');
+}
+
+function getTierSortIndex(tier) {
+    const index = TIER_DISPLAY_ORDER.indexOf(tier);
+    return index === -1 ? Number.POSITIVE_INFINITY : index;
+}
+
+function getTierProgressByTier() {
+    const grouped = new Map();
+
+    tasksGlobal.forEach(task => {
+        const tier = task.tier || 'other';
+        if (!grouped.has(tier)) {
+            grouped.set(tier, {
+                tier,
+                total: 0,
+                completed: 0,
+                tasks: []
+            });
+        }
+
+        const bucket = grouped.get(tier);
+        bucket.total += 1;
+        if (getState(task.id) === 'complete') {
+            bucket.completed += 1;
+        }
+        bucket.tasks.push(task);
+    });
+
+    return Array.from(grouped.values()).sort((a, b) => {
+        const sortA = getTierSortIndex(a.tier);
+        const sortB = getTierSortIndex(b.tier);
+        if (sortA !== sortB) {
+            return sortA - sortB;
+        }
+        return a.tier.localeCompare(b.tier);
+    });
+}
+
+function updateTierProgressMenu() {
+    const linesEl = document.getElementById('tier-progress-lines');
+    if (!linesEl) {
+        return;
+    }
+
+    const tierData = getTierProgressByTier();
+    linesEl.innerHTML = '';
+
+    if (tierData.length === 0) {
+        linesEl.textContent = 'No tasks loaded';
+        return;
+    }
+
+    tierData.forEach(entry => {
+        const row = document.createElement('span');
+        row.className = 'tier-progress-row';
+
+        const name = document.createElement('span');
+        name.className = 'tier-progress-name';
+        name.textContent = formatTierName(entry.tier);
+
+        const value = document.createElement('span');
+        value.className = 'tier-progress-value';
+        value.textContent = `${entry.completed}/${entry.total}`;
+
+        row.appendChild(name);
+        row.appendChild(value);
+        linesEl.appendChild(row);
+    });
+}
+
+function renderTierTasksModal() {
+    const titleEl = document.getElementById('tier-tasks-title');
+    const tabsEl = document.getElementById('tier-tabs');
+    const listEl = document.getElementById('tier-tasks-list');
+    if (!titleEl || !tabsEl || !listEl) {
+        return;
+    }
+
+    const tierData = getTierProgressByTier();
+    tabsEl.innerHTML = '';
+    listEl.innerHTML = '';
+
+    if (tierData.length === 0) {
+        titleEl.textContent = 'Tier Tasks';
+        listEl.textContent = 'No tasks loaded';
+        return;
+    }
+
+    if (!activeTierTab || !tierData.some(entry => entry.tier === activeTierTab)) {
+        activeTierTab = tierData[0].tier;
+    }
+
+    tierData.forEach(entry => {
+        const tab = document.createElement('button');
+        tab.type = 'button';
+        tab.className = 'tier-tab';
+        if (entry.tier === activeTierTab) {
+            tab.classList.add('active');
+        }
+        tab.textContent = `${formatTierName(entry.tier)} (${entry.completed}/${entry.total})`;
+        tab.addEventListener('click', () => {
+            activeTierTab = entry.tier;
+            renderTierTasksModal();
+        });
+        tabsEl.appendChild(tab);
+    });
+
+    const selectedTier = tierData.find(entry => entry.tier === activeTierTab) || tierData[0];
+    titleEl.textContent = `${formatTierName(selectedTier.tier)} Tasks`;
+
+    const stateOrder = {
+        incomplete: 0,
+        locked: 1,
+        hidden: 2,
+        complete: 3
+    };
+
+    selectedTier.tasks
+        .slice()
+        .sort((taskA, taskB) => {
+            const stateA = getState(taskA.id) || 'hidden';
+            const stateB = getState(taskB.id) || 'hidden';
+            const rankA = stateOrder[stateA] ?? 99;
+            const rankB = stateOrder[stateB] ?? 99;
+            if (rankA !== rankB) {
+                return rankA - rankB;
+            }
+            return taskA.name.localeCompare(taskB.name);
+        })
+        .forEach(task => {
+            const state = getState(task.id) || 'hidden';
+
+            const row = document.createElement('div');
+            row.className = 'tier-task-row';
+
+            const taskName = document.createElement('span');
+            taskName.className = 'tier-task-name';
+            taskName.textContent = task.name;
+
+            const status = document.createElement('span');
+            status.className = `tier-task-status status-${state}`;
+            status.textContent = TASK_STATE_LABELS[state] || state;
+
+            row.appendChild(taskName);
+            row.appendChild(status);
+            listEl.appendChild(row);
+        });
+}
+
+function showTierTasksModal() {
+    const modal = document.getElementById('tier-tasks-modal');
+    if (!modal) {
+        return;
+    }
+
+    renderTierTasksModal();
+    modal.classList.add('open');
+}
+
+function hideTierTasksModal() {
+    const modal = document.getElementById('tier-tasks-modal');
+    if (!modal) {
+        return;
+    }
+
+    modal.classList.remove('open');
+}
+
+function updateCurrentTasksPopover() {
+    const button = document.getElementById('current-tasks-button');
+    const listEl = document.getElementById('current-tasks-list');
+    const incompleteTasks = tasksGlobal
+        .filter(task => getState(task.id) === 'incomplete')
+        .sort((taskA, taskB) => {
+            const tierSortA = getTierSortIndex(taskA.tier);
+            const tierSortB = getTierSortIndex(taskB.tier);
+            if (tierSortA !== tierSortB) {
+                return tierSortA - tierSortB;
+            }
+            return taskA.name.localeCompare(taskB.name);
+        });
+
+    if (button) {
+        button.textContent = `Current Tasks (${incompleteTasks.length})`;
+    }
+
+    if (!listEl) {
+        return;
+    }
+
+    listEl.innerHTML = '';
+
+    if (incompleteTasks.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'current-task-empty';
+        empty.textContent = 'No available incomplete tasks right now.';
+        listEl.appendChild(empty);
+        return;
+    }
+
+    incompleteTasks.forEach(task => {
+        const item = document.createElement('div');
+        item.className = 'current-task-item';
+        item.textContent = `[${formatTierName(task.tier)}] ${task.name}`;
+        listEl.appendChild(item);
+    });
+}
+
+function closeCurrentTasksPopover() {
+    const popover = document.getElementById('current-tasks-popover');
+    if (!popover) {
+        return;
+    }
+
+    popover.classList.remove('open');
+}
+
+function toggleCurrentTasksPopover() {
+    const popover = document.getElementById('current-tasks-popover');
+    if (!popover) {
+        return;
+    }
+
+    const nextOpen = !popover.classList.contains('open');
+    if (nextOpen) {
+        updateCurrentTasksPopover();
+    }
+
+    popover.classList.toggle('open', nextOpen);
 }
 
 function getTaskVerificationItemIds(task) {
@@ -1031,9 +1284,32 @@ function render(tasks) {
 
 window.addEventListener('DOMContentLoaded', () => {
     const modal = document.getElementById('task-modal');
+    const tierTasksModal = document.getElementById('tier-tasks-modal');
     const close = modal.querySelector('.modal-close');
+    const tierTasksClose = document.getElementById('tier-tasks-close');
+    const tierProgressButton = document.getElementById('tier-progress-button');
+    const currentTasksButton = document.getElementById('current-tasks-button');
 
     close.addEventListener('click', hideModal);
+
+    if (tierTasksClose) {
+        tierTasksClose.addEventListener('click', hideTierTasksModal);
+    }
+
+    if (tierProgressButton) {
+        tierProgressButton.addEventListener('click', () => {
+            closeCurrentTasksPopover();
+            showTierTasksModal();
+        });
+    }
+
+    if (currentTasksButton) {
+        currentTasksButton.addEventListener('click', e => {
+            e.preventDefault();
+            hideTierTasksModal();
+            toggleCurrentTasksPopover();
+        });
+    }
 
     const toastClose = document.querySelector('.unlock-toast-close');
     if (toastClose) {
@@ -1049,20 +1325,29 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     document.addEventListener('mousedown', e => {
-        if (!modal.classList.contains('open')) {
-            return;
-        }
-
         const clickedPopover = e.target.closest('#task-modal .modal-content');
         const clickedTile = e.target.closest('.cell');
-        if (!clickedPopover && !clickedTile) {
+        if (modal.classList.contains('open') && !clickedPopover && !clickedTile) {
             hideModal();
+        }
+
+        const clickedTierPopover = e.target.closest('#tier-tasks-modal .modal-content');
+        const clickedTierButton = e.target.closest('#tier-progress-button');
+        if (tierTasksModal?.classList.contains('open') && !clickedTierPopover && !clickedTierButton) {
+            hideTierTasksModal();
+        }
+
+        const currentTasksWrap = document.getElementById('current-tasks-wrap');
+        if (currentTasksWrap && !currentTasksWrap.contains(e.target)) {
+            closeCurrentTasksPopover();
         }
     });
 
     document.addEventListener('keydown', e => {
         if (e.key === 'Escape') {
             hideModal();
+            hideTierTasksModal();
+            closeCurrentTasksPopover();
         }
     });
 

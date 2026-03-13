@@ -27,6 +27,20 @@
             <span id="hud-next-unlock">0 tasks</span>
         </div>
     </div>
+
+    <button id="tier-progress-button" type="button" title="View tier progress and tasks">
+        <span class="menu-title">Tier Progress</span>
+        <span id="tier-progress-lines" class="tier-progress-lines"></span>
+    </button>
+
+    <div id="current-tasks-wrap">
+        <button id="current-tasks-button" type="button" title="Show available incomplete tasks">Current Tasks</button>
+        <div id="current-tasks-popover" class="current-tasks-popover" aria-live="polite">
+            <div class="current-tasks-header">Available Incomplete Tasks</div>
+            <div id="current-tasks-list" class="current-tasks-list"></div>
+        </div>
+    </div>
+
     <button id="sync-button" type="button" title="Reload collection log progress">Sync</button>
 
     <!-- loading overlay -->
@@ -63,6 +77,15 @@
             </div>
             <div id="modal-items-required"></div>
             <div id="modal-items"></div>
+        </div>
+    </div>
+
+    <div id="tier-tasks-modal" class="modal">
+        <div class="modal-content tier-tasks-modal-content">
+            <button type="button" class="modal-close" id="tier-tasks-close" aria-label="Close">×</button>
+            <h5 id="tier-tasks-title">Tier Tasks</h5>
+            <div id="tier-tabs" class="tier-tabs"></div>
+            <div id="tier-tasks-list" class="tier-tasks-list"></div>
         </div>
     </div>
 
