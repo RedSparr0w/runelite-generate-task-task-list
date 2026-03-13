@@ -316,6 +316,7 @@ body::-webkit-scrollbar {
 
 .cell::before {
     content: '';
+    display: none;
     position: absolute;
     top: 7px;
     left: 7px;
@@ -407,6 +408,7 @@ body::-webkit-scrollbar {
         inset 0 1px 0 rgba(255,255,255,0.08);
 }
 .state-locked::before {
+    display: block;
     content: 'LOCKED';
     color: #e2e8f0;
     background: rgba(15, 23, 42, 0.78);
@@ -430,11 +432,6 @@ body::-webkit-scrollbar {
         0 16px 32px rgba(217, 119, 6, 0.18),
         inset 0 1px 0 rgba(255,255,255,0.85);
 }
-.state-incomplete::before {
-    content: 'READY';
-    color: #78350f;
-    background: rgba(254, 240, 138, 0.95);
-}
 .state-incomplete .task-name {
     color: #4a2d00;
 }
@@ -448,11 +445,6 @@ body::-webkit-scrollbar {
         0 12px 28px rgba(22, 101, 52, 0.18),
         inset 0 1px 0 rgba(255,255,255,0.8);
     filter: saturate(0.88);
-}
-.state-complete::before {
-    content: 'DONE';
-    color: #14532d;
-    background: rgba(220, 252, 231, 0.98);
 }
 .state-complete .task-name {
     color: #14532d;
