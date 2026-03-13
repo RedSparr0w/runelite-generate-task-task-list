@@ -3,11 +3,17 @@ body {
     padding: 1rem;
 }
 
+#grid-container {
+    overflow: auto;
+    width: 100vw;
+    height: 100vh;
+}
+
 #grid {
     display: grid;
     grid-template-columns: repeat(var(--grid-size), 80px);
     grid-auto-rows: 80px;
-    gap: 2px;
+    gap: 15px; /* larger gaps between items */
     background: #333;
     width: max-content;
 }

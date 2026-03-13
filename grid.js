@@ -87,6 +87,7 @@ function render(tasks) {
     const size = computeGridSize(tasks.length);
     grid.style.setProperty('--grid-size', size);
     const coords = generateSpiral(tasks.length, size);
+    let firstCell = null;
 
     tasks.forEach((t, idx) => {
         const [x, y] = coords[idx];
@@ -94,7 +95,13 @@ function render(tasks) {
         cell.style.gridColumnStart = x + 1;
         cell.style.gridRowStart = y + 1;
         grid.appendChild(cell);
+        if (idx === 0) firstCell = cell;
     });
+
+    // once grid is in DOM, scroll the first (center) cell into view
+    if (firstCell) {
+        firstCell.scrollIntoView({ block: 'center', inline: 'center' });
+    }
 }
 
 // weights used when interleaving tiers; higher means the tier tends to appear closer to the centre
