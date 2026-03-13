@@ -1085,12 +1085,16 @@ function drawCanvasCell(context, cell, now) {
         }
 
         const progress = clamp(elapsed / POP_DURATION_MS, 0, 1);
+        const popEasing = cell.popAnimation.easing || 'linear';
         if (progress >= 1) {
             cell.popAnimation = null;
         } else {
             keepAnimating = true;
             if (progress < 0.5) {
-                const up = progress / 0.5;
+                const upRaw = progress / 0.5;
+                const up = popEasing === 'ease-in'
+                    ? upRaw * upRaw
+                    : upRaw;
                 scale = 1.2 * up;
                 alpha = clamp(up * 1.2, 0, 1);
             } else {
@@ -2296,13 +2300,14 @@ function revealNeighborAsLocked(id) {
 }
 
 function playPopReveal(cell, options = {}) {
-    const { delay = 0 } = options;
+    const { delay = 0, easing = 'linear' } = options;
     if (!cell) {
         return;
     }
 
     cell.popAnimation = {
-        startTime: performance.now() + delay
+        startTime: performance.now() + delay,
+        easing
     };
     queueCanvasRender();
 }
@@ -2313,7 +2318,8 @@ function refreshHiddenEdges(options = {}) {
         center = null,
         revealDelayByCoord = null,
         edgeDelayOffset = EDGE_POP_OFFSET_MS,
-        staggerMs = POP_STAGGER_MS
+        staggerMs = POP_STAGGER_MS,
+        revealEasing = 'linear'
     } = options;
     const stateByCoord = new Map();
     const isFrontierState = state => state === 'incomplete' || state === 'locked';
@@ -2434,7 +2440,7 @@ function refreshHiddenEdges(options = {}) {
                 return;
             }
             item.cell.edgeVisible = true;
-            playPopReveal(item.cell);
+            playPopReveal(item.cell, { easing: revealEasing });
         }, startDelay);
     });
 
@@ -2691,10 +2697,10 @@ function render(tasks) {
     sortedVisibleCells.forEach((item, index) => {
         const revealDelay = index * revealStagger;
         revealDelayByCoord.set(`${item.x},${item.y}`, revealDelay);
-        playPopReveal(item.cell, { delay: revealDelay });
+        playPopReveal(item.cell, { delay: revealDelay, easing: 'ease-in' });
     });
 
-    refreshHiddenEdges({ animate: true, center, revealDelayByCoord, staggerMs: revealStagger });
+    refreshHiddenEdges({ animate: true, center, revealDelayByCoord, staggerMs: revealStagger, revealEasing: 'ease-in' });
     updateGridScale();
     updateUnlockHud();
     scheduleSpritePrewarm(0);
