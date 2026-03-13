@@ -2049,6 +2049,161 @@ function getTaskObtainedCount(task) {
     }, 0);
 }
 
+function getCollectionLogSeriesKey(task) {
+    if (task?.verification?.method !== 'collection-log') {
+        return '';
+    }
+
+    const itemIds = getTaskVerificationItemIds(task)
+        .map(id => Number(id))
+        .filter(Number.isFinite)
+        .sort((a, b) => a - b);
+
+    if (itemIds.length === 0) {
+        return '';
+    }
+
+    return itemIds.join(',');
+}
+
+function isSeriesSwapCandidateState(state) {
+    return state === 'locked' || state === 'hidden';
+}
+
+function getLowestPendingSeriesTask(task) {
+    const seriesKey = getCollectionLogSeriesKey(task);
+    if (!seriesKey) {
+        return task;
+    }
+
+    const taskOrderById = new Map(tasksGlobal.map((candidate, index) => [String(candidate.id), index]));
+    const seriesCandidates = tasksGlobal
+        .filter(candidate => getCollectionLogSeriesKey(candidate) === seriesKey)
+        .filter(candidate => isSeriesSwapCandidateState(getState(candidate.id) || 'hidden'))
+        .sort((taskA, taskB) => {
+            const requiredDelta = getTaskRequiredCount(taskA) - getTaskRequiredCount(taskB);
+            if (requiredDelta !== 0) {
+                return requiredDelta;
+            }
+
+            const indexA = taskOrderById.get(String(taskA.id)) ?? Number.POSITIVE_INFINITY;
+            const indexB = taskOrderById.get(String(taskB.id)) ?? Number.POSITIVE_INFINITY;
+            if (indexA !== indexB) {
+                return indexA - indexB;
+            }
+
+            return String(taskA.id).localeCompare(String(taskB.id));
+        });
+
+    return seriesCandidates[0] || task;
+}
+
+function saveTaskGridOrder(tasks = tasksGlobal) {
+    try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks.map(task => task.id)));
+    } catch {
+        // ignore localStorage failures
+    }
+}
+
+function syncCellPositionsFromTaskOrder() {
+    updateTaskCoordinates(tasksGlobal);
+    coordToTaskId.clear();
+
+    tasksGlobal.forEach(task => {
+        const taskId = String(task.id);
+        const coord = idToCoords.get(task.id);
+        if (!coord) {
+            return;
+        }
+
+        coordToTaskId.set(`${coord.x},${coord.y}`, taskId);
+
+        const cell = getCellById(taskId);
+        if (!cell) {
+            return;
+        }
+
+        cell.pixelX = coord.x * CELL_STEP;
+        cell.pixelY = coord.y * CELL_STEP;
+    });
+
+    refreshPopoverPosition();
+}
+
+function swapTaskStates(taskIdA, taskIdB) {
+    const idA = String(taskIdA);
+    const idB = String(taskIdB);
+    if (idA === idB) {
+        return;
+    }
+
+    const stateA = getState(idA) || 'hidden';
+    const stateB = getState(idB) || 'hidden';
+
+    setState(idA, stateB);
+    setState(idB, stateA);
+
+    const cellA = getCellById(idA);
+    const cellB = getCellById(idB);
+    if (cellA) {
+        setCellState(cellA, stateB);
+    }
+    if (cellB) {
+        setCellState(cellB, stateA);
+    }
+}
+
+function swapTasksById(taskIdA, taskIdB, options = {}) {
+    const { swapStates = false } = options;
+    const idA = String(taskIdA);
+    const idB = String(taskIdB);
+    if (idA === idB) {
+        return false;
+    }
+
+    const indexA = tasksGlobal.findIndex(task => String(task.id) === idA);
+    const indexB = tasksGlobal.findIndex(task => String(task.id) === idB);
+    if (indexA < 0 || indexB < 0) {
+        return false;
+    }
+
+    if (swapStates) {
+        swapTaskStates(idA, idB);
+    }
+
+    [tasksGlobal[indexA], tasksGlobal[indexB]] = [tasksGlobal[indexB], tasksGlobal[indexA]];
+
+    syncCellPositionsFromTaskOrder();
+    saveTaskGridOrder(tasksGlobal);
+    setHoveredCellId('');
+    scheduleSpritePrewarm(0);
+    queueCanvasRender();
+
+    return true;
+}
+
+function alignUnlockedTaskToLowestSeriesTask(task) {
+    const unlockedTask = tasksGlobal.find(candidate => String(candidate.id) === String(task?.id));
+    if (!unlockedTask) {
+        return task;
+    }
+
+    const targetTask = getLowestPendingSeriesTask(unlockedTask);
+    if (!targetTask || String(targetTask.id) === String(unlockedTask.id)) {
+        return unlockedTask;
+    }
+
+    // Only swap if the target has a strictly lower required count than the just-unlocked task.
+    // If the unlocked task is already the lowest unrevealed count, leave it in place.
+    if (getTaskRequiredCount(targetTask) >= getTaskRequiredCount(unlockedTask)) {
+        return unlockedTask;
+    }
+
+    const swapped = swapTasksById(unlockedTask.id, targetTask.id, { swapStates: true });
+    return swapped ? targetTask : unlockedTask;
+}
+
 function revealTaskNeighbors(taskId) {
     const coords = idToCoords.get(taskId);
     if (!coords) {
@@ -2564,13 +2719,17 @@ function showModal(task, anchor) {
             if (cell) {
                 setCellState(cell, 'incomplete');
             }
+
+            const unlockedTask = alignUnlockedTaskToLowestSeriesTask(task);
+
             updateUnlockHud();
             refreshHiddenEdges({ animate: true });
 
             hideModal();
             requestAnimationFrame(() => {
-                const unlockedCell = getCellById(task.id);
-                if (!unlockedCell || getState(task.id) !== 'incomplete') {
+                const unlockedTaskId = String(unlockedTask?.id || task.id);
+                const unlockedCell = getCellById(unlockedTaskId);
+                if (!unlockedCell || getState(unlockedTaskId) !== 'incomplete') {
                     return;
                 }
 
@@ -3068,11 +3227,7 @@ function startApp() {
 
     animateIcons(0);
 
-    try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(all.map(task => task.id)));
-    } catch {
-        // ignore localStorage failures
-    }
+    saveTaskGridOrder(all);
 
     const container = document.getElementById('grid-container');
     let isPointerDown = false;
