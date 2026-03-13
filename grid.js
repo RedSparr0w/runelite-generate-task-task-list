@@ -69,6 +69,7 @@ const STATES = ['hidden','incomplete','current','complete'];
 function createCell(task) {
     const el = document.createElement('div');
     el.className = 'cell';
+    el.dataset.id = task.id;
     el.classList.add(`tier-${task.tier}`); // used only for indicator
     // apply stored state class
     const state = getState(task.id) || 'incomplete';
@@ -146,7 +147,7 @@ function showModal(task) {
             const cell = document.querySelector(`.cell img[alt="${task.name}"]`).parentElement;
             cell.classList.remove(`state-${state}`);
             cell.classList.add('state-complete');
-            // unhide four-direction neighbours
+            // unhide four-direction neighbours without full rerender
             const coords = idToCoords.get(task.id);
             if (coords) {
                 const {x,y} = coords;
@@ -155,12 +156,16 @@ function showModal(task) {
                         (c.y === y && (c.x === x-1 || c.x === x+1))) {
                         if (getState(id) === 'hidden') {
                             setState(id, 'incomplete');
+                            const ncell = document.querySelector(`.cell[data-id="${id}"]`);
+                            if (ncell) {
+                                ncell.classList.remove('state-hidden');
+                                ncell.classList.add('state-incomplete');
+                                ncell.classList.add('reveal');
+                                setTimeout(() => ncell.classList.remove('reveal'), 400);
+                            }
                         }
                     }
                 });
-                // rerender to apply new states
-                document.getElementById('grid').innerHTML = '';
-                render(tasksGlobal);
             }
             hideModal();
         };
@@ -203,6 +208,8 @@ function render(tasks) {
         cell.style.gridColumnStart = x + 1;
         cell.style.gridRowStart = y + 1;
         grid.appendChild(cell);
+        // stagger visibility by index
+        setTimeout(() => cell.classList.add('visible'), idx * 50);
         if (idx === 0) firstCell = cell;
     });
 
@@ -230,6 +237,15 @@ const STORAGE_KEY = 'taskGridOrder';
 
 loadAll().then(data => {
     let all = [];
+    // preload images for all tasks to avoid jank
+    function preload(tasks) {
+        const promises = tasks.map(t => new Promise(resolve => {
+            const img = new Image();
+            img.onload = img.onerror = () => resolve();
+            img.src = t.imageLink;
+        }));
+        return Promise.all(promises);
+    }
     tasksGlobal = all; // keep reference for neighbour updates
 
     // if we have a saved order, try to restore it
@@ -292,7 +308,8 @@ loadAll().then(data => {
     // keep global reference
     tasksGlobal = all;
 
-    render(all);
+    // ensure images cached before rendering (wait for them)
+    preload(all).then(() => render(all));
 
     // save order after rendering (just store ids)
     const saveIds = all.map(t => t.id);
