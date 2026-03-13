@@ -184,8 +184,18 @@ body::-webkit-scrollbar {
 
 /* state styling */
 .state-hidden { visibility: hidden; }
+.state-locked {
+    opacity: 0.95 !important;
+    outline: 2px solid #6c757d;
+}
+.state-locked .task-name {
+    display: none;
+}
+.state-locked img {
+    max-width: 44px;
+    max-height: 44px;
+}
 .state-incomplete { opacity: 0.7 !important; }
-.state-current { outline: 2px solid #007bff; }
 .state-complete { opacity: 0.4; filter: grayscale(50%); }
 
 /* no background colors – cells use default background regardless of tier */

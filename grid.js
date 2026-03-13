@@ -10,6 +10,8 @@ const tiers = [
     'pets'
 ];
 
+const LOCKED_TILE_IMAGE = 'https://oldschool.runescape.wiki/images/thumb/Cake_of_guidance_detail.png/260px-Cake_of_guidance_detail.png?c3595';
+
 async function loadAll() {
     const promises = tiers.map(name => fetch(`./tiers/${name}.json`).then(r => r.json()));
     const data = await Promise.all(promises);
@@ -64,7 +66,7 @@ function generateSpiral(count, size) {
 }
 
 // valid states for tasks
-const STATES = ['hidden','incomplete','current','complete'];
+const STATES = ['hidden', 'locked', 'incomplete', 'complete'];
 const DRAG_THRESHOLD = 6;
 
 let suppressTaskClick = false;
@@ -73,25 +75,22 @@ function createCell(task) {
     const el = document.createElement('div');
     el.className = 'cell';
     el.dataset.id = task.id;
+    el._task = task;
     el.classList.add(`tier-${task.tier}`); // used only for indicator
     // apply stored state class
     const state = getState(task.id) || 'incomplete';
     el.classList.add(`state-${state}`);
 
     const img = document.createElement('img');
-    img.alt = task.name;
-    if (getState(task.id) !== 'hidden') {
-        img.src = task.imageLink;
-    } else {
-        img._src = task.imageLink; // store original link for later reveal
-    }
+    img._src = task.imageLink;
     img.width = 48;
     img.height = 48;
     const name = document.createElement('div');
-    name.textContent = task.name;
     name.className = 'task-name';
     el.appendChild(img);
     el.appendChild(name);
+
+    applyCellContent(el, state);
 
     el.addEventListener('click', e => {
         if (e.button === 0) {
@@ -104,8 +103,10 @@ function createCell(task) {
 
     el.oncontextmenu = e => {
         e.preventDefault();
-        // open wiki on right click
-        window.open(task.wikiLink, '_blank');
+        const currentState = getState(task.id) || 'hidden';
+        if (currentState === 'incomplete' || currentState === 'complete') {
+            window.open(task.wikiLink, '_blank');
+        }
     };
     return el;
 }
@@ -115,7 +116,17 @@ const STATE_KEY = 'taskStates';
 function loadStates() {
     try {
         const s = localStorage.getItem(STATE_KEY);
-        return s ? JSON.parse(s) : {};
+        if (!s) {
+            return {};
+        }
+
+        const parsed = JSON.parse(s);
+        Object.keys(parsed).forEach(id => {
+            if (parsed[id] === 'current') {
+                parsed[id] = 'incomplete';
+            }
+        });
+        return parsed;
     } catch {
         return {};
     }
@@ -126,10 +137,6 @@ function saveStates(map) {
 let stateMap = loadStates();
 function getState(id) { return stateMap[id]; }
 function setState(id, state) { stateMap[id] = state; saveStates(stateMap); }
-function nextState(current) {
-    const idx = STATES.indexOf(current);
-    return STATES[(idx + 1) % STATES.length];
-}
 
 // keep copy of tasks for re-rendering when neighbours change
 let tasksGlobal = [];
@@ -205,45 +212,115 @@ function bindWheelZoom(container) {
     });
 }
 
+function getCompletedCount() {
+    return tasksGlobal.filter(task => getState(task.id) === 'complete').length;
+}
+
+function getUnlockLimit(completedCount = getCompletedCount()) {
+    return Math.max(1, Math.floor(Math.sqrt(completedCount / 5)) + 1);
+}
+
+function getUnlockedCount() {
+    return tasksGlobal.filter(task => getState(task.id) === 'incomplete').length;
+}
+
+function canUnlockMore() {
+    return getUnlockedCount() < getUnlockLimit();
+}
+
+function normalizeUnlockStates() {
+    const unlockLimit = getUnlockLimit();
+    const incompleteTasks = tasksGlobal.filter(task => getState(task.id) === 'incomplete');
+
+    incompleteTasks.slice(unlockLimit).forEach(task => {
+        setState(task.id, 'locked');
+    });
+}
+
+function applyCellContent(cell, state) {
+    const task = cell._task;
+    const img = cell.querySelector('img');
+    const name = cell.querySelector('.task-name');
+    if (!task || !img || !name) {
+        return;
+    }
+
+    if (state === 'locked') {
+        img.src = LOCKED_TILE_IMAGE;
+        img.alt = 'Locked task';
+        name.textContent = '';
+        return;
+    }
+
+    if (state === 'hidden') {
+        img.removeAttribute('src');
+        img.alt = '';
+        name.textContent = '';
+        return;
+    }
+
+    img.src = task.imageLink;
+    img.alt = task.name;
+    name.textContent = task.name;
+}
+
+function setCellState(cell, nextState) {
+    cell.classList.remove('state-hidden', 'state-locked', 'state-incomplete', 'state-complete');
+    cell.classList.add(`state-${nextState}`);
+    applyCellContent(cell, nextState);
+}
+
 // modal helpers
 function showModal(task) {
     const modal = document.getElementById('task-modal');
-    document.getElementById('modal-title').textContent = task.name;
+    const title = document.getElementById('modal-title');
     const img = document.getElementById('modal-image');
-    img.src = task.imageLink;
-    img.alt = task.name;
-    document.getElementById('modal-tip').textContent = task.tip || '';
+    const tip = document.getElementById('modal-tip');
     const wiki = document.getElementById('modal-wiki');
-    wiki.href = task.wikiLink || '#';
-    // button
+    const cell = document.querySelector(`.cell[data-id="${task.id}"]`);
     const btn = document.getElementById('modal-complete');
     const state = getState(task.id) || 'incomplete';
-    if (state === 'incomplete' || state === 'current') {
+
+    if (state === 'locked') {
+        title.textContent = 'Locked Task';
+        img.src = LOCKED_TILE_IMAGE;
+        img.alt = 'Locked task';
+        tip.textContent = 'Unlock this tile to reveal what task is here.';
+        wiki.style.display = 'none';
+    } else {
+        title.textContent = task.name;
+        img.src = task.imageLink;
+        img.alt = task.name;
+        tip.textContent = task.tip || '';
+        wiki.href = task.wikiLink || '#';
+        wiki.style.display = 'inline-block';
+    }
+
+    if (state === 'incomplete') {
         btn.type = 'button';
+        btn.disabled = false;
+        btn.textContent = 'Mark complete';
         btn.style.display = 'block';
         btn.onclick = e => {
             e.preventDefault();
             setState(task.id, 'complete');
-            // update cell class
-            const cell = document.querySelector(`.cell img[alt="${task.name}"]`).parentElement;
-            cell.classList.remove(`state-${state}`);
-            cell.classList.add('state-complete');
-            // unhide four-direction neighbours without full rerender
+            if (cell) {
+                setCellState(cell, 'complete');
+            }
+
+            // reveal four-direction neighbours as locked
             const coords = idToCoords.get(task.id);
             if (coords) {
-                const {x,y} = coords;
+                const { x, y } = coords;
                 idToCoords.forEach((c, id) => {
-                    if ((c.x === x && (c.y === y-1 || c.y === y+1)) ||
-                        (c.y === y && (c.x === x-1 || c.x === x+1))) {
+                    if ((c.x === x && (c.y === y - 1 || c.y === y + 1)) ||
+                        (c.y === y && (c.x === x - 1 || c.x === x + 1))) {
                         if (getState(id) === 'hidden') {
-                            setState(id, 'incomplete');
+                            setState(id, 'locked');
                             const ncell = document.querySelector(`.cell[data-id="${id}"]`);
                             if (ncell) {
-                                ncell.classList.remove('state-hidden');
-                                ncell.classList.add('state-incomplete');
+                                setCellState(ncell, 'locked');
                                 ncell.classList.add('reveal');
-                                ncell.getElementsByTagName('img')[0].src = ncell.getElementsByTagName('img')[0]._src;
-                                // keep visible after reveal
                                 setTimeout(() => {
                                     ncell.classList.remove('reveal');
                                     ncell.classList.add('visible');
@@ -255,8 +332,28 @@ function showModal(task) {
             }
             hideModal();
         };
+    } else if (state === 'locked') {
+        const unlockLimit = getUnlockLimit();
+        const unlockedCount = getUnlockedCount();
+        const unlockAvailable = canUnlockMore();
+
+        btn.type = 'button';
+        btn.style.display = 'block';
+        btn.disabled = !unlockAvailable;
+        btn.textContent = unlockAvailable
+            ? `Unlock task (${unlockedCount}/${unlockLimit})`
+            : `Unlock limit reached (${unlockedCount}/${unlockLimit})`;
+        btn.onclick = unlockAvailable ? e => {
+            e.preventDefault();
+            setState(task.id, 'incomplete');
+            if (cell) {
+                setCellState(cell, 'incomplete');
+            }
+            hideModal();
+        } : null;
     } else {
         btn.style.display = 'none';
+        btn.disabled = false;
         btn.onclick = null;
     }
     modal.style.display = 'block';
@@ -343,7 +440,8 @@ loadAll().then(data => {
     // preload images for all tasks to avoid jank
     function preload(tasks) {
         const promises = tasks.map(t => new Promise(resolve => {
-            if (getState(t.id) !== 'hidden') {
+            const state = getState(t.id);
+            if (state === 'incomplete' || state === 'complete') {
                 const img = new Image();
                 img.onload = img.onerror = () => resolve();
                 img.src = t.imageLink;
@@ -414,6 +512,7 @@ loadAll().then(data => {
 
     // keep global reference
     tasksGlobal = all;
+    normalizeUnlockStates();
 
     // ensure images cached before rendering (wait for them)
     // preload loading icons themselves so they animate instantly
