@@ -24,6 +24,8 @@ const POP_DURATION_MS = 400;
 const EDGE_POP_OFFSET_MS = 120;
 const INITIAL_REVEAL_DURATION_MS = 2000;
 const ZOOM_RENDER_DEBOUNCE_MS = 120;
+const MAX_CANVAS_PIXEL_RATIO = 3;
+const CANVAS_PIXEL_RATIO_STEP = 0.25;
 const UNLOCK_TOAST_DURATION_MS = 4500;
 const SYNC_BATCH_SIZE = 3;
 const SYNC_BATCH_DELAY_MS = 45;
@@ -242,7 +244,9 @@ function ensureGridCanvas() {
 }
 
 function getCanvasPixelRatio() {
-    return Math.max(0.25, (window.devicePixelRatio || 1) * currentScale);
+    const rawRatio = (window.devicePixelRatio || 1) * currentScale;
+    const cappedRatio = Math.min(MAX_CANVAS_PIXEL_RATIO, rawRatio);
+    return Math.max(0.25, Math.round(cappedRatio / CANVAS_PIXEL_RATIO_STEP) * CANVAS_PIXEL_RATIO_STEP);
 }
 
 function syncCanvasResolution() {
@@ -473,6 +477,21 @@ function getCellImageDrawState(imageSource) {
     };
 }
 
+function getContainedImageRect(image, boxX, boxY, boxWidth, boxHeight) {
+    const sourceWidth = Math.max(1, image?.naturalWidth || image?.width || boxWidth);
+    const sourceHeight = Math.max(1, image?.naturalHeight || image?.height || boxHeight);
+    const scale = Math.min(boxWidth / sourceWidth, boxHeight / sourceHeight);
+    const drawWidth = Math.max(1, sourceWidth * scale);
+    const drawHeight = Math.max(1, sourceHeight * scale);
+
+    return {
+        x: boxX + ((boxWidth - drawWidth) / 2),
+        y: boxY + ((boxHeight - drawHeight) / 2),
+        width: drawWidth,
+        height: drawHeight
+    };
+}
+
 function getCellSpriteKey(cell, imageKey) {
     const pixelRatioKey = Math.round(getCanvasPixelRatio() * 1000);
     if (cell.state === 'locked') {
@@ -575,11 +594,12 @@ function drawCellSpriteForeground(spriteContext, cell, palette, imageState) {
     const imageY = y + (state === 'locked' ? 22 : 14);
 
     if (imageState.image) {
+        const imageRect = getContainedImageRect(imageState.image, imageX, imageY, imageSize, imageSize);
         spriteContext.save();
         spriteContext.shadowColor = 'rgba(15, 23, 42, 0.24)';
         spriteContext.shadowBlur = 6;
         spriteContext.shadowOffsetY = 2;
-        spriteContext.drawImage(imageState.image, imageX, imageY, imageSize, imageSize);
+        spriteContext.drawImage(imageState.image, imageRect.x, imageRect.y, imageRect.width, imageRect.height);
         spriteContext.restore();
     } else if (imageState.hasImageSource) {
         drawRoundedRect(spriteContext, imageX + 2, imageY + 2, imageSize - 4, imageSize - 4, 8);
@@ -842,13 +862,37 @@ function getVisibleCoordBounds(bounds) {
     };
 }
 
+function getVisibleClearRect(bounds) {
+    if (!bounds) {
+        return {
+            x: 0,
+            y: 0,
+            width: gridPixelWidth,
+            height: gridPixelHeight
+        };
+    }
+
+    const x = clamp(bounds.left, 0, gridPixelWidth);
+    const y = clamp(bounds.top, 0, gridPixelHeight);
+    const right = clamp(bounds.right, 0, gridPixelWidth);
+    const bottom = clamp(bounds.bottom, 0, gridPixelHeight);
+
+    return {
+        x,
+        y,
+        width: Math.max(0, right - x),
+        height: Math.max(0, bottom - y)
+    };
+}
+
 function renderGridCanvas(now = performance.now()) {
     if (!gridContext || !gridCanvas) {
         return false;
     }
 
-    gridContext.clearRect(0, 0, gridPixelWidth, gridPixelHeight);
     const visibleBounds = getVisibleWorldBounds();
+    const clearRect = getVisibleClearRect(visibleBounds);
+    gridContext.clearRect(clearRect.x, clearRect.y, clearRect.width, clearRect.height);
     const visibleCoords = getVisibleCoordBounds(visibleBounds);
     if (!visibleCoords) {
         return false;
