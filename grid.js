@@ -65,6 +65,9 @@ function generateSpiral(count, size) {
 
 // valid states for tasks
 const STATES = ['hidden','incomplete','current','complete'];
+const DRAG_THRESHOLD = 6;
+
+let suppressTaskClick = false;
 
 function createCell(task) {
     const el = document.createElement('div');
@@ -92,6 +95,9 @@ function createCell(task) {
 
     el.addEventListener('click', e => {
         if (e.button === 0) {
+            if (suppressTaskClick) {
+                return;
+            }
             showModal(task);
         }
     });
@@ -448,20 +454,40 @@ loadAll().then(data => {
         console.warn('unable to save order', e);
     }
 
-    // enable middle-button drag scrolling
+    // enable drag scrolling without opening task modals after a drag gesture
     const container = document.getElementById('grid-container');
+    let isPointerDown = false;
     let isDragging = false;
-    let lastX, lastY;
+    let dragButton = null;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let lastX = 0;
+    let lastY = 0;
     bindWheelZoom(container);
     container.addEventListener('mousedown', e => {
         if (e.button === 0 || e.button === 1) { // middle button or left click
-            isDragging = true;
+            isPointerDown = true;
+            isDragging = false;
+            dragButton = e.button;
+            dragStartX = e.clientX;
+            dragStartY = e.clientY;
             lastX = e.clientX;
             lastY = e.clientY;
             e.preventDefault();
         }
     });
     window.addEventListener('mousemove', e => {
+        if (!isPointerDown) {
+            return;
+        }
+
+        const totalDx = e.clientX - dragStartX;
+        const totalDy = e.clientY - dragStartY;
+
+        if (!isDragging && Math.hypot(totalDx, totalDy) >= DRAG_THRESHOLD) {
+            isDragging = true;
+        }
+
         if (isDragging) {
             const dx = e.clientX - lastX;
             const dy = e.clientY - lastY;
@@ -473,8 +499,17 @@ loadAll().then(data => {
         }
     });
     window.addEventListener('mouseup', e => {
-        if ((e.button === 0 || e.button === 1) && isDragging) {
+        if (isPointerDown && e.button === dragButton) {
+            if (dragButton === 0 && isDragging) {
+                suppressTaskClick = true;
+                setTimeout(() => {
+                    suppressTaskClick = false;
+                }, 0);
+            }
+
+            isPointerDown = false;
             isDragging = false;
+            dragButton = null;
             e.preventDefault();
         }
     });
