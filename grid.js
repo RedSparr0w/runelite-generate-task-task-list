@@ -2182,6 +2182,64 @@ function shuffle(array) {
     }
 }
 
+function buildTaskListFromTierData(data) {
+    const tasks = [];
+    data.forEach(tierObj => {
+        tierObj.tasks.forEach(task => {
+            tasks.push({ ...task, tier: tierObj.name });
+        });
+    });
+    return tasks;
+}
+
+function buildWeightedTaskOrder(tasks) {
+    const weightedTasks = tasks.map(task => ({
+        task,
+        priority: Math.random() / (tierWeights[task.tier] || 1)
+    }));
+
+    shuffle(weightedTasks);
+    weightedTasks.sort((a, b) => a.priority - b.priority);
+
+    return weightedTasks.map(entry => entry.task);
+}
+
+function mergeSavedTaskOrder(savedIds, currentTasks) {
+    const taskById = new Map(currentTasks.map(task => [String(task.id), task]));
+    taskById.set(String(INTRO_TASK_ID), INTRO_TASK);
+
+    const normalizedSavedIds = savedIds.map(id => String(id));
+    const savedIdSet = new Set(normalizedSavedIds);
+    const orderedTasks = normalizedSavedIds
+        .map(id => taskById.get(id))
+        .filter(Boolean);
+    const newTasks = currentTasks.filter(task => !savedIdSet.has(String(task.id)));
+
+    if (newTasks.length === 0) {
+        return orderedTasks;
+    }
+
+    const hiddenPool = [...newTasks];
+    const rebuiltTasks = orderedTasks.map(task => {
+        const state = getState(task.id);
+        const isHiddenTask = String(task.id) !== INTRO_TASK_ID && (!state || state === 'hidden');
+        if (!isHiddenTask) {
+            return task;
+        }
+
+        hiddenPool.push(task);
+        return null;
+    });
+
+    const reshuffledHiddenTasks = buildWeightedTaskOrder(hiddenPool);
+    let hiddenIndex = 0;
+
+    return rebuiltTasks
+        .map(task => task || reshuffledHiddenTasks[hiddenIndex++] || null)
+        .filter(Boolean)
+        .concat(reshuffledHiddenTasks.slice(hiddenIndex));
+}
+
 function computeGridSize(count) {
     let size = Math.ceil(Math.sqrt(count));
     if (size % 2 === 0) {
@@ -3792,8 +3850,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
     document.addEventListener('mousedown', e => {
         const clickedPopover = e.target.closest('#task-modal .modal-content');
-        const clickedGridCanvas = e.target.closest('#grid-canvas');
-        if (modal.classList.contains('open') && !clickedPopover && !clickedGridCanvas) {
+        if (modal.classList.contains('open') && !clickedPopover) {
             hideModal();
         }
 
@@ -3941,27 +3998,18 @@ function startApp() {
     loadingIcons.forEach(icon => bindImageErrorFallback(icon));
 
     Promise.all([loadAll(), loadCollectionLogItems(), loadPlayerCollectionLog(playerUsername)]).then(([data]) => {
+    const currentTasks = buildTaskListFromTierData(data);
     let all = [];
 
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
         try {
             const ids = JSON.parse(saved);
-            const map = {};
-            data.forEach(tierObj => {
-                tierObj.tasks.forEach(task => {
-                    map[task.id] = { ...task, tier: tierObj.name };
-                });
-            });
+            if (!Array.isArray(ids)) {
+                throw new Error('saved order must be an array');
+            }
 
-            all = ids.map(id => map[id]).filter(Boolean);
-            data.forEach(tierObj => {
-                tierObj.tasks.forEach(task => {
-                    if (!ids.includes(task.id)) {
-                        all.push({ ...task, tier: tierObj.name });
-                    }
-                });
-            });
+            all = mergeSavedTaskOrder(ids, currentTasks);
         } catch (error) {
             console.error('corrupt saved order', error);
         }
@@ -3969,17 +4017,7 @@ function startApp() {
 
     const freshOrder = all.length === 0;
     if (freshOrder) {
-        data.forEach(tierObj => {
-            const weight = tierWeights[tierObj.name] || 1;
-            const tasks = tierObj.tasks.map(task => ({
-                ...task,
-                tier: tierObj.name,
-                priority: Math.random() / weight
-            }));
-            shuffle(tasks);
-            all = all.concat(tasks);
-        });
-        all.sort((a, b) => a.priority - b.priority);
+        all = buildWeightedTaskOrder(currentTasks);
     }
 
     // Ensure the intro tile is always at position 0, regardless of saved order or fresh shuffle.
