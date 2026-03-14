@@ -190,6 +190,90 @@ const imageAssetCache = new Map();
 const backgroundSpriteCache = new Map();
 const skillBadgeIconCache = new Map();
 
+class Task {
+    constructor(taskData = {}) {
+        Object.assign(this, taskData);
+    }
+
+    static from(taskData = {}) {
+        return taskData instanceof Task ? taskData : new Task(taskData);
+    }
+}
+
+class Grid {
+    getTaskCoord(taskOrId) {
+        const rawId = typeof taskOrId === 'object' && taskOrId !== null
+            ? taskOrId.id
+            : taskOrId;
+        return idToCoords.get(rawId)
+            || idToCoords.get(String(rawId))
+            || { x: 0, y: 0 };
+    }
+
+    getCenterCoord(tasks = tasksGlobal) {
+        return this.getTaskCoord(tasks[0]);
+    }
+
+    updateTaskCoordinates(tasks) {
+        const size = computeGridSize(tasks.length);
+        const coords = generateSpiral(tasks.length, size);
+
+        idToCoords.clear();
+        tasks.forEach((task, index) => {
+            const [x, y] = coords[index];
+            idToCoords.set(task.id, { x, y });
+        });
+
+        return {
+            size,
+            coords,
+            center: coords.length > 0 ? { x: coords[0][0], y: coords[0][1] } : { x: 0, y: 0 }
+        };
+    }
+}
+
+class GameController {
+    constructor(grid) {
+        this.grid = grid;
+        this.tasks = [];
+    }
+
+    toTask(taskData) {
+        return Task.from(taskData);
+    }
+
+    setTasks(tasks = []) {
+        this.tasks = tasks.map(task => this.toTask(task));
+        tasksGlobal = this.tasks;
+        return this.tasks;
+    }
+
+    getTasks() {
+        return this.tasks;
+    }
+
+    buildTasksFromTierData(data) {
+        const tasks = [];
+        data.forEach(tierObj => {
+            tierObj.tasks.forEach(task => {
+                tasks.push(this.toTask({ ...task, tier: tierObj.name }));
+            });
+        });
+        return tasks;
+    }
+
+    getTaskCoord(taskOrId) {
+        return this.grid.getTaskCoord(taskOrId);
+    }
+
+    getCenterCoord(tasks = this.tasks) {
+        return this.grid.getCenterCoord(tasks);
+    }
+}
+
+const gridModel = new Grid();
+const gameController = new GameController(gridModel);
+
 // collection log item map: id -> { name, category, wikiLink, imageUrl }
 let collectionLogMap = new Map();
 
@@ -2182,13 +2266,7 @@ function shuffle(array) {
 }
 
 function buildTaskListFromTierData(data) {
-    const tasks = [];
-    data.forEach(tierObj => {
-        tierObj.tasks.forEach(task => {
-            tasks.push({ ...task, tier: tierObj.name });
-        });
-    });
-    return tasks;
+    return gameController.buildTasksFromTierData(data);
 }
 
 function buildWeightedTaskOrder(tasks) {
@@ -3088,12 +3166,7 @@ async function syncCompletedTasksFromObtained(options = {}) {
 
     const previousLimit = getUnlockLimit();
     let completedCount = 0;
-    const getTaskCoord = task => {
-        return idToCoords.get(task?.id)
-            || idToCoords.get(String(task?.id))
-            || { x: 0, y: 0 };
-    };
-    const center = getTaskCoord(tasksGlobal[0]);
+    const center = gameController.getCenterCoord(tasksGlobal);
 
     const tasksToComplete = tasksGlobal
         .filter(task => getState(task.id) !== 'complete')
@@ -3102,7 +3175,7 @@ async function syncCompletedTasksFromObtained(options = {}) {
             return requiredCount > 0 && getTaskObtainedCount(task) >= requiredCount;
         })
         .map(task => {
-            const coord = getTaskCoord(task);
+            const coord = gameController.getTaskCoord(task);
             return {
                 task,
                 distance: Math.abs(coord.x - center.x) + Math.abs(coord.y - center.y)
@@ -3801,20 +3874,7 @@ function showUnlockToast(newLimit) {
 }
 
 function updateTaskCoordinates(tasks) {
-    const size = computeGridSize(tasks.length);
-    const coords = generateSpiral(tasks.length, size);
-
-    idToCoords.clear();
-    tasks.forEach((task, index) => {
-        const [x, y] = coords[index];
-        idToCoords.set(task.id, { x, y });
-    });
-
-    return {
-        size,
-        coords,
-        center: coords.length > 0 ? { x: coords[0][0], y: coords[0][1] } : { x: 0, y: 0 }
-    };
+    return gridModel.updateTaskCoordinates(tasks);
 }
 
 function render(tasks) {
@@ -4128,7 +4188,7 @@ function startApp() {
         stateMap = loadStates();
     }
 
-    tasksGlobal = all;
+    all = gameController.setTasks(all);
     applyTierFilters(selectedTierFilters, { persist: false, rerender: false });
     updateTaskCoordinates(all);
 
