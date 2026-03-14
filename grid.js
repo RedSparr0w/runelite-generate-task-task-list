@@ -24,6 +24,8 @@ const POP_DURATION_MS = 500;
 const EDGE_POP_OFFSET_MS = 120;
 const INITIAL_REVEAL_DELAY_MS = 500;
 const INITIAL_REVEAL_DURATION_MS = 3000;
+const SYNC_STAGGER_MS = POP_STAGGER_MS;
+const SYNC_DURATION_MS = INITIAL_REVEAL_DURATION_MS * 2;
 const ZOOM_RENDER_DEBOUNCE_MS = 120;
 const MAX_CANVAS_PIXEL_RATIO = 3;
 const CANVAS_PIXEL_RATIO_STEP = 0.25;
@@ -39,9 +41,6 @@ const MIN_COMPLETE_CELL_OPACITY = 0.2;
 const MAX_COMPLETE_CELL_OPACITY = 1;
 const FILTERED_TIER_OPACITY = 0.2;
 const UNLOCK_TOAST_DURATION_MS = 4500;
-const SYNC_BATCH_SIZE = 3;
-const SYNC_BATCH_DELAY_MS = 45;
-const SYNC_STATUS_DURATION_MS = 2200;
 const CL_CACHE_KEY = 'collectionLogCache';
 const CL_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 const USERNAME_KEY = 'playerUsername';
@@ -3082,35 +3081,40 @@ function revealFrontierFromCompletedTasks() {
 
 async function syncCompletedTasksFromObtained(options = {}) {
     const {
-        animate = true,
         showToast = true,
         refreshModal = true,
-        batchSize = SYNC_BATCH_SIZE,
-        batchDelay = SYNC_BATCH_DELAY_MS
+        batchDelay = SYNC_STAGGER_MS
     } = options;
 
     const previousLimit = getUnlockLimit();
     let completedCount = 0;
-
-    const statePriority = {
-        incomplete: 0,
-        locked: 1,
-        hidden: 2
+    const getTaskCoord = task => {
+        return idToCoords.get(task?.id)
+            || idToCoords.get(String(task?.id))
+            || { x: 0, y: 0 };
     };
+    const center = getTaskCoord(tasksGlobal[0]);
+
     const tasksToComplete = tasksGlobal
         .filter(task => getState(task.id) !== 'complete')
         .filter(task => {
             const requiredCount = getTaskRequiredCount(task);
             return requiredCount > 0 && getTaskObtainedCount(task) >= requiredCount;
         })
-        .sort((taskA, taskB) => {
-            const stateA = statePriority[getState(taskA.id)] ?? 99;
-            const stateB = statePriority[getState(taskB.id)] ?? 99;
-            return stateA - stateB;
+        .sort((a, b) => {
+            const coordA = getTaskCoord(a);
+            const coordB = getTaskCoord(b);
+            const distanceA = Math.abs(coordA.x - center.x) + Math.abs(coordA.y - center.y);
+            const distanceB = Math.abs(coordB.x - center.x) + Math.abs(coordB.y - center.y);
+            return distanceA - distanceB;
         });
 
-    for (let index = 0; index < tasksToComplete.length; index += batchSize) {
-        const batch = tasksToComplete.slice(index, index + batchSize);
+    const revealStagger = tasksToComplete.length * POP_STAGGER_MS > INITIAL_REVEAL_DURATION_MS
+        ? INITIAL_REVEAL_DURATION_MS / (tasksToComplete.length - 1)
+        : POP_STAGGER_MS;
+
+    for (let index = 0; index < tasksToComplete.length; index++) {
+        const batch = tasksToComplete.slice(index, index + 1);
         batch.forEach(task => {
             applyTaskCompletion(task);
         });
@@ -3120,8 +3124,8 @@ async function syncCompletedTasksFromObtained(options = {}) {
         updateUnlockHud();
         refreshHiddenEdges({ animate: false });
 
-        if (index + batchSize < tasksToComplete.length) {
-            await wait(batchDelay);
+        if (index + 1 < tasksToComplete.length) {
+            await wait(revealStagger);
         }
     }
 
@@ -3964,14 +3968,14 @@ window.addEventListener('DOMContentLoaded', () => {
                 syncButtonStatusTimer = setTimeout(() => {
                     syncButton.textContent = 'Wiki Sync';
                     syncButtonStatusTimer = null;
-                }, SYNC_STATUS_DURATION_MS);
+                }, SYNC_DURATION_MS);
             } catch {
                 syncButton.disabled = false;
                 syncButton.textContent = 'Wiki sync failed';
                 syncButtonStatusTimer = setTimeout(() => {
                     syncButton.textContent = 'Wiki Sync';
                     syncButtonStatusTimer = null;
-                }, SYNC_STATUS_DURATION_MS);
+                }, SYNC_DURATION_MS);
             }
         });
     }
