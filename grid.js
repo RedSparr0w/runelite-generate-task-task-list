@@ -122,11 +122,93 @@ const CELL_PALETTES_BY_THEME = {
     }
 };
 
+class CoreUtils {
+    static getCellById(id) {
+        return idToCell.get(String(id)) || null;
+    }
+
+    static clamp(value, min, max) {
+        return Math.min(Math.max(value, min), max);
+    }
+
+    static normalizeTheme(value) {
+        const normalized = String(value || '').trim().toLowerCase();
+        return THEMES.has(normalized) ? normalized : 'osrs';
+    }
+
+    static normalizeCompleteOpacity(value) {
+        const parsed = Number.parseFloat(String(value ?? ''));
+        if (!Number.isFinite(parsed)) {
+            return DEFAULT_COMPLETE_CELL_OPACITY;
+        }
+
+        return this.clamp(parsed, MIN_COMPLETE_CELL_OPACITY, MAX_COMPLETE_CELL_OPACITY);
+    }
+
+    static normalizeTierHintSetting(value) {
+        return value === true || value === 'true' || value === '1';
+    }
+
+    static normalizeTierFilterSelection(value) {
+        let parsed = value;
+
+        if (typeof parsed === 'string') {
+            const raw = parsed.trim();
+            if (!raw) {
+                return new Set();
+            }
+
+            try {
+                parsed = JSON.parse(raw);
+            } catch {
+                return new Set();
+            }
+        }
+
+        if (!Array.isArray(parsed)) {
+            return new Set();
+        }
+
+        const normalized = parsed
+            .map(item => String(item || '').trim())
+            .filter(Boolean);
+
+        return new Set(normalized);
+    }
+
+    static loadStates() {
+        try {
+            const raw = localStorage.getItem(STATE_KEY);
+            if (!raw) {
+                return {};
+            }
+
+            const parsed = JSON.parse(raw);
+            Object.keys(parsed).forEach(id => {
+                if (parsed[id] === 'current') {
+                    parsed[id] = 'incomplete';
+                }
+            });
+            return parsed;
+        } catch {
+            return {};
+        }
+    }
+
+    static saveStates(map) {
+        try {
+            localStorage.setItem(STATE_KEY, JSON.stringify(map));
+        } catch {
+            // ignore localStorage failures
+        }
+    }
+}
+
 let suppressTaskClick = false;
 let tasksGlobal = [];
 let currentScale = 1;
 let activePopoverAnchor = null;
-let stateMap = loadStates();
+let stateMap = CoreUtils.loadStates();
 let playerUsername = '';
 let hasStartedApp = false;
 let syncButtonStatusTimer = null;
@@ -148,25 +230,25 @@ let hideTierHintOnLocked = false;
 let selectedTierFilters = new Set();
 
 try {
-    completeCellOpacity = normalizeCompleteOpacity(localStorage.getItem(COMPLETE_OPACITY_KEY));
+    completeCellOpacity = CoreUtils.normalizeCompleteOpacity(localStorage.getItem(COMPLETE_OPACITY_KEY));
 } catch {
     completeCellOpacity = DEFAULT_COMPLETE_CELL_OPACITY;
 }
 
 try {
-    hideTierHintOnLocked = normalizeTierHintSetting(localStorage.getItem(HIDE_TIER_HINT_KEY));
+    hideTierHintOnLocked = CoreUtils.normalizeTierHintSetting(localStorage.getItem(HIDE_TIER_HINT_KEY));
 } catch {
     hideTierHintOnLocked = false;
 }
 
 try {
-    selectedTierFilters = normalizeTierFilterSelection(localStorage.getItem(TIER_FILTER_KEY));
+    selectedTierFilters = CoreUtils.normalizeTierFilterSelection(localStorage.getItem(TIER_FILTER_KEY));
 } catch {
     selectedTierFilters = new Set();
 }
 
 try {
-    activeTheme = normalizeTheme(localStorage.getItem(THEME_KEY));
+    activeTheme = CoreUtils.normalizeTheme(localStorage.getItem(THEME_KEY));
 } catch {
     activeTheme = 'osrs';
 }
@@ -197,6 +279,47 @@ class Task {
 }
 
 class Grid {
+    computeGridSize(count) {
+        let size = Math.ceil(Math.sqrt(count));
+        if (size % 2 === 0) {
+            size += 1;
+        }
+        return size;
+    }
+
+    generateSpiral(count, size) {
+        const centerX = Math.floor(size / 2);
+        const centerY = Math.floor(size / 2);
+        const coords = [];
+        let x = centerX;
+        let y = centerY;
+        coords.push([x, y]);
+        let step = 1;
+
+        while (coords.length < count) {
+            for (let i = 0; i < step && coords.length < count; i++) {
+                x++;
+                coords.push([x, y]);
+            }
+            for (let i = 0; i < step && coords.length < count; i++) {
+                y++;
+                coords.push([x, y]);
+            }
+            step++;
+            for (let i = 0; i < step && coords.length < count; i++) {
+                x--;
+                coords.push([x, y]);
+            }
+            for (let i = 0; i < step && coords.length < count; i++) {
+                y--;
+                coords.push([x, y]);
+            }
+            step++;
+        }
+
+        return coords;
+    }
+
     getTaskCoord(taskOrId) {
         const rawId = typeof taskOrId === 'object' && taskOrId !== null
             ? taskOrId.id
@@ -211,8 +334,8 @@ class Grid {
     }
 
     updateTaskCoordinates(tasks) {
-        const size = computeGridSize(tasks.length);
-        const coords = generateSpiral(tasks.length, size);
+        const size = this.computeGridSize(tasks.length);
+        const coords = this.generateSpiral(tasks.length, size);
 
         idToCoords.clear();
         tasks.forEach((task, index) => {
@@ -267,7 +390,7 @@ class TaskManager {
 
     setState(id, state) {
         stateMap[id] = state;
-        saveStates(stateMap);
+        CoreUtils.saveStates(stateMap);
     }
 
     getCompletedCount() {
@@ -297,9 +420,9 @@ class TaskManager {
         const incompleteTasks = this.getTaskList().filter(task => this.getState(task.id) === 'incomplete');
         incompleteTasks.slice(unlockLimit).forEach(task => {
             this.setState(task.id, 'locked');
-            const cell = getCellById(task.id);
+            const cell = CoreUtils.getCellById(task.id);
             if (cell) {
-                setCellState(cell, 'locked');
+                gridSceneManager.setCellState(cell, 'locked');
             }
         });
     }
@@ -316,16 +439,16 @@ class TaskManager {
                 (coord.x === x && (coord.y === y - 1 || coord.y === y + 1)) ||
                 (coord.y === y && (coord.x === x - 1 || coord.x === x + 1));
             if (isNeighbor && this.getState(id) === 'hidden') {
-                revealNeighborAsLocked(id);
+                gridSceneManager.revealNeighborAsLocked(id);
             }
         });
     }
 
     applyTaskCompletion(task) {
         this.setState(task.id, 'complete');
-        const cell = getCellById(task.id);
+        const cell = CoreUtils.getCellById(task.id);
         if (cell) {
-            setCellState(cell, 'complete');
+            gridSceneManager.setCellState(cell, 'complete');
         }
         this.revealTaskNeighbors(task.id);
     }
@@ -358,7 +481,7 @@ class PlayerProgress {
     static finalizeSkillSnapshots(skillExperienceBySkill, skillLevelBySkill) {
         skillLevelBySkill.forEach((level, skillName) => {
             if (!Number.isFinite(skillExperienceBySkill.get(skillName))) {
-                const experience = levelToExperience(level);
+                const experience = gameDataUtils.levelToExperience(level);
                 if (Number.isFinite(experience) && experience >= 0) {
                     skillExperienceBySkill.set(skillName, experience);
                 }
@@ -367,7 +490,7 @@ class PlayerProgress {
 
         skillExperienceBySkill.forEach((experience, skillName) => {
             if (!Number.isFinite(skillLevelBySkill.get(skillName))) {
-                const level = experienceToLevel(experience);
+                const level = gameDataUtils.experienceToLevel(experience);
                 if (Number.isFinite(level) && level >= 1) {
                     skillLevelBySkill.set(skillName, level);
                 }
@@ -413,7 +536,7 @@ class PlayerProgress {
     }
 
     getSkillLevel(skillName) {
-        const normalizedSkill = normalizeSkillName(skillName);
+        const normalizedSkill = gameDataUtils.normalizeSkillName(skillName);
         if (!normalizedSkill) {
             return Number.NaN;
         }
@@ -424,7 +547,7 @@ class PlayerProgress {
         }
 
         const experience = this.skillExperienceBySkill.get(normalizedSkill);
-        const derivedLevel = experienceToLevel(experience);
+        const derivedLevel = gameDataUtils.experienceToLevel(experience);
         if (Number.isFinite(derivedLevel) && derivedLevel >= 1) {
             return Math.floor(derivedLevel);
         }
@@ -442,14 +565,14 @@ class PlayerProgress {
             return false;
         }
 
-        return this.completedAchievementDiaryKeys.has(getAchievementDiaryKey(region, difficulty));
+        return this.completedAchievementDiaryKeys.has(gameDataUtils.getAchievementDiaryKey(region, difficulty));
     }
 
     isSkillRequirementMet(requirement, requiredLevel = Number.NaN) {
         const resolvedRequiredLevel = Number.isFinite(requiredLevel)
             ? requiredLevel
             : (() => {
-                const computedLevel = experienceToLevel(requirement?.requiredExperience);
+                const computedLevel = gameDataUtils.experienceToLevel(requirement?.requiredExperience);
                 return Number.isFinite(computedLevel) && computedLevel >= 1
                     ? Math.floor(computedLevel)
                     : 1;
@@ -493,7 +616,7 @@ class Wiki {
             }
         }
 
-        const levelExperience = levelToExperience(skillData.level);
+        const levelExperience = gameDataUtils.levelToExperience(skillData.level);
         if (Number.isFinite(levelExperience) && levelExperience >= 0) {
             return levelExperience;
         }
@@ -524,7 +647,7 @@ class Wiki {
             }
         }
 
-        const experienceLevel = experienceToLevel(this.getSkillExperienceValue(skillData));
+        const experienceLevel = gameDataUtils.experienceToLevel(this.getSkillExperienceValue(skillData));
         if (Number.isFinite(experienceLevel) && experienceLevel >= 1) {
             return experienceLevel;
         }
@@ -533,7 +656,7 @@ class Wiki {
     }
 
     addSkillExperienceEntry(targetMap, rawSkillName, skillData) {
-        const skillName = normalizeSkillName(rawSkillName);
+        const skillName = gameDataUtils.normalizeSkillName(rawSkillName);
         if (!skillName) {
             return;
         }
@@ -550,7 +673,7 @@ class Wiki {
     }
 
     addSkillLevelEntry(targetMap, rawSkillName, skillData) {
-        const skillName = normalizeSkillName(rawSkillName);
+        const skillName = gameDataUtils.normalizeSkillName(rawSkillName);
         if (!skillName) {
             return;
         }
@@ -693,19 +816,19 @@ class Wiki {
         }
 
         Object.entries(achievementDiaries).forEach(([rawRegion, regionData]) => {
-            const region = normalizeAchievementDiaryRegion(rawRegion);
+            const region = gameDataUtils.normalizeAchievementDiaryRegion(rawRegion);
             if (!region || !regionData || typeof regionData !== 'object') {
                 return;
             }
 
             Object.entries(regionData).forEach(([rawDifficulty, difficultyData]) => {
-                const difficulty = normalizeAchievementDiaryDifficulty(rawDifficulty);
+                const difficulty = gameDataUtils.normalizeAchievementDiaryDifficulty(rawDifficulty);
                 if (!difficulty || !difficultyData || typeof difficultyData !== 'object') {
                     return;
                 }
 
                 if (difficultyData.complete === true) {
-                    completedKeys.add(getAchievementDiaryKey(region, difficulty));
+                    completedKeys.add(gameDataUtils.getAchievementDiaryKey(region, difficulty));
                 }
             });
         });
@@ -904,7 +1027,7 @@ class TaskVerification {
 
         return Object.entries(experienceRequirements)
             .map(([rawSkillName, rawExperience]) => {
-                const skillName = normalizeSkillName(rawSkillName);
+                const skillName = gameDataUtils.normalizeSkillName(rawSkillName);
                 const requiredExperience = Number(rawExperience);
                 return { skillName, requiredExperience };
             })
@@ -916,7 +1039,7 @@ class TaskVerification {
     }
 
     getRequiredSkillLevelForRequirement(requirement) {
-        const requiredLevel = experienceToLevel(requirement?.requiredExperience);
+        const requiredLevel = gameDataUtils.experienceToLevel(requirement?.requiredExperience);
         return Number.isFinite(requiredLevel) && requiredLevel >= 1
             ? Math.floor(requiredLevel)
             : 1;
@@ -935,7 +1058,7 @@ class TaskVerification {
 
             const rawRequired = task?.verification?.count;
             return Number.isFinite(rawRequired)
-                ? clamp(Math.floor(rawRequired), 1, requirements.length)
+                ? CoreUtils.clamp(Math.floor(rawRequired), 1, requirements.length)
                 : requirements.length;
         }
 
@@ -946,14 +1069,14 @@ class TaskVerification {
 
         const rawRequired = task?.verification?.count;
         return Number.isFinite(rawRequired)
-            ? clamp(Math.floor(rawRequired), 1, totalItems)
+            ? CoreUtils.clamp(Math.floor(rawRequired), 1, totalItems)
             : totalItems;
     }
 
     getTaskObtainedCount(task) {
         if (task?.verification?.method === 'achievement-diary') {
-            const region = normalizeAchievementDiaryRegion(task?.verification?.region);
-            const difficulty = normalizeAchievementDiaryDifficulty(task?.verification?.difficulty);
+            const region = gameDataUtils.normalizeAchievementDiaryRegion(task?.verification?.region);
+            const difficulty = gameDataUtils.normalizeAchievementDiaryDifficulty(task?.verification?.difficulty);
             return this.playerProgress.hasCompletedAchievementDiary(region, difficulty) ? 1 : 0;
         }
 
@@ -1090,8 +1213,8 @@ class TaskPanels {
         });
 
         return Array.from(grouped.values()).sort((a, b) => {
-            const sortA = getTierSortIndex(a.tier);
-            const sortB = getTierSortIndex(b.tier);
+            const sortA = tierUtils.getTierSortIndex(a.tier);
+            const sortB = tierUtils.getTierSortIndex(b.tier);
             if (sortA !== sortB) {
                 return sortA - sortB;
             }
@@ -1119,7 +1242,7 @@ class TaskPanels {
 
             const name = document.createElement('span');
             name.className = 'tier-progress-name';
-            name.textContent = formatTierName(entry.tier);
+            name.textContent = tierUtils.formatTierName(entry.tier);
 
             const value = document.createElement('span');
             value.className = 'tier-progress-value';
@@ -1160,7 +1283,7 @@ class TaskPanels {
             if (entry.tier === activeTierTab) {
                 tab.classList.add('active');
             }
-            tab.textContent = `${formatTierName(entry.tier)} (${entry.completed}/${entry.total})`;
+            tab.textContent = `${tierUtils.formatTierName(entry.tier)} (${entry.completed}/${entry.total})`;
             tab.addEventListener('click', () => {
                 activeTierTab = entry.tier;
                 this.renderTierTasksModal();
@@ -1169,7 +1292,7 @@ class TaskPanels {
         });
 
         const selectedTier = tierData.find(entry => entry.tier === activeTierTab) || tierData[0];
-        titleEl.textContent = `${formatTierName(selectedTier.tier)} Tasks`;
+        titleEl.textContent = `${tierUtils.formatTierName(selectedTier.tier)} Tasks`;
 
         const getTierListStateGroup = (state) => {
             if (state === 'locked' || state === 'hidden') {
@@ -1239,7 +1362,7 @@ class TaskPanels {
     centerTaskInView(taskId, options = {}) {
         const { smooth = true } = options;
         const container = document.getElementById('grid-container');
-        const cell = getCellById(taskId);
+        const cell = CoreUtils.getCellById(taskId);
         if (!container || !cell) {
             return false;
         }
@@ -1249,8 +1372,8 @@ class TaskPanels {
         const scaledCellSize = CELL_SIZE * currentScale;
         const targetLeft = (cell.pixelX * currentScale) - ((container.clientWidth - scaledCellSize) / 2);
         const targetTop = (cell.pixelY * currentScale) - ((container.clientHeight - scaledCellSize) / 2);
-        const nextLeft = clamp(targetLeft, 0, maxLeft);
-        const nextTop = clamp(targetTop, 0, maxTop);
+        const nextLeft = CoreUtils.clamp(targetLeft, 0, maxLeft);
+        const nextTop = CoreUtils.clamp(targetTop, 0, maxTop);
 
         container.scrollTo({
             left: nextLeft,
@@ -1267,8 +1390,8 @@ class TaskPanels {
         const incompleteTasks = tasksGlobal
             .filter(task => this.taskManager.getState(task.id) === 'incomplete')
             .sort((taskA, taskB) => {
-                const tierSortA = getTierSortIndex(taskA.tier);
-                const tierSortB = getTierSortIndex(taskB.tier);
+                const tierSortA = tierUtils.getTierSortIndex(taskA.tier);
+                const tierSortB = tierUtils.getTierSortIndex(taskB.tier);
                 if (tierSortA !== tierSortB) {
                     return tierSortA - tierSortB;
                 }
@@ -1469,7 +1592,7 @@ class TaskOrderManager {
         });
 
         stateMap = nextStateMap;
-        saveStates(stateMap);
+        CoreUtils.saveStates(stateMap);
     }
 
     saveTaskGridOrder(tasks = tasksGlobal) {
@@ -1493,7 +1616,7 @@ class TaskOrderManager {
 
             coordToTaskId.set(`${coord.x},${coord.y}`, taskId);
 
-            const cell = getCellById(taskId);
+            const cell = CoreUtils.getCellById(taskId);
             if (!cell) {
                 return;
             }
@@ -1518,13 +1641,13 @@ class TaskOrderManager {
         this.taskManager.setState(idA, stateB);
         this.taskManager.setState(idB, stateA);
 
-        const cellA = getCellById(idA);
-        const cellB = getCellById(idB);
+        const cellA = CoreUtils.getCellById(idA);
+        const cellB = CoreUtils.getCellById(idB);
         if (cellA) {
-            setCellState(cellA, stateB);
+            gridSceneManager.setCellState(cellA, stateB);
         }
         if (cellB) {
-            setCellState(cellB, stateA);
+            gridSceneManager.setCellState(cellB, stateA);
         }
     }
 
@@ -1551,7 +1674,7 @@ class TaskOrderManager {
         this.syncCellPositionsFromTaskOrder();
         this.saveTaskGridOrder(tasksGlobal);
         canvasInteractionManager.setHoveredCellId('');
-        scheduleSpritePrewarm(0);
+        renderWarmupManager.scheduleSpritePrewarm(0);
         queueCanvasRender();
 
         return true;
@@ -1570,159 +1693,237 @@ const taskPanels = new TaskPanels(taskManager);
 // collection log item map: id -> { name, category, wikiLink, imageUrl }
 const collectionLogMap = wiki.collectionLogMap;
 
-function formatSkillName(skillName) {
-    const normalized = normalizeSkillName(skillName);
-    if (!normalized) {
-        return 'Skill';
+class GameDataUtils {
+    normalizeAchievementDiaryRegion(value) {
+        const raw = String(value || '').trim().toLowerCase();
+        if (!raw) {
+            return '';
+        }
+
+        const slug = raw
+            .replace(/_/g, ' ')
+            .replace(/&/g, ' and ')
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '')
+            .replace(/-+/g, '-');
+
+        if (slug === 'kourend-kebos') {
+            return 'kourend-and-kebos';
+        }
+        if (slug === 'lumbridge-draynor') {
+            return 'lumbridge-and-draynor';
+        }
+
+        return slug;
     }
 
-    const labels = {
-        hitpoints: 'Hitpoints',
-        runecraft: 'Runecraft'
-    };
-
-    return labels[normalized] || `${normalized.charAt(0).toUpperCase()}${normalized.slice(1)}`;
-}
-
-function getSkillShortLabel(skillName) {
-    const normalized = normalizeSkillName(skillName);
-    const labels = {
-        attack: 'ATK',
-        strength: 'STR',
-        defence: 'DEF',
-        ranged: 'RNG',
-        prayer: 'PRY',
-        magic: 'MAG',
-        runecraft: 'RC',
-        hitpoints: 'HP',
-        crafting: 'CRF',
-        mining: 'MIN',
-        smithing: 'SMI',
-        fishing: 'FSH',
-        cooking: 'CKG',
-        firemaking: 'FM',
-        woodcutting: 'WC',
-        agility: 'AGI',
-        herblore: 'HER',
-        thieving: 'THV',
-        fletching: 'FLT',
-        slayer: 'SLY',
-        farming: 'FAR',
-        construction: 'CON',
-        hunter: 'HNT',
-        sailing: 'SAI'
-    };
-
-    return labels[normalized] || 'SKL';
-}
-
-function formatExperience(value) {
-    const numeric = Number(value);
-    if (!Number.isFinite(numeric) || numeric < 0) {
-        return '0';
+    normalizeAchievementDiaryDifficulty(value) {
+        const difficulty = String(value || '').trim().toLowerCase();
+        return DIARY_DIFFICULTIES.has(difficulty) ? difficulty : '';
     }
 
-    return Math.floor(numeric).toLocaleString('en-US');
-}
-
-function getSkillBadgeIcon(skillName, isObtained) {
-    const normalized = normalizeSkillName(skillName) || 'skill';
-    const cacheKey = `${normalized}:${isObtained ? '1' : '0'}`;
-    if (skillBadgeIconCache.has(cacheKey)) {
-        return skillBadgeIconCache.get(cacheKey);
+    getAchievementDiaryKey(region, difficulty) {
+        return `${region}|${difficulty}`;
     }
 
-    const label = getSkillShortLabel(normalized);
-    const background = isObtained ? '#5a513f' : '#3a3a3a';
-    const textColor = '#f1e8d4';
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="10" fill="${background}"/><text x="32" y="41" text-anchor="middle" fill="${textColor}" font-family="sans-serif" font-size="22" font-weight="700">${label}</text></svg>`;
-    const icon = `data:image/svg+xml,${encodeURIComponent(svg)}`;
-    skillBadgeIconCache.set(cacheKey, icon);
-    return icon;
-}
+    normalizeSkillName(value) {
+        const raw = String(value || '').trim().toLowerCase();
+        if (!raw) {
+            return '';
+        }
 
-function bindImageErrorFallback(image) {
-    if (!image || image.dataset.fallbackBound === '1') {
-        return;
+        const compact = raw.replace(/[_\s-]+/g, '');
+        const aliases = {
+            attack: 'attack',
+            strength: 'strength',
+            defence: 'defence',
+            defense: 'defence',
+            ranged: 'ranged',
+            prayer: 'prayer',
+            magic: 'magic',
+            runecraft: 'runecraft',
+            runecrafting: 'runecraft',
+            hitpoint: 'hitpoints',
+            hitpoints: 'hitpoints',
+            hp: 'hitpoints',
+            crafting: 'crafting',
+            mining: 'mining',
+            smithing: 'smithing',
+            fishing: 'fishing',
+            cooking: 'cooking',
+            firemaking: 'firemaking',
+            woodcutting: 'woodcutting',
+            agility: 'agility',
+            herblore: 'herblore',
+            thieving: 'thieving',
+            fletching: 'fletching',
+            slayer: 'slayer',
+            farming: 'farming',
+            construction: 'construction',
+            hunter: 'hunter',
+            sailing: 'sailing'
+        };
+
+        return aliases[compact] || '';
     }
 
-    image.dataset.fallbackBound = '1';
-    image.addEventListener('error', () => {
-        if (image.dataset.fallbackApplied === '1') {
+    levelToExperience(level) {
+        const numericLevel = Number(level);
+        if (!Number.isFinite(numericLevel) || numericLevel < 1) {
+            return Number.NaN;
+        }
+
+        const cappedLevel = Math.min(126, Math.floor(numericLevel));
+        let points = 0;
+        for (let currentLevel = 1; currentLevel < cappedLevel; currentLevel += 1) {
+            points += Math.floor(currentLevel + (300 * (2 ** (currentLevel / 7))));
+        }
+
+        return Math.floor(points / 4);
+    }
+
+    experienceToLevel(experience) {
+        const numericExperience = Number(experience);
+        if (!Number.isFinite(numericExperience) || numericExperience < 0) {
+            return Number.NaN;
+        }
+
+        let level = 1;
+        while (level < 126 && this.levelToExperience(level + 1) <= numericExperience) {
+            level += 1;
+        }
+
+        return level;
+    }
+
+    formatSkillName(skillName) {
+        const normalized = this.normalizeSkillName(skillName);
+        if (!normalized) {
+            return 'Skill';
+        }
+
+        const labels = {
+            hitpoints: 'Hitpoints',
+            runecraft: 'Runecraft'
+        };
+
+        return labels[normalized] || `${normalized.charAt(0).toUpperCase()}${normalized.slice(1)}`;
+    }
+
+    getSkillShortLabel(skillName) {
+        const normalized = this.normalizeSkillName(skillName);
+        const labels = {
+            attack: 'ATK',
+            strength: 'STR',
+            defence: 'DEF',
+            ranged: 'RNG',
+            prayer: 'PRY',
+            magic: 'MAG',
+            runecraft: 'RC',
+            hitpoints: 'HP',
+            crafting: 'CRF',
+            mining: 'MIN',
+            smithing: 'SMI',
+            fishing: 'FSH',
+            cooking: 'CKG',
+            firemaking: 'FM',
+            woodcutting: 'WC',
+            agility: 'AGI',
+            herblore: 'HER',
+            thieving: 'THV',
+            fletching: 'FLT',
+            slayer: 'SLY',
+            farming: 'FAR',
+            construction: 'CON',
+            hunter: 'HNT',
+            sailing: 'SAI'
+        };
+
+        return labels[normalized] || 'SKL';
+    }
+
+    formatExperience(value) {
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric) || numeric < 0) {
+            return '0';
+        }
+
+        return Math.floor(numeric).toLocaleString('en-US');
+    }
+
+    getSkillBadgeIcon(skillName, isObtained) {
+        const normalized = this.normalizeSkillName(skillName) || 'skill';
+        const cacheKey = `${normalized}:${isObtained ? '1' : '0'}`;
+        if (skillBadgeIconCache.has(cacheKey)) {
+            return skillBadgeIconCache.get(cacheKey);
+        }
+
+        const label = this.getSkillShortLabel(normalized);
+        const background = isObtained ? '#5a513f' : '#3a3a3a';
+        const textColor = '#f1e8d4';
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="10" fill="${background}"/><text x="32" y="41" text-anchor="middle" fill="${textColor}" font-family="sans-serif" font-size="22" font-weight="700">${label}</text></svg>`;
+        const icon = `data:image/svg+xml,${encodeURIComponent(svg)}`;
+        skillBadgeIconCache.set(cacheKey, icon);
+        return icon;
+    }
+}
+
+const gameDataUtils = new GameDataUtils();
+
+class TierUtils {
+    formatTierName(tier) {
+        return String(tier || '')
+            .split('-')
+            .filter(Boolean)
+            .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+            .join(' ');
+    }
+
+    getTierSortIndex(tier) {
+        const index = TIER_DISPLAY_ORDER.indexOf(tier);
+        return index === -1 ? Number.POSITIVE_INFINITY : index;
+    }
+}
+
+const tierUtils = new TierUtils();
+
+class AppUtils {
+    bindImageErrorFallback(image) {
+        if (!image || image.dataset.fallbackBound === '1') {
             return;
         }
 
-        image.dataset.fallbackApplied = '1';
-        image.src = QUESTION_MARK_ICON;
-        image.alt = 'Image unavailable';
-    });
-}
+        image.dataset.fallbackBound = '1';
+        image.addEventListener('error', () => {
+            if (image.dataset.fallbackApplied === '1') {
+                return;
+            }
 
-function setImageWithFallback(image, src, alt = '') {
-    if (!image) {
-        return;
+            image.dataset.fallbackApplied = '1';
+            image.src = QUESTION_MARK_ICON;
+            image.alt = 'Image unavailable';
+        });
     }
 
-    bindImageErrorFallback(image);
-    image.dataset.fallbackApplied = '0';
-    image.alt = alt;
-    image.src = src || QUESTION_MARK_ICON;
-}
-
-function wait(ms) {
-    return new Promise(resolve => {
-        setTimeout(resolve, ms);
-    });
-}
-
-function getCellById(id) {
-    return idToCell.get(String(id)) || null;
-}
-
-function normalizeTheme(value) {
-    const normalized = String(value || '').trim().toLowerCase();
-    return THEMES.has(normalized) ? normalized : 'osrs';
-}
-
-function normalizeCompleteOpacity(value) {
-    const parsed = Number.parseFloat(String(value ?? ''));
-    if (!Number.isFinite(parsed)) {
-        return DEFAULT_COMPLETE_CELL_OPACITY;
-    }
-
-    return clamp(parsed, MIN_COMPLETE_CELL_OPACITY, MAX_COMPLETE_CELL_OPACITY);
-}
-
-function normalizeTierHintSetting(value) {
-    return value === true || value === 'true' || value === '1';
-}
-
-function normalizeTierFilterSelection(value) {
-    let parsed = value;
-
-    if (typeof parsed === 'string') {
-        const raw = parsed.trim();
-        if (!raw) {
-            return new Set();
+    setImageWithFallback(image, src, alt = '') {
+        if (!image) {
+            return;
         }
 
-        try {
-            parsed = JSON.parse(raw);
-        } catch {
-            return new Set();
-        }
+        this.bindImageErrorFallback(image);
+        image.dataset.fallbackApplied = '0';
+        image.alt = alt;
+        image.src = src || QUESTION_MARK_ICON;
     }
 
-    if (!Array.isArray(parsed)) {
-        return new Set();
+    wait(ms) {
+        return new Promise(resolve => {
+            setTimeout(resolve, ms);
+        });
     }
-
-    const normalized = parsed
-        .map(item => String(item || '').trim())
-        .filter(Boolean);
-
-    return new Set(normalized);
 }
+
+const appUtils = new AppUtils();
 
 class UiSettings {
     constructor(taskManager) {
@@ -1741,8 +1942,8 @@ class UiSettings {
         });
 
         return Array.from(tierSet).sort((a, b) => {
-            const sortA = getTierSortIndex(a);
-            const sortB = getTierSortIndex(b);
+            const sortA = tierUtils.getTierSortIndex(a);
+            const sortB = tierUtils.getTierSortIndex(b);
             if (sortA !== sortB) {
                 return sortA - sortB;
             }
@@ -1779,7 +1980,7 @@ class UiSettings {
             const text = document.createElement('span');
             text.textContent = filterKey === LOCKED_FILTER_KEY
                 ? 'Locked'
-                : formatTierName(filterKey);
+                : tierUtils.formatTierName(filterKey);
 
             button.appendChild(swatch);
             button.appendChild(text);
@@ -1794,7 +1995,7 @@ class UiSettings {
     applyTierFilters(nextFilters, options = {}) {
         const { persist = true, rerender = true } = options;
         const filterableTierSet = new Set(this.getFilterableTiers());
-        const normalized = normalizeTierFilterSelection(Array.from(nextFilters || []));
+        const normalized = CoreUtils.normalizeTierFilterSelection(Array.from(nextFilters || []));
 
         selectedTierFilters = new Set(Array.from(normalized).filter(tier => filterableTierSet.has(tier)));
 
@@ -1869,7 +2070,7 @@ class UiSettings {
 
     applyCompleteOpacity(value, options = {}) {
         const { persist = true, rerender = true } = options;
-        const nextOpacity = normalizeCompleteOpacity(value);
+        const nextOpacity = CoreUtils.normalizeCompleteOpacity(value);
 
         completeCellOpacity = nextOpacity;
 
@@ -2016,7 +2217,7 @@ class UiSettings {
 
     applyTheme(theme, options = {}) {
         const { persist = true } = options;
-        const nextTheme = normalizeTheme(theme);
+        const nextTheme = CoreUtils.normalizeTheme(theme);
         const changed = nextTheme !== activeTheme || document.body?.dataset.theme !== nextTheme;
 
         activeTheme = nextTheme;
@@ -2157,7 +2358,7 @@ class TaskModal {
         }
 
         if (anchor.__virtualAnchor) {
-            return Boolean(getCellById(anchor.taskId));
+            return Boolean(CoreUtils.getCellById(anchor.taskId));
         }
 
         return anchor instanceof Node ? document.body.contains(anchor) : false;
@@ -2169,7 +2370,7 @@ class TaskModal {
             taskId: String(cell.id),
             _task: cell.task,
             getBoundingClientRect() {
-                const currentCell = getCellById(this.taskId);
+                const currentCell = CoreUtils.getCellById(this.taskId);
                 const grid = document.getElementById('grid');
                 if (!currentCell || !grid) {
                     return {
@@ -2243,12 +2444,12 @@ class TaskModal {
             side = 'top';
         }
 
-        top = clamp(top, pad, window.innerHeight - contentRect.height - pad);
+        top = CoreUtils.clamp(top, pad, window.innerHeight - contentRect.height - pad);
 
         let left = anchorRect.left + (anchorRect.width / 2) - (contentRect.width / 2);
-        left = clamp(left, pad, window.innerWidth - contentRect.width - pad);
+        left = CoreUtils.clamp(left, pad, window.innerWidth - contentRect.width - pad);
 
-        const arrowX = clamp(anchorRect.left + (anchorRect.width / 2) - left, 24, contentRect.width - 24);
+        const arrowX = CoreUtils.clamp(anchorRect.left + (anchorRect.width / 2) - left, 24, contentRect.width - 24);
         content.style.top = `${top}px`;
         content.style.left = `${left}px`;
         content.style.setProperty('--popover-arrow-x', `${arrowX}px`);
@@ -2269,12 +2470,12 @@ class TaskModal {
         const wiki = document.getElementById('modal-wiki');
         const button = document.getElementById('modal-complete');
         const tierBadge = document.getElementById('modal-tier-badge');
-        const cell = getCellById(task.id);
+        const cell = CoreUtils.getCellById(task.id);
         const state = taskManager.getState(task.id) || 'incomplete';
 
         if (task.id === INTRO_TASK_ID) {
             title.textContent = 'Welcome to the Task Grid!';
-            setImageWithFallback(image, INTRO_TASK_IMAGE, 'Task Grid');
+            appUtils.setImageWithFallback(image, INTRO_TASK_IMAGE, 'Task Grid');
             tip.innerHTML =
                 'Complete randomly assigned OSRS collection log goals and work your way across the grid.<br><br>' +
                 '<strong>Unlocking tasks:</strong> Locked tiles can be revealed by spending unlock slots. ' +
@@ -2306,7 +2507,7 @@ class TaskModal {
                     e.preventDefault();
                     taskManager.applyTaskCompletion(task);
                     hudManager.updateUnlockHud();
-                    refreshHiddenEdges({ animate: true });
+                    gridSceneManager.refreshHiddenEdges({ animate: true });
                     this.hideModal();
                 };
             } else {
@@ -2324,12 +2525,12 @@ class TaskModal {
 
         if (state === 'locked') {
             title.textContent = 'Locked Task';
-            setImageWithFallback(image, LOCKED_TILE_IMAGE, 'Locked task');
+            appUtils.setImageWithFallback(image, LOCKED_TILE_IMAGE, 'Locked task');
             tip.textContent = 'Unlock this tile to reveal what task is here.';
             wiki.style.display = 'none';
         } else {
             title.textContent = task.name;
-            setImageWithFallback(image, task.imageLink, task.name);
+            appUtils.setImageWithFallback(image, task.imageLink, task.name);
             tip.textContent = task.tip || '';
             wiki.href = task.wikiLink || '#';
             wiki.style.display = 'inline-block';
@@ -2345,7 +2546,7 @@ class TaskModal {
                 const previousLimit = taskManager.getUnlockLimit();
                 taskManager.applyTaskCompletion(task);
                 hudManager.updateUnlockHud();
-                refreshHiddenEdges({ animate: true });
+                gridSceneManager.refreshHiddenEdges({ animate: true });
                 const nextLimit = taskManager.getUnlockLimit();
                 if (nextLimit > previousLimit) {
                     hudManager.showUnlockToast(nextLimit);
@@ -2367,18 +2568,18 @@ class TaskModal {
                 e.preventDefault();
                 taskManager.setState(task.id, 'incomplete');
                 if (cell) {
-                    setCellState(cell, 'incomplete');
+                    gridSceneManager.setCellState(cell, 'incomplete');
                 }
 
                 const unlockedTask = taskVerification.alignUnlockedTaskToLowestSeriesTask(task);
 
                 hudManager.updateUnlockHud();
-                refreshHiddenEdges({ animate: true });
+                gridSceneManager.refreshHiddenEdges({ animate: true });
 
                 this.hideModal();
                 requestAnimationFrame(() => {
                     const unlockedTaskId = String(unlockedTask?.id || task.id);
-                    const unlockedCell = getCellById(unlockedTaskId);
+                    const unlockedCell = CoreUtils.getCellById(unlockedTaskId);
                     if (!unlockedCell || taskManager.getState(unlockedTaskId) !== 'incomplete') {
                         return;
                     }
@@ -2398,7 +2599,7 @@ class TaskModal {
             if (tier && !shouldHideTierBadge) {
                 const bgColor = uiSettings.getTierColor(tier);
                 const textColor = uiSettings.getReadableTextColor(bgColor);
-                tierBadge.textContent = formatTierName(tier) || 'Unknown';
+                tierBadge.textContent = tierUtils.formatTierName(tier) || 'Unknown';
                 tierBadge.style.background = bgColor;
                 tierBadge.style.color = textColor;
                 tierBadge.style.display = 'inline-block';
@@ -2442,9 +2643,9 @@ class TaskModal {
                     img.loading = 'lazy';
                     img.decoding = 'async';
                     if (info) {
-                        setImageWithFallback(img, info.imageUrl, info.name);
+                        appUtils.setImageWithFallback(img, info.imageUrl, info.name);
                     } else {
-                        setImageWithFallback(img, QUESTION_MARK_ICON, `Item ${id}`);
+                        appUtils.setImageWithFallback(img, QUESTION_MARK_ICON, `Item ${id}`);
                     }
                     link.appendChild(img);
                     itemsEl.appendChild(link);
@@ -2476,12 +2677,12 @@ class TaskModal {
                             return requiredLevelDelta;
                         }
 
-                        return formatSkillName(requirementA.skillName).localeCompare(formatSkillName(requirementB.skillName));
+                        return gameDataUtils.formatSkillName(requirementA.skillName).localeCompare(gameDataUtils.formatSkillName(requirementB.skillName));
                     });
 
                 itemsEl.classList.toggle('is-scrollable', sortedRequirements.length > 20);
                 sortedRequirements.forEach(requirement => {
-                    const skillName = formatSkillName(requirement.skillName);
+                    const skillName = gameDataUtils.formatSkillName(requirement.skillName);
                     const requiredLevel = taskVerification.getRequiredSkillLevelForRequirement(requirement);
                     const playerLevel = playerProgress.getSkillLevel(requirement.skillName);
                     const normalizedLevel = Number.isFinite(playerLevel) ? Math.floor(playerLevel) : 0;
@@ -2499,7 +2700,7 @@ class TaskModal {
                     img.height = 32;
                     img.loading = 'lazy';
                     img.decoding = 'async';
-                    setImageWithFallback(img, getSkillBadgeIcon(requirement.skillName, isObtained), skillName);
+                    appUtils.setImageWithFallback(img, gameDataUtils.getSkillBadgeIcon(requirement.skillName, isObtained), skillName);
 
                     link.appendChild(img);
                     itemsEl.appendChild(link);
@@ -2579,10 +2780,10 @@ class ProgressSyncManager {
             completedCount += batch.length;
             taskManager.normalizeUnlockStates();
             hudManager.updateUnlockHud();
-            refreshHiddenEdges({ animate: false });
+            gridSceneManager.refreshHiddenEdges({ animate: false });
 
             if (index + 1 < distanceBatches.length) {
-                await wait(revealStagger * 2);
+                await appUtils.wait(revealStagger * 2);
             }
         }
 
@@ -2591,7 +2792,7 @@ class ProgressSyncManager {
         hudManager.updateUnlockHud();
 
         if (completedCount > 0) {
-            refreshHiddenEdges({ animate: false });
+            gridSceneManager.refreshHiddenEdges({ animate: false });
         }
 
         const nextLimit = taskManager.getUnlockLimit();
@@ -2632,7 +2833,64 @@ class GridViewport {
 
         const widthFit = container.clientWidth / grid.scrollWidth;
         const heightFit = container.clientHeight / grid.scrollHeight;
-        return clamp(Math.max(widthFit, heightFit), MIN_SCALE, MAX_SCALE);
+        return CoreUtils.clamp(Math.max(widthFit, heightFit), MIN_SCALE, MAX_SCALE);
+    }
+
+    getVisibleWorldBounds() {
+        const container = document.getElementById('grid-container');
+        if (!container || currentScale <= 0) {
+            return null;
+        }
+
+        const margin = CELL_STEP;
+        return {
+            left: (container.scrollLeft / currentScale) - margin,
+            top: (container.scrollTop / currentScale) - margin,
+            right: ((container.scrollLeft + container.clientWidth) / currentScale) + margin,
+            bottom: ((container.scrollTop + container.clientHeight) / currentScale) + margin
+        };
+    }
+
+    getVisibleCoordBounds(bounds) {
+        if (!bounds || gridCellCount <= 0) {
+            return null;
+        }
+
+        const maxCoord = gridCellCount - 1;
+        const left = CoreUtils.clamp(Math.floor((bounds.left - GRID_SAFE_PADDING_X) / CELL_STEP), 0, maxCoord);
+        const right = CoreUtils.clamp(Math.floor((bounds.right - GRID_SAFE_PADDING_X) / CELL_STEP), 0, maxCoord);
+        const top = CoreUtils.clamp(Math.floor((bounds.top - GRID_SAFE_PADDING_Y) / CELL_STEP), 0, maxCoord);
+        const bottom = CoreUtils.clamp(Math.floor((bounds.bottom - GRID_SAFE_PADDING_Y) / CELL_STEP), 0, maxCoord);
+
+        return {
+            left,
+            right,
+            top,
+            bottom
+        };
+    }
+
+    getVisibleClearRect(bounds) {
+        if (!bounds) {
+            return {
+                x: 0,
+                y: 0,
+                width: gridPixelWidth,
+                height: gridPixelHeight
+            };
+        }
+
+        const x = CoreUtils.clamp(bounds.left, 0, gridPixelWidth);
+        const y = CoreUtils.clamp(bounds.top, 0, gridPixelHeight);
+        const right = CoreUtils.clamp(bounds.right, 0, gridPixelWidth);
+        const bottom = CoreUtils.clamp(bounds.bottom, 0, gridPixelHeight);
+
+        return {
+            x,
+            y,
+            width: Math.max(0, right - x),
+            height: Math.max(0, bottom - y)
+        };
     }
 
     updateGridScale(options = {}) {
@@ -2643,7 +2901,7 @@ class GridViewport {
             return;
         }
 
-        currentScale = clamp(currentScale, this.getMinScale(), MAX_SCALE);
+        currentScale = CoreUtils.clamp(currentScale, this.getMinScale(), MAX_SCALE);
         grid.style.transform = `scale(${currentScale})`;
         stage.style.width = `${grid.scrollWidth * currentScale}px`;
         stage.style.height = `${grid.scrollHeight * currentScale}px`;
@@ -2663,7 +2921,7 @@ class GridViewport {
             const previousScale = currentScale;
 
             const minScale = this.getMinScale();
-            const nextScale = clamp(
+            const nextScale = CoreUtils.clamp(
                 e.deltaY < 0 ? currentScale * ZOOM_FACTOR : currentScale / ZOOM_FACTOR,
                 minScale,
                 MAX_SCALE
@@ -2687,7 +2945,7 @@ class GridViewport {
             container.scrollLeft = worldX * currentScale - pointerX;
             container.scrollTop = worldY * currentScale - pointerY;
             if (nextScale < previousScale) {
-                prewarmVisibleCellSprites();
+                renderWarmupManager.prewarmVisibleCellSprites();
                 queueCanvasRender();
             }
             taskModal.refreshPopoverPosition();
@@ -2736,7 +2994,7 @@ class CanvasInteractionManager {
         }
 
         const taskId = coordToTaskId.get(`${coordX},${coordY}`);
-        return taskId ? getCellById(taskId) : null;
+        return taskId ? CoreUtils.getCellById(taskId) : null;
     }
 
     isCellHoverable(cell) {
@@ -2754,9 +3012,9 @@ class CanvasInteractionManager {
             return;
         }
 
-        const previousCell = hoveredCellId ? getCellById(hoveredCellId) : null;
+        const previousCell = hoveredCellId ? CoreUtils.getCellById(hoveredCellId) : null;
         hoveredCellId = normalized;
-        const nextCell = hoveredCellId ? getCellById(hoveredCellId) : null;
+        const nextCell = hoveredCellId ? CoreUtils.getCellById(hoveredCellId) : null;
 
         if (gridCanvas) {
             gridCanvas.style.cursor = nextCell && this.isCellHoverable(nextCell) ? 'pointer' : 'default';
@@ -2829,6 +3087,349 @@ class CanvasInteractionManager {
 
 const canvasInteractionManager = new CanvasInteractionManager();
 
+class GridSceneManager {
+    setCellState(cell, nextState) {
+        if (!cell) {
+            return;
+        }
+
+        cell.state = nextState;
+        cell.spriteKey = '';
+        if (hoveredCellId === cell.id && !canvasInteractionManager.isCellHoverable(cell)) {
+            canvasInteractionManager.setHoveredCellId('');
+        }
+        if (nextState !== 'hidden') {
+            cell.edgeVisible = false;
+            cell.edgeSides = {
+                top: false,
+                right: false,
+                bottom: false,
+                left: false
+            };
+        }
+
+        renderWarmupManager.scheduleSpritePrewarm(0);
+        queueCanvasRender();
+    }
+
+    buildTaskNameLines(name, options = {}) {
+        const { maxCharsPerLine = 14, maxLines = 2 } = options;
+        const raw = String(name || '').trim();
+        if (!raw) {
+            return [''];
+        }
+
+        const words = raw.split(/\s+/);
+        const lines = [];
+        let current = '';
+
+        const pushCurrent = () => {
+            if (current) {
+                lines.push(current);
+                current = '';
+            }
+        };
+
+        for (const word of words) {
+            if (!current) {
+                if (word.length <= maxCharsPerLine) {
+                    current = word;
+                } else {
+                    lines.push(`${word.slice(0, Math.max(1, maxCharsPerLine - 1))}…`);
+                }
+                continue;
+            }
+
+            const next = `${current} ${word}`;
+            if (next.length <= maxCharsPerLine) {
+                current = next;
+            } else {
+                pushCurrent();
+                if (word.length <= maxCharsPerLine) {
+                    current = word;
+                } else {
+                    lines.push(`${word.slice(0, Math.max(1, maxCharsPerLine - 1))}…`);
+                }
+            }
+        }
+
+        pushCurrent();
+
+        if (lines.length <= maxLines) {
+            return lines;
+        }
+
+        const clipped = lines.slice(0, maxLines);
+        const last = clipped[maxLines - 1];
+        clipped[maxLines - 1] = last.endsWith('…') ? last : `${last.slice(0, Math.max(1, maxCharsPerLine - 1))}…`;
+        return clipped;
+    }
+
+    createCell(task, coord) {
+        const state = taskManager.getState(task.id) || 'incomplete';
+        const nameLines = this.buildTaskNameLines(task.name, {
+            maxCharsPerLine: 15,
+            maxLines: 2
+        });
+
+        return {
+            id: String(task.id),
+            task,
+            _task: task,
+            __virtualAnchor: true,
+            taskId: String(task.id),
+            state,
+            pixelX: GRID_SAFE_PADDING_X + (coord.x * CELL_STEP),
+            pixelY: GRID_SAFE_PADDING_Y + (coord.y * CELL_STEP),
+            nameLines,
+            popAnimation: null,
+            hoverProgress: 0,
+            spriteCanvas: null,
+            spriteKey: '',
+            edgeVisible: false,
+            edgeSides: {
+                top: false,
+                right: false,
+                bottom: false,
+                left: false
+            },
+            getBoundingClientRect() {
+                return taskModal.createCellAnchor(this).getBoundingClientRect();
+            }
+        };
+    }
+
+    revealNeighborAsLocked(id) {
+        taskManager.setState(id, 'locked');
+        const cell = CoreUtils.getCellById(id);
+        if (!cell) {
+            return;
+        }
+
+        this.setCellState(cell, 'locked');
+        this.playPopReveal(cell);
+    }
+
+    playPopReveal(cell, options = {}) {
+        const { delay = 0, easing = 'linear' } = options;
+        if (!cell) {
+            return;
+        }
+
+        cell.popAnimation = {
+            startTime: performance.now() + delay,
+            easing
+        };
+        queueCanvasRender();
+    }
+
+    refreshHiddenEdges(options = {}) {
+        const {
+            animate = false,
+            center = null,
+            revealDelayByCoord = null,
+            edgeDelayOffset = EDGE_POP_OFFSET_MS,
+            staggerMs = POP_STAGGER_MS,
+            revealEasing = 'linear'
+        } = options;
+        const stateByCoord = new Map();
+        const isFrontierState = state => state === 'incomplete' || state === 'locked';
+        const newlyVisibleEdges = [];
+
+        idToCoords.forEach((coord, id) => {
+            stateByCoord.set(`${coord.x},${coord.y}`, taskManager.getState(id));
+        });
+
+        idToCoords.forEach((coord, id) => {
+            const cell = CoreUtils.getCellById(id);
+            if (!cell) {
+                return;
+            }
+
+            const state = stateByCoord.get(`${coord.x},${coord.y}`);
+            const hadVisibleEdge = cell.edgeVisible;
+
+            if (state !== 'hidden') {
+                if (cell.edgeVisible || cell.edgeSides.top || cell.edgeSides.right || cell.edgeSides.bottom || cell.edgeSides.left) {
+                    cell.edgeVisible = false;
+                    cell.edgeSides = {
+                        top: false,
+                        right: false,
+                        bottom: false,
+                        left: false
+                    };
+                }
+                return;
+            }
+
+            let hasVisibleEdge = false;
+            let minAdjacentDelay = Number.POSITIVE_INFINITY;
+            const nextEdgeSides = {
+                top: false,
+                right: false,
+                bottom: false,
+                left: false
+            };
+
+            const noteAdjacentDelay = (x, y) => {
+                if (!revealDelayByCoord) {
+                    return;
+                }
+                const delay = revealDelayByCoord.get(`${x},${y}`);
+                if (typeof delay === 'number') {
+                    minAdjacentDelay = Math.min(minAdjacentDelay, delay);
+                }
+            };
+
+            if (isFrontierState(stateByCoord.get(`${coord.x},${coord.y - 1}`))) {
+                nextEdgeSides.top = true;
+                hasVisibleEdge = true;
+                noteAdjacentDelay(coord.x, coord.y - 1);
+            }
+            if (isFrontierState(stateByCoord.get(`${coord.x + 1},${coord.y}`))) {
+                nextEdgeSides.right = true;
+                hasVisibleEdge = true;
+                noteAdjacentDelay(coord.x + 1, coord.y);
+            }
+            if (isFrontierState(stateByCoord.get(`${coord.x},${coord.y + 1}`))) {
+                nextEdgeSides.bottom = true;
+                hasVisibleEdge = true;
+                noteAdjacentDelay(coord.x, coord.y + 1);
+            }
+            if (isFrontierState(stateByCoord.get(`${coord.x - 1},${coord.y}`))) {
+                nextEdgeSides.left = true;
+                hasVisibleEdge = true;
+                noteAdjacentDelay(coord.x - 1, coord.y);
+            }
+
+            cell.edgeSides = nextEdgeSides;
+
+            if (hasVisibleEdge) {
+                if (animate && !hadVisibleEdge) {
+                    const hasTimedNeighbor = Number.isFinite(minAdjacentDelay);
+                    newlyVisibleEdges.push({
+                        cell,
+                        coord,
+                        startDelay: hasTimedNeighbor ? minAdjacentDelay + edgeDelayOffset : edgeDelayOffset
+                    });
+                } else {
+                    cell.edgeVisible = true;
+                }
+            } else {
+                cell.edgeVisible = false;
+            }
+        });
+
+        if (!animate || newlyVisibleEdges.length === 0) {
+            queueCanvasRender();
+            return;
+        }
+
+        const orderedEdges = center
+            ? newlyVisibleEdges
+                .slice()
+                .sort((a, b) => {
+                    const distanceA = Math.abs(a.coord.x - center.x) + Math.abs(a.coord.y - center.y);
+                    const distanceB = Math.abs(b.coord.x - center.x) + Math.abs(b.coord.y - center.y);
+                    return distanceA - distanceB;
+                })
+            : newlyVisibleEdges;
+
+        orderedEdges.forEach((item, index) => {
+            const startDelay = Math.max(item.startDelay ?? edgeDelayOffset, index * staggerMs);
+            setTimeout(() => {
+                const cellId = item.cell.id;
+                if (taskManager.getState(cellId) !== 'hidden') {
+                    return;
+                }
+                const stillHasEdgeSide =
+                    item.cell.edgeSides.top ||
+                    item.cell.edgeSides.right ||
+                    item.cell.edgeSides.bottom ||
+                    item.cell.edgeSides.left;
+                if (!stillHasEdgeSide) {
+                    return;
+                }
+                item.cell.edgeVisible = true;
+                this.playPopReveal(item.cell, { easing: revealEasing });
+            }, startDelay);
+        });
+
+        queueCanvasRender();
+    }
+
+    render(tasks) {
+        const grid = document.getElementById('grid');
+        if (!grid) {
+            return;
+        }
+
+        taskModal.hideModal();
+        hoveredCellId = '';
+        if (gridCanvas) {
+            gridCanvas.style.cursor = 'default';
+        }
+        grid.innerHTML = '';
+        idToCell.clear();
+        coordToTaskId.clear();
+
+        const { size, coords, center } = gridModel.updateTaskCoordinates(tasks);
+        gridCellCount = size;
+        const canvas = ensureGridCanvas();
+        if (!canvas || !gridContext) {
+            return;
+        }
+
+        const gridCoreSize = Math.max(1, (size * CELL_SIZE) + ((size - 1) * CELL_GAP));
+        gridPixelWidth = gridCoreSize + (GRID_SAFE_PADDING_X * 2);
+        gridPixelHeight = gridCoreSize + (GRID_SAFE_PADDING_Y * 2);
+
+        grid.style.width = `${gridPixelWidth}px`;
+        grid.style.height = `${gridPixelHeight}px`;
+        syncCanvasResolution();
+
+        const cells = [];
+
+        tasks.forEach((task, index) => {
+            const [x, y] = coords[index];
+            const cell = this.createCell(task, { x, y });
+            idToCell.set(String(task.id), cell);
+            coordToTaskId.set(`${x},${y}`, String(task.id));
+            cells.push({ cell, x, y });
+        });
+
+        const visibleCells = cells.filter(item => taskManager.getState(item.cell.id) !== 'hidden');
+        const sortedVisibleCells = visibleCells
+            .sort((a, b) => {
+                const distanceA = Math.abs(a.x - center.x) + Math.abs(a.y - center.y);
+                const distanceB = Math.abs(b.x - center.x) + Math.abs(b.y - center.y);
+                return distanceA - distanceB;
+            });
+        const revealStagger = sortedVisibleCells.length * POP_STAGGER_MS > INITIAL_REVEAL_DURATION_MS
+            ? INITIAL_REVEAL_DURATION_MS / (sortedVisibleCells.length - 1)
+            : POP_STAGGER_MS;
+        const revealDelayByCoord = new Map();
+
+        sortedVisibleCells.forEach((item, index) => {
+            const revealDelay = INITIAL_REVEAL_DELAY_MS + (index * revealStagger);
+            revealDelayByCoord.set(`${item.x},${item.y}`, revealDelay);
+            this.playPopReveal(item.cell, { delay: revealDelay, easing: 'ease-in' });
+        });
+
+        this.refreshHiddenEdges({ animate: true, center, revealDelayByCoord, staggerMs: revealStagger, revealEasing: 'ease-in' });
+        gridViewport.updateGridScale();
+        hudManager.updateUnlockHud();
+        renderWarmupManager.scheduleSpritePrewarm(0);
+        queueCanvasRender();
+
+        if (tasks.length > 0) {
+            taskPanels.centerTaskInView(tasks[0].id, { smooth: false });
+        }
+    }
+}
+
+const gridSceneManager = new GridSceneManager();
+
 function ensureGridCanvas() {
     const grid = document.getElementById('grid');
     if (!grid) {
@@ -2888,7 +3489,7 @@ function syncCanvasResolution() {
             cell.spriteKey = '';
         });
         lastCanvasPixelRatio = pixelRatio;
-        scheduleSpritePrewarm(60);
+        renderWarmupManager.scheduleSpritePrewarm(60);
     }
 }
 
@@ -3010,59 +3611,6 @@ function drawRoundedRect(context, x, y, width, height, radius) {
     context.lineTo(x, y + radius);
     context.quadraticCurveTo(x, y, x + radius, y);
     context.closePath();
-}
-
-function buildTaskNameLines(name, options = {}) {
-    const { maxCharsPerLine = 14, maxLines = 2 } = options;
-    const raw = String(name || '').trim();
-    if (!raw) {
-        return [''];
-    }
-
-    const words = raw.split(/\s+/);
-    const lines = [];
-    let current = '';
-
-    const pushCurrent = () => {
-        if (current) {
-            lines.push(current);
-            current = '';
-        }
-    };
-
-    for (const word of words) {
-        if (!current) {
-            if (word.length <= maxCharsPerLine) {
-                current = word;
-            } else {
-                lines.push(`${word.slice(0, Math.max(1, maxCharsPerLine - 1))}…`);
-            }
-            continue;
-        }
-
-        const next = `${current} ${word}`;
-        if (next.length <= maxCharsPerLine) {
-            current = next;
-        } else {
-            pushCurrent();
-            if (word.length <= maxCharsPerLine) {
-                current = word;
-            } else {
-                lines.push(`${word.slice(0, Math.max(1, maxCharsPerLine - 1))}…`);
-            }
-        }
-    }
-
-    pushCurrent();
-
-    if (lines.length <= maxLines) {
-        return lines;
-    }
-
-    const clipped = lines.slice(0, maxLines);
-    const last = clipped[maxLines - 1];
-    clipped[maxLines - 1] = last.endsWith('…') ? last : `${last.slice(0, Math.max(1, maxCharsPerLine - 1))}…`;
-    return clipped;
 }
 
 function getCellImageDrawState(imageSource) {
@@ -3370,60 +3918,6 @@ function ensureEdgeCellSprite(edgeSides) {
     return spriteCanvas;
 }
 
-function prewarmCellSprites() {
-    idToCell.forEach(cell => {
-        if (cell.state === 'hidden') {
-            if (cell.edgeVisible && (cell.edgeSides.top || cell.edgeSides.right || cell.edgeSides.bottom || cell.edgeSides.left)) {
-                ensureEdgeCellSprite(cell.edgeSides);
-            }
-        } else {
-            ensureCellSprite(cell);
-        }
-    });
-}
-
-function prewarmVisibleCellSprites() {
-    const visibleBounds = getVisibleWorldBounds();
-    const visibleCoords = getVisibleCoordBounds(visibleBounds);
-    if (!visibleCoords) {
-        return;
-    }
-
-    for (let y = visibleCoords.top; y <= visibleCoords.bottom; y++) {
-        for (let x = visibleCoords.left; x <= visibleCoords.right; x++) {
-            const taskId = coordToTaskId.get(`${x},${y}`);
-            if (!taskId) {
-                continue;
-            }
-
-            const cell = getCellById(taskId);
-            if (!cell) {
-                continue;
-            }
-
-            if (cell.state === 'hidden') {
-                if (cell.edgeVisible && (cell.edgeSides.top || cell.edgeSides.right || cell.edgeSides.bottom || cell.edgeSides.left)) {
-                    ensureEdgeCellSprite(cell.edgeSides);
-                }
-            } else {
-                ensureCellSprite(cell);
-            }
-        }
-    }
-}
-
-function scheduleSpritePrewarm(delay = 0) {
-    if (spritePrewarmTimer) {
-        clearTimeout(spritePrewarmTimer);
-    }
-
-    spritePrewarmTimer = setTimeout(() => {
-        spritePrewarmTimer = null;
-        prewarmCellSprites();
-        queueCanvasRender();
-    }, delay);
-}
-
 function drawCanvasCell(context, cell, now) {
     const state = cell.state || 'hidden';
     const hasEdge = state === 'hidden' && cell.edgeVisible && (cell.edgeSides.top || cell.edgeSides.right || cell.edgeSides.bottom || cell.edgeSides.left);
@@ -3442,7 +3936,7 @@ function drawCanvasCell(context, cell, now) {
             return true;
         }
 
-        const progress = clamp(elapsed / POP_DURATION_MS, 0, 1);
+        const progress = CoreUtils.clamp(elapsed / POP_DURATION_MS, 0, 1);
         const popEasing = cell.popAnimation.easing || 'linear';
         if (progress >= 1) {
             cell.popAnimation = null;
@@ -3454,7 +3948,7 @@ function drawCanvasCell(context, cell, now) {
                     ? upRaw * upRaw
                     : upRaw;
                 scale = 1.2 * up;
-                alpha = clamp(up * 1.2, 0, 1);
+                alpha = CoreUtils.clamp(up * 1.2, 0, 1);
             } else {
                 const down = (progress - 0.5) / 0.5;
                 scale = 1.2 - (0.2 * down);
@@ -3542,72 +4036,15 @@ function drawCanvasCell(context, cell, now) {
     return keepAnimating;
 }
 
-function getVisibleWorldBounds() {
-    const container = document.getElementById('grid-container');
-    if (!container || currentScale <= 0) {
-        return null;
-    }
-
-    const margin = CELL_STEP;
-    return {
-        left: (container.scrollLeft / currentScale) - margin,
-        top: (container.scrollTop / currentScale) - margin,
-        right: ((container.scrollLeft + container.clientWidth) / currentScale) + margin,
-        bottom: ((container.scrollTop + container.clientHeight) / currentScale) + margin
-    };
-}
-
-function getVisibleCoordBounds(bounds) {
-    if (!bounds || gridCellCount <= 0) {
-        return null;
-    }
-
-    const maxCoord = gridCellCount - 1;
-    const left = clamp(Math.floor((bounds.left - GRID_SAFE_PADDING_X) / CELL_STEP), 0, maxCoord);
-    const right = clamp(Math.floor((bounds.right - GRID_SAFE_PADDING_X) / CELL_STEP), 0, maxCoord);
-    const top = clamp(Math.floor((bounds.top - GRID_SAFE_PADDING_Y) / CELL_STEP), 0, maxCoord);
-    const bottom = clamp(Math.floor((bounds.bottom - GRID_SAFE_PADDING_Y) / CELL_STEP), 0, maxCoord);
-
-    return {
-        left,
-        right,
-        top,
-        bottom
-    };
-}
-
-function getVisibleClearRect(bounds) {
-    if (!bounds) {
-        return {
-            x: 0,
-            y: 0,
-            width: gridPixelWidth,
-            height: gridPixelHeight
-        };
-    }
-
-    const x = clamp(bounds.left, 0, gridPixelWidth);
-    const y = clamp(bounds.top, 0, gridPixelHeight);
-    const right = clamp(bounds.right, 0, gridPixelWidth);
-    const bottom = clamp(bounds.bottom, 0, gridPixelHeight);
-
-    return {
-        x,
-        y,
-        width: Math.max(0, right - x),
-        height: Math.max(0, bottom - y)
-    };
-}
-
 function renderGridCanvas(now = performance.now()) {
     if (!gridContext || !gridCanvas) {
         return false;
     }
 
-    const visibleBounds = getVisibleWorldBounds();
-    const clearRect = getVisibleClearRect(visibleBounds);
+    const visibleBounds = gridViewport.getVisibleWorldBounds();
+    const clearRect = gridViewport.getVisibleClearRect(visibleBounds);
     gridContext.clearRect(clearRect.x, clearRect.y, clearRect.width, clearRect.height);
-    const visibleCoords = getVisibleCoordBounds(visibleBounds);
+    const visibleCoords = gridViewport.getVisibleCoordBounds(visibleBounds);
     if (!visibleCoords) {
         return false;
     }
@@ -3620,7 +4057,7 @@ function renderGridCanvas(now = performance.now()) {
                 continue;
             }
 
-            const cell = getCellById(taskId);
+            const cell = CoreUtils.getCellById(taskId);
             if (!cell) {
                 continue;
             }
@@ -3631,479 +4068,6 @@ function renderGridCanvas(now = performance.now()) {
     }
 
     return keepAnimating;
-}
-
-function normalizeAchievementDiaryRegion(value) {
-    const raw = String(value || '').trim().toLowerCase();
-    if (!raw) {
-        return '';
-    }
-
-    const slug = raw
-        .replace(/_/g, ' ')
-        .replace(/&/g, ' and ')
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '')
-        .replace(/-+/g, '-');
-
-    if (slug === 'kourend-kebos') {
-        return 'kourend-and-kebos';
-    }
-    if (slug === 'lumbridge-draynor') {
-        return 'lumbridge-and-draynor';
-    }
-
-    return slug;
-}
-
-function normalizeAchievementDiaryDifficulty(value) {
-    const difficulty = String(value || '').trim().toLowerCase();
-    return DIARY_DIFFICULTIES.has(difficulty) ? difficulty : '';
-}
-
-function getAchievementDiaryKey(region, difficulty) {
-    return `${region}|${difficulty}`;
-}
-
-function normalizeSkillName(value) {
-    const raw = String(value || '').trim().toLowerCase();
-    if (!raw) {
-        return '';
-    }
-
-    const compact = raw.replace(/[_\s-]+/g, '');
-    const aliases = {
-        attack: 'attack',
-        strength: 'strength',
-        defence: 'defence',
-        defense: 'defence',
-        ranged: 'ranged',
-        prayer: 'prayer',
-        magic: 'magic',
-        runecraft: 'runecraft',
-        runecrafting: 'runecraft',
-        hitpoint: 'hitpoints',
-        hitpoints: 'hitpoints',
-        hp: 'hitpoints',
-        crafting: 'crafting',
-        mining: 'mining',
-        smithing: 'smithing',
-        fishing: 'fishing',
-        cooking: 'cooking',
-        firemaking: 'firemaking',
-        woodcutting: 'woodcutting',
-        agility: 'agility',
-        herblore: 'herblore',
-        thieving: 'thieving',
-        fletching: 'fletching',
-        slayer: 'slayer',
-        farming: 'farming',
-        construction: 'construction',
-        hunter: 'hunter',
-        sailing: 'sailing'
-    };
-
-    return aliases[compact] || '';
-}
-
-function levelToExperience(level) {
-    const numericLevel = Number(level);
-    if (!Number.isFinite(numericLevel) || numericLevel < 1) {
-        return Number.NaN;
-    }
-
-    const cappedLevel = Math.min(126, Math.floor(numericLevel));
-    let points = 0;
-    for (let currentLevel = 1; currentLevel < cappedLevel; currentLevel += 1) {
-        points += Math.floor(currentLevel + (300 * (2 ** (currentLevel / 7))));
-    }
-
-    return Math.floor(points / 4);
-}
-
-function experienceToLevel(experience) {
-    const numericExperience = Number(experience);
-    if (!Number.isFinite(numericExperience) || numericExperience < 0) {
-        return Number.NaN;
-    }
-
-    let level = 1;
-    while (level < 126 && levelToExperience(level + 1) <= numericExperience) {
-        level += 1;
-    }
-
-    return level;
-}
-
-function computeGridSize(count) {
-    let size = Math.ceil(Math.sqrt(count));
-    if (size % 2 === 0) {
-        size += 1;
-    }
-    return size;
-}
-
-function generateSpiral(count, size) {
-    const centerX = Math.floor(size / 2);
-    const centerY = Math.floor(size / 2);
-    const coords = [];
-    let x = centerX;
-    let y = centerY;
-    coords.push([x, y]);
-    let step = 1;
-
-    while (coords.length < count) {
-        for (let i = 0; i < step && coords.length < count; i++) {
-            x++;
-            coords.push([x, y]);
-        }
-        for (let i = 0; i < step && coords.length < count; i++) {
-            y++;
-            coords.push([x, y]);
-        }
-        step++;
-        for (let i = 0; i < step && coords.length < count; i++) {
-            x--;
-            coords.push([x, y]);
-        }
-        for (let i = 0; i < step && coords.length < count; i++) {
-            y--;
-            coords.push([x, y]);
-        }
-        step++;
-    }
-
-    return coords;
-}
-
-function clamp(value, min, max) {
-    return Math.min(Math.max(value, min), max);
-}
-
-function loadStates() {
-    try {
-        const raw = localStorage.getItem(STATE_KEY);
-        if (!raw) {
-            return {};
-        }
-
-        const parsed = JSON.parse(raw);
-        Object.keys(parsed).forEach(id => {
-            if (parsed[id] === 'current') {
-                parsed[id] = 'incomplete';
-            }
-        });
-        return parsed;
-    } catch {
-        return {};
-    }
-}
-
-function saveStates(map) {
-    try {
-        localStorage.setItem(STATE_KEY, JSON.stringify(map));
-    } catch {
-        // ignore localStorage failures
-    }
-}
-
-function formatTierName(tier) {
-    return String(tier || '')
-        .split('-')
-        .filter(Boolean)
-        .map(part => part.charAt(0).toUpperCase() + part.slice(1))
-        .join(' ');
-}
-
-function getTierSortIndex(tier) {
-    const index = TIER_DISPLAY_ORDER.indexOf(tier);
-    return index === -1 ? Number.POSITIVE_INFINITY : index;
-}
-
-function setCellState(cell, nextState) {
-    if (!cell) {
-        return;
-    }
-
-    cell.state = nextState;
-    cell.spriteKey = '';
-    if (hoveredCellId === cell.id && !canvasInteractionManager.isCellHoverable(cell)) {
-        canvasInteractionManager.setHoveredCellId('');
-    }
-    if (nextState !== 'hidden') {
-        cell.edgeVisible = false;
-        cell.edgeSides = {
-            top: false,
-            right: false,
-            bottom: false,
-            left: false
-        };
-    }
-
-    scheduleSpritePrewarm(0);
-    queueCanvasRender();
-}
-
-function createCell(task, coord) {
-    const state = taskManager.getState(task.id) || 'incomplete';
-    const nameLines = buildTaskNameLines(task.name, {
-        maxCharsPerLine: 15,
-        maxLines: 2
-    });
-
-    return {
-        id: String(task.id),
-        task,
-        _task: task,
-        __virtualAnchor: true,
-        taskId: String(task.id),
-        state,
-        pixelX: GRID_SAFE_PADDING_X + (coord.x * CELL_STEP),
-        pixelY: GRID_SAFE_PADDING_Y + (coord.y * CELL_STEP),
-        nameLines,
-        popAnimation: null,
-        hoverProgress: 0,
-        spriteCanvas: null,
-        spriteKey: '',
-        edgeVisible: false,
-        edgeSides: {
-            top: false,
-            right: false,
-            bottom: false,
-            left: false
-        },
-        getBoundingClientRect() {
-            return taskModal.createCellAnchor(this).getBoundingClientRect();
-        }
-    };
-}
-
-function revealNeighborAsLocked(id) {
-    taskManager.setState(id, 'locked');
-    const cell = getCellById(id);
-    if (!cell) {
-        return;
-    }
-
-    setCellState(cell, 'locked');
-    playPopReveal(cell);
-}
-
-function playPopReveal(cell, options = {}) {
-    const { delay = 0, easing = 'linear' } = options;
-    if (!cell) {
-        return;
-    }
-
-    cell.popAnimation = {
-        startTime: performance.now() + delay,
-        easing
-    };
-    queueCanvasRender();
-}
-
-function refreshHiddenEdges(options = {}) {
-    const {
-        animate = false,
-        center = null,
-        revealDelayByCoord = null,
-        edgeDelayOffset = EDGE_POP_OFFSET_MS,
-        staggerMs = POP_STAGGER_MS,
-        revealEasing = 'linear'
-    } = options;
-    const stateByCoord = new Map();
-    const isFrontierState = state => state === 'incomplete' || state === 'locked';
-    const newlyVisibleEdges = [];
-
-    idToCoords.forEach((coord, id) => {
-        stateByCoord.set(`${coord.x},${coord.y}`, taskManager.getState(id));
-    });
-
-    idToCoords.forEach((coord, id) => {
-        const cell = getCellById(id);
-        if (!cell) {
-            return;
-        }
-
-        const state = stateByCoord.get(`${coord.x},${coord.y}`);
-        const hadVisibleEdge = cell.edgeVisible;
-
-        if (state !== 'hidden') {
-            if (cell.edgeVisible || cell.edgeSides.top || cell.edgeSides.right || cell.edgeSides.bottom || cell.edgeSides.left) {
-                cell.edgeVisible = false;
-                cell.edgeSides = {
-                    top: false,
-                    right: false,
-                    bottom: false,
-                    left: false
-                };
-            }
-            return;
-        }
-
-        let hasVisibleEdge = false;
-        let minAdjacentDelay = Number.POSITIVE_INFINITY;
-        const nextEdgeSides = {
-            top: false,
-            right: false,
-            bottom: false,
-            left: false
-        };
-
-        const noteAdjacentDelay = (x, y) => {
-            if (!revealDelayByCoord) {
-                return;
-            }
-            const delay = revealDelayByCoord.get(`${x},${y}`);
-            if (typeof delay === 'number') {
-                minAdjacentDelay = Math.min(minAdjacentDelay, delay);
-            }
-        };
-
-        if (isFrontierState(stateByCoord.get(`${coord.x},${coord.y - 1}`))) {
-            nextEdgeSides.top = true;
-            hasVisibleEdge = true;
-            noteAdjacentDelay(coord.x, coord.y - 1);
-        }
-        if (isFrontierState(stateByCoord.get(`${coord.x + 1},${coord.y}`))) {
-            nextEdgeSides.right = true;
-            hasVisibleEdge = true;
-            noteAdjacentDelay(coord.x + 1, coord.y);
-        }
-        if (isFrontierState(stateByCoord.get(`${coord.x},${coord.y + 1}`))) {
-            nextEdgeSides.bottom = true;
-            hasVisibleEdge = true;
-            noteAdjacentDelay(coord.x, coord.y + 1);
-        }
-        if (isFrontierState(stateByCoord.get(`${coord.x - 1},${coord.y}`))) {
-            nextEdgeSides.left = true;
-            hasVisibleEdge = true;
-            noteAdjacentDelay(coord.x - 1, coord.y);
-        }
-
-        cell.edgeSides = nextEdgeSides;
-
-        if (hasVisibleEdge) {
-            if (animate && !hadVisibleEdge) {
-                const hasTimedNeighbor = Number.isFinite(minAdjacentDelay);
-                newlyVisibleEdges.push({
-                    cell,
-                    coord,
-                    startDelay: hasTimedNeighbor ? minAdjacentDelay + edgeDelayOffset : edgeDelayOffset
-                });
-            } else {
-                cell.edgeVisible = true;
-            }
-        } else {
-            cell.edgeVisible = false;
-        }
-    });
-
-    if (!animate || newlyVisibleEdges.length === 0) {
-        queueCanvasRender();
-        return;
-    }
-
-    const orderedEdges = center
-        ? newlyVisibleEdges
-            .slice()
-            .sort((a, b) => {
-                const distanceA = Math.abs(a.coord.x - center.x) + Math.abs(a.coord.y - center.y);
-                const distanceB = Math.abs(b.coord.x - center.x) + Math.abs(b.coord.y - center.y);
-                return distanceA - distanceB;
-            })
-        : newlyVisibleEdges;
-
-    orderedEdges.forEach((item, index) => {
-        const startDelay = Math.max(item.startDelay ?? edgeDelayOffset, index * staggerMs);
-        setTimeout(() => {
-            const cellId = item.cell.id;
-            if (taskManager.getState(cellId) !== 'hidden') {
-                return;
-            }
-            const stillHasEdgeSide =
-                item.cell.edgeSides.top ||
-                item.cell.edgeSides.right ||
-                item.cell.edgeSides.bottom ||
-                item.cell.edgeSides.left;
-            if (!stillHasEdgeSide) {
-                return;
-            }
-            item.cell.edgeVisible = true;
-            playPopReveal(item.cell, { easing: revealEasing });
-        }, startDelay);
-    });
-
-    queueCanvasRender();
-}
-
-function render(tasks) {
-    const grid = document.getElementById('grid');
-    if (!grid) {
-        return;
-    }
-
-    taskModal.hideModal();
-    hoveredCellId = '';
-    if (gridCanvas) {
-        gridCanvas.style.cursor = 'default';
-    }
-    grid.innerHTML = '';
-    idToCell.clear();
-    coordToTaskId.clear();
-
-    const { size, coords, center } = gridModel.updateTaskCoordinates(tasks);
-    gridCellCount = size;
-    const canvas = ensureGridCanvas();
-    if (!canvas || !gridContext) {
-        return;
-    }
-
-    const gridCoreSize = Math.max(1, (size * CELL_SIZE) + ((size - 1) * CELL_GAP));
-    gridPixelWidth = gridCoreSize + (GRID_SAFE_PADDING_X * 2);
-    gridPixelHeight = gridCoreSize + (GRID_SAFE_PADDING_Y * 2);
-
-    grid.style.width = `${gridPixelWidth}px`;
-    grid.style.height = `${gridPixelHeight}px`;
-    syncCanvasResolution();
-
-    const cells = [];
-
-    tasks.forEach((task, index) => {
-        const [x, y] = coords[index];
-        const cell = createCell(task, { x, y });
-        idToCell.set(String(task.id), cell);
-        coordToTaskId.set(`${x},${y}`, String(task.id));
-        cells.push({ cell, x, y });
-    });
-
-    const visibleCells = cells.filter(item => taskManager.getState(item.cell.id) !== 'hidden');
-    const sortedVisibleCells = visibleCells
-        .sort((a, b) => {
-            const distanceA = Math.abs(a.x - center.x) + Math.abs(a.y - center.y);
-            const distanceB = Math.abs(b.x - center.x) + Math.abs(b.y - center.y);
-            return distanceA - distanceB;
-        });
-    const revealStagger = sortedVisibleCells.length * POP_STAGGER_MS > INITIAL_REVEAL_DURATION_MS
-        ? INITIAL_REVEAL_DURATION_MS / (sortedVisibleCells.length - 1)
-        : POP_STAGGER_MS;
-    const revealDelayByCoord = new Map();
-
-    sortedVisibleCells.forEach((item, index) => {
-        const revealDelay = INITIAL_REVEAL_DELAY_MS + (index * revealStagger);
-        revealDelayByCoord.set(`${item.x},${item.y}`, revealDelay);
-        playPopReveal(item.cell, { delay: revealDelay, easing: 'ease-in' });
-    });
-
-    refreshHiddenEdges({ animate: true, center, revealDelayByCoord, staggerMs: revealStagger, revealEasing: 'ease-in' });
-    gridViewport.updateGridScale();
-    hudManager.updateUnlockHud();
-    scheduleSpritePrewarm(0);
-    queueCanvasRender();
-
-    if (tasks.length > 0) {
-        taskPanels.centerTaskInView(tasks[0].id, { smooth: false });
-    }
 }
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -4222,6 +4186,60 @@ const tierWeights = {
 };
 
 class RenderWarmupManager {
+    prewarmCellSprites() {
+        idToCell.forEach(cell => {
+            if (cell.state === 'hidden') {
+                if (cell.edgeVisible && (cell.edgeSides.top || cell.edgeSides.right || cell.edgeSides.bottom || cell.edgeSides.left)) {
+                    ensureEdgeCellSprite(cell.edgeSides);
+                }
+            } else {
+                ensureCellSprite(cell);
+            }
+        });
+    }
+
+    prewarmVisibleCellSprites() {
+        const visibleBounds = gridViewport.getVisibleWorldBounds();
+        const visibleCoords = gridViewport.getVisibleCoordBounds(visibleBounds);
+        if (!visibleCoords) {
+            return;
+        }
+
+        for (let y = visibleCoords.top; y <= visibleCoords.bottom; y++) {
+            for (let x = visibleCoords.left; x <= visibleCoords.right; x++) {
+                const taskId = coordToTaskId.get(`${x},${y}`);
+                if (!taskId) {
+                    continue;
+                }
+
+                const cell = CoreUtils.getCellById(taskId);
+                if (!cell) {
+                    continue;
+                }
+
+                if (cell.state === 'hidden') {
+                    if (cell.edgeVisible && (cell.edgeSides.top || cell.edgeSides.right || cell.edgeSides.bottom || cell.edgeSides.left)) {
+                        ensureEdgeCellSprite(cell.edgeSides);
+                    }
+                } else {
+                    ensureCellSprite(cell);
+                }
+            }
+        }
+    }
+
+    scheduleSpritePrewarm(delay = 0) {
+        if (spritePrewarmTimer) {
+            clearTimeout(spritePrewarmTimer);
+        }
+
+        spritePrewarmTimer = setTimeout(() => {
+            spritePrewarmTimer = null;
+            this.prewarmCellSprites();
+            queueCanvasRender();
+        }, delay);
+    }
+
     async preloadTaskImages(tasks) {
         const sources = new Set([LOCKED_TILE_IMAGE, QUESTION_MARK_ICON]);
 
@@ -4280,7 +4298,7 @@ class RenderWarmupManager {
     }
 
     async prewarmInitialCanvasSprites() {
-        prewarmVisibleCellSprites();
+        this.prewarmVisibleCellSprites();
         queueCanvasRender();
         await this.waitForAnimationFrames(2);
     }
@@ -4288,247 +4306,249 @@ class RenderWarmupManager {
 
 const renderWarmupManager = new RenderWarmupManager();
 
-function startApp() {
-    const loader = document.getElementById('loading');
-    if (loader) {
-        loader.style.display = 'flex';
-    }
+class AppBootstrap {
+    startApp() {
+        const loader = document.getElementById('loading');
+        if (loader) {
+            loader.style.display = 'flex';
+        }
 
-    const loadingIcons = Array.from(document.querySelectorAll('#loading .loading-icon'));
-    loadingIcons.forEach(icon => icon.classList.remove('visible'));
-    loadingIcons.forEach(icon => bindImageErrorFallback(icon));
+        const loadingIcons = Array.from(document.querySelectorAll('#loading .loading-icon'));
+        loadingIcons.forEach(icon => icon.classList.remove('visible'));
+        loadingIcons.forEach(icon => appUtils.bindImageErrorFallback(icon));
 
-    Promise.all([taskOrderManager.loadAllTierData(), wiki.loadCollectionLogItems(), wiki.loadPlayerData(playerUsername)]).then(([data, _, playerSnapshot]) => {
-    if (playerSnapshot) {
-        playerProgress.applySnapshot(playerSnapshot);
-    }
-
-    const currentTasks = taskManager.buildTasksFromTierData(data);
-    let all = [];
-    let taskListChanged = false;
-
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-        try {
-            const ids = JSON.parse(saved);
-            if (!Array.isArray(ids)) {
-                throw new Error('saved order must be an array');
+        Promise.all([taskOrderManager.loadAllTierData(), wiki.loadCollectionLogItems(), wiki.loadPlayerData(playerUsername)]).then(([data, _, playerSnapshot]) => {
+            if (playerSnapshot) {
+                playerProgress.applySnapshot(playerSnapshot);
             }
 
-            const mergedOrder = taskOrderManager.mergeSavedTaskOrder(ids, currentTasks);
-            all = mergedOrder.tasks;
-            taskListChanged = mergedOrder.taskListChanged;
-        } catch (error) {
-            console.error('corrupt saved order', error);
-        }
-    }
+            const currentTasks = taskManager.buildTasksFromTierData(data);
+            let all = [];
+            let taskListChanged = false;
 
-    const freshOrder = all.length === 0;
-    if (freshOrder) {
-        all = taskOrderManager.buildWeightedTaskOrder(currentTasks);
-    }
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                try {
+                    const ids = JSON.parse(saved);
+                    if (!Array.isArray(ids)) {
+                        throw new Error('saved order must be an array');
+                    }
 
-    // Ensure the intro tile is always at position 0, regardless of saved order or fresh shuffle.
-    const introIdx = all.findIndex(task => task.id === INTRO_TASK_ID);
-    if (introIdx < 0) {
-        all.unshift(INTRO_TASK);
-    } else if (introIdx !== 0) {
-        all.splice(introIdx, 1);
-        all.unshift(INTRO_TASK);
-    }
-
-    all.forEach(task => {
-        if (!taskManager.getState(task.id)) {
-            taskManager.setState(task.id, task.id === INTRO_TASK_ID ? 'incomplete' : 'hidden');
-        }
-    });
-
-    if (freshOrder && all.length > 0) {
-        all.forEach((task, index) => {
-            taskManager.setState(task.id, index === 0 ? 'incomplete' : 'hidden');
-        });
-        stateMap = loadStates();
-    }
-
-    all = taskManager.setTasks(all);
-    uiSettings.applyTierFilters(selectedTierFilters, { persist: false, rerender: false });
-    gridModel.updateTaskCoordinates(all);
-
-    if (!freshOrder && taskListChanged) {
-        taskOrderManager.rebuildHiddenAndLockedStatesFromProgress(all);
-    }
-
-    taskManager.normalizeUnlockStates();
-    hudManager.updateUnlockHud();
-
-    const loadingIcons = Array.from(document.querySelectorAll('#loading .loading-icon'));
-    loadingIcons.forEach(icon => {
-        const image = new Image();
-        image.src = icon.src;
-    });
-
-    const preloadPromise = renderWarmupManager.preloadTaskImages(all);
-
-    function animateIcons(index) {
-        if (index >= loadingIcons.length) {
-            const finish = async () => {
-                await Promise.all([preloadPromise, wait(500)]);
-                render(all);
-                await renderWarmupManager.prewarmInitialCanvasSprites();
-
-                const loader = document.getElementById('loading');
-                if (loader) {
-                    loader.style.display = 'none';
+                    const mergedOrder = taskOrderManager.mergeSavedTaskOrder(ids, currentTasks);
+                    all = mergedOrder.tasks;
+                    taskListChanged = mergedOrder.taskListChanged;
+                } catch (error) {
+                    console.error('corrupt saved order', error);
                 }
-            };
+            }
 
-            finish().catch(() => {
-                render(all);
-                const fallbackLoader = document.getElementById('loading');
-                if (fallbackLoader) {
-                    fallbackLoader.style.display = 'none';
+            const freshOrder = all.length === 0;
+            if (freshOrder) {
+                all = taskOrderManager.buildWeightedTaskOrder(currentTasks);
+            }
+
+            const introIdx = all.findIndex(task => task.id === INTRO_TASK_ID);
+            if (introIdx < 0) {
+                all.unshift(INTRO_TASK);
+            } else if (introIdx !== 0) {
+                all.splice(introIdx, 1);
+                all.unshift(INTRO_TASK);
+            }
+
+            all.forEach(task => {
+                if (!taskManager.getState(task.id)) {
+                    taskManager.setState(task.id, task.id === INTRO_TASK_ID ? 'incomplete' : 'hidden');
                 }
             });
-            return;
-        }
 
-        const icon = loadingIcons[index];
-        icon.classList.add('visible');
-        setTimeout(() => {
-            animateIcons(index + 1);
-        }, 400);
-    }
-
-    animateIcons(0);
-
-    taskOrderManager.saveTaskGridOrder(all);
-
-    const container = document.getElementById('grid-container');
-    let isPointerDown = false;
-    let isDragging = false;
-    let dragButton = null;
-    let dragStartX = 0;
-    let dragStartY = 0;
-    let lastX = 0;
-    let lastY = 0;
-
-    gridViewport.bindWheelZoom(container);
-
-    container.addEventListener('scroll', () => {
-        if (!isZooming) {
-            queueCanvasRender();
-        }
-        taskModal.refreshPopoverPosition();
-    }, { passive: true });
-
-    container.addEventListener('mousedown', e => {
-        if (e.button === 0 || e.button === 1) {
-            isPointerDown = true;
-            isDragging = false;
-            dragButton = e.button;
-            dragStartX = e.clientX;
-            dragStartY = e.clientY;
-            lastX = e.clientX;
-            lastY = e.clientY;
-            e.preventDefault();
-        }
-    });
-
-    window.addEventListener('mousemove', e => {
-        if (!isPointerDown) {
-            return;
-        }
-
-        const totalDx = e.clientX - dragStartX;
-        const totalDy = e.clientY - dragStartY;
-        if (!isDragging && Math.hypot(totalDx, totalDy) >= DRAG_THRESHOLD) {
-            isDragging = true;
-        }
-
-        if (isDragging) {
-            const dx = e.clientX - lastX;
-            const dy = e.clientY - lastY;
-            container.scrollLeft -= dx;
-            container.scrollTop -= dy;
-            lastX = e.clientX;
-            lastY = e.clientY;
-            taskModal.refreshPopoverPosition();
-            e.preventDefault();
-        }
-    });
-
-    window.addEventListener('mouseup', e => {
-        if (isPointerDown && e.button === dragButton) {
-            if (dragButton === 0 && isDragging) {
-                suppressTaskClick = true;
-                setTimeout(() => {
-                    suppressTaskClick = false;
-                }, 0);
+            if (freshOrder && all.length > 0) {
+                all.forEach((task, index) => {
+                    taskManager.setState(task.id, index === 0 ? 'incomplete' : 'hidden');
+                });
+                stateMap = CoreUtils.loadStates();
             }
 
-            isPointerDown = false;
-            isDragging = false;
-            dragButton = null;
-            e.preventDefault();
-        }
-    });
-    }).catch(err => console.error(err));
-}
+            all = taskManager.setTasks(all);
+            uiSettings.applyTierFilters(selectedTierFilters, { persist: false, rerender: false });
+            gridModel.updateTaskCoordinates(all);
 
-function initUsernameGate() {
-    const gate = document.getElementById('username-gate');
-    const form = document.getElementById('username-form');
-    const input = document.getElementById('username-input');
-    const submit = document.getElementById('username-submit');
-    const error = document.getElementById('username-error');
+            if (!freshOrder && taskListChanged) {
+                taskOrderManager.rebuildHiddenAndLockedStatesFromProgress(all);
+            }
 
-    const startWithUsername = username => {
-        playerUsername = wiki.normalizeUsername(username);
-        try {
-            localStorage.setItem(USERNAME_KEY, playerUsername);
-        } catch {
-            // ignore localStorage failures
-        }
+            taskManager.normalizeUnlockStates();
+            hudManager.updateUnlockHud();
 
-        if (gate) {
-            gate.style.display = 'none';
-        }
+            const loadingIcons = Array.from(document.querySelectorAll('#loading .loading-icon'));
+            loadingIcons.forEach(icon => {
+                const image = new Image();
+                image.src = icon.src;
+            });
 
-        if (!hasStartedApp) {
-            hasStartedApp = true;
-            startApp();
-        }
-    };
+            const preloadPromise = renderWarmupManager.preloadTaskImages(all);
 
-    const savedUsername = wiki.normalizeUsername(localStorage.getItem(USERNAME_KEY));
-    if (savedUsername) {
-        startWithUsername(savedUsername);
-        return;
+            const animateIcons = index => {
+                if (index >= loadingIcons.length) {
+                    const finish = async () => {
+                        await Promise.all([preloadPromise, appUtils.wait(500)]);
+                        gridSceneManager.render(all);
+                        await renderWarmupManager.prewarmInitialCanvasSprites();
+
+                        const loader = document.getElementById('loading');
+                        if (loader) {
+                            loader.style.display = 'none';
+                        }
+                    };
+
+                    finish().catch(() => {
+                        gridSceneManager.render(all);
+                        const fallbackLoader = document.getElementById('loading');
+                        if (fallbackLoader) {
+                            fallbackLoader.style.display = 'none';
+                        }
+                    });
+                    return;
+                }
+
+                const icon = loadingIcons[index];
+                icon.classList.add('visible');
+                setTimeout(() => {
+                    animateIcons(index + 1);
+                }, 400);
+            };
+
+            animateIcons(0);
+
+            taskOrderManager.saveTaskGridOrder(all);
+
+            const container = document.getElementById('grid-container');
+            let isPointerDown = false;
+            let isDragging = false;
+            let dragButton = null;
+            let dragStartX = 0;
+            let dragStartY = 0;
+            let lastX = 0;
+            let lastY = 0;
+
+            gridViewport.bindWheelZoom(container);
+
+            container.addEventListener('scroll', () => {
+                if (!isZooming) {
+                    queueCanvasRender();
+                }
+                taskModal.refreshPopoverPosition();
+            }, { passive: true });
+
+            container.addEventListener('mousedown', e => {
+                if (e.button === 0 || e.button === 1) {
+                    isPointerDown = true;
+                    isDragging = false;
+                    dragButton = e.button;
+                    dragStartX = e.clientX;
+                    dragStartY = e.clientY;
+                    lastX = e.clientX;
+                    lastY = e.clientY;
+                    e.preventDefault();
+                }
+            });
+
+            window.addEventListener('mousemove', e => {
+                if (!isPointerDown) {
+                    return;
+                }
+
+                const totalDx = e.clientX - dragStartX;
+                const totalDy = e.clientY - dragStartY;
+                if (!isDragging && Math.hypot(totalDx, totalDy) >= DRAG_THRESHOLD) {
+                    isDragging = true;
+                }
+
+                if (isDragging) {
+                    const dx = e.clientX - lastX;
+                    const dy = e.clientY - lastY;
+                    container.scrollLeft -= dx;
+                    container.scrollTop -= dy;
+                    lastX = e.clientX;
+                    lastY = e.clientY;
+                    taskModal.refreshPopoverPosition();
+                    e.preventDefault();
+                }
+            });
+
+            window.addEventListener('mouseup', e => {
+                if (isPointerDown && e.button === dragButton) {
+                    if (dragButton === 0 && isDragging) {
+                        suppressTaskClick = true;
+                        setTimeout(() => {
+                            suppressTaskClick = false;
+                        }, 0);
+                    }
+
+                    isPointerDown = false;
+                    isDragging = false;
+                    dragButton = null;
+                    e.preventDefault();
+                }
+            });
+        }).catch(err => console.error(err));
     }
 
-    if (!gate || !form || !input || !submit || !error) {
-        if (!hasStartedApp) {
-            hasStartedApp = true;
-            startApp();
-        }
-        return;
-    }
+    initUsernameGate() {
+        const gate = document.getElementById('username-gate');
+        const form = document.getElementById('username-form');
+        const input = document.getElementById('username-input');
+        const submit = document.getElementById('username-submit');
+        const error = document.getElementById('username-error');
 
-    gate.style.display = 'flex';
-    input.focus();
+        const startWithUsername = username => {
+            playerUsername = wiki.normalizeUsername(username);
+            try {
+                localStorage.setItem(USERNAME_KEY, playerUsername);
+            } catch {
+                // ignore localStorage failures
+            }
 
-    form.addEventListener('submit', e => {
-        e.preventDefault();
-        const username = wiki.normalizeUsername(input.value);
-        if (!username) {
-            error.textContent = 'Please enter a username.';
+            if (gate) {
+                gate.style.display = 'none';
+            }
+
+            if (!hasStartedApp) {
+                hasStartedApp = true;
+                this.startApp();
+            }
+        };
+
+        const savedUsername = wiki.normalizeUsername(localStorage.getItem(USERNAME_KEY));
+        if (savedUsername) {
+            startWithUsername(savedUsername);
             return;
         }
 
-        error.textContent = '';
-        submit.disabled = true;
-        startWithUsername(username);
-    });
+        if (!gate || !form || !input || !submit || !error) {
+            if (!hasStartedApp) {
+                hasStartedApp = true;
+                this.startApp();
+            }
+            return;
+        }
+
+        gate.style.display = 'flex';
+        input.focus();
+
+        form.addEventListener('submit', e => {
+            e.preventDefault();
+            const username = wiki.normalizeUsername(input.value);
+            if (!username) {
+                error.textContent = 'Please enter a username.';
+                return;
+            }
+
+            error.textContent = '';
+            submit.disabled = true;
+            startWithUsername(username);
+        });
+    }
 }
 
-initUsernameGate();
+const appBootstrap = new AppBootstrap();
+appBootstrap.initUsernameGate();
