@@ -776,9 +776,21 @@ class Wiki {
         return this.collectionLogMap;
     }
 
+    normalizeUsername(value) {
+        return (value || '').trim().replace(/\s+/g, ' ');
+    }
+
+    toSyncUsername(value) {
+        return this.normalizeUsername(value).replace(/\W/g, '_');
+    }
+
+    getPlayerCacheKey(username) {
+        return `${PLAYER_CL_CACHE_PREFIX}:${this.normalizeUsername(username).toLowerCase()}`;
+    }
+
     async loadPlayerData(username, options = {}) {
         const { forceRefresh = false } = options;
-        const normalized = normalizeUsername(username);
+        const normalized = this.normalizeUsername(username);
         if (!normalized) {
             return {
                 obtainedItemIds: new Set(),
@@ -788,7 +800,7 @@ class Wiki {
             };
         }
 
-        const cacheKey = getPlayerCacheKey(normalized);
+        const cacheKey = this.getPlayerCacheKey(normalized);
         if (!forceRefresh) {
             try {
                 const raw = localStorage.getItem(cacheKey);
@@ -821,7 +833,7 @@ class Wiki {
         }
 
         try {
-            const syncName = encodeURIComponent(toSyncUsername(normalized));
+            const syncName = encodeURIComponent(this.toSyncUsername(normalized));
             const url = `https://sync.runescape.wiki/runelite/player/${syncName}/STANDARD`;
             const response = await fetch(url, { cache: forceRefresh ? 'no-store' : 'default' });
             if (!response.ok) {
@@ -1538,7 +1550,7 @@ class TaskOrderManager {
 
         this.syncCellPositionsFromTaskOrder();
         this.saveTaskGridOrder(tasksGlobal);
-        setHoveredCellId('');
+        canvasInteractionManager.setHoveredCellId('');
         scheduleSpritePrewarm(0);
         queueCanvasRender();
 
@@ -2200,7 +2212,7 @@ class TaskModal {
 
         const task = activePopoverAnchor._task;
         if (task) {
-            showModal(task, activePopoverAnchor);
+            this.showModal(task, activePopoverAnchor);
         }
     }
 
@@ -2248,9 +2260,574 @@ class TaskModal {
         modal.classList.remove('open');
         activePopoverAnchor = null;
     }
+
+    showModal(task, anchor) {
+        const modal = document.getElementById('task-modal');
+        const title = document.getElementById('modal-title');
+        const image = document.getElementById('modal-image');
+        const tip = document.getElementById('modal-tip');
+        const wiki = document.getElementById('modal-wiki');
+        const button = document.getElementById('modal-complete');
+        const tierBadge = document.getElementById('modal-tier-badge');
+        const cell = getCellById(task.id);
+        const state = taskManager.getState(task.id) || 'incomplete';
+
+        if (task.id === INTRO_TASK_ID) {
+            title.textContent = 'Welcome to the Task Grid!';
+            setImageWithFallback(image, INTRO_TASK_IMAGE, 'Task Grid');
+            tip.innerHTML =
+                'Complete randomly assigned OSRS collection log goals and work your way across the grid.<br><br>' +
+                '<strong>Unlocking tasks:</strong> Locked tiles can be revealed by spending unlock slots. ' +
+                'Complete tasks to earn more slots — the more you finish, the more you unlock.<br><br>' +
+                '<strong>Wiki Sync:</strong> In RuneLite, enable the <em>Wiki Sync</em> plugin. ' +
+                'Open your Collection Log in-game and click the Wiki Sync button. ' +
+                'Then use the Wiki Sync button here to automatically mark completed tasks.';
+            wiki.style.display = 'none';
+            if (tierBadge) {
+                tierBadge.style.display = 'none';
+            }
+            const itemsEl = document.getElementById('modal-items');
+            const requiredEl = document.getElementById('modal-items-required');
+            if (itemsEl) {
+                itemsEl.innerHTML = '';
+                itemsEl.classList.remove('is-scrollable');
+                itemsEl.style.display = 'none';
+            }
+            if (requiredEl) {
+                requiredEl.style.display = 'none';
+                requiredEl.textContent = '';
+            }
+            if (state === 'incomplete') {
+                button.type = 'button';
+                button.disabled = false;
+                button.textContent = "Let's go!";
+                button.style.display = 'block';
+                button.onclick = e => {
+                    e.preventDefault();
+                    taskManager.applyTaskCompletion(task);
+                    hudManager.updateUnlockHud();
+                    refreshHiddenEdges({ animate: true });
+                    this.hideModal();
+                };
+            } else {
+                button.style.display = 'none';
+                button.disabled = false;
+                button.onclick = null;
+            }
+            activePopoverAnchor = anchor || cell;
+            modal.classList.add('open');
+            requestAnimationFrame(() => {
+                this.refreshPopoverPosition();
+            });
+            return;
+        }
+
+        if (state === 'locked') {
+            title.textContent = 'Locked Task';
+            setImageWithFallback(image, LOCKED_TILE_IMAGE, 'Locked task');
+            tip.textContent = 'Unlock this tile to reveal what task is here.';
+            wiki.style.display = 'none';
+        } else {
+            title.textContent = task.name;
+            setImageWithFallback(image, task.imageLink, task.name);
+            tip.textContent = task.tip || '';
+            wiki.href = task.wikiLink || '#';
+            wiki.style.display = 'inline-block';
+        }
+
+        if (state === 'incomplete') {
+            button.type = 'button';
+            button.disabled = false;
+            button.textContent = 'Mark complete';
+            button.style.display = 'block';
+            button.onclick = e => {
+                e.preventDefault();
+                const previousLimit = taskManager.getUnlockLimit();
+                taskManager.applyTaskCompletion(task);
+                hudManager.updateUnlockHud();
+                refreshHiddenEdges({ animate: true });
+                const nextLimit = taskManager.getUnlockLimit();
+                if (nextLimit > previousLimit) {
+                    hudManager.showUnlockToast(nextLimit);
+                }
+                this.hideModal();
+            };
+        } else if (state === 'locked') {
+            const unlockLimit = taskManager.getUnlockLimit();
+            const unlockedCount = taskManager.getUnlockedCount();
+            const unlockAvailable = taskManager.canUnlockMore();
+
+            button.type = 'button';
+            button.style.display = 'block';
+            button.disabled = !unlockAvailable;
+            button.textContent = unlockAvailable
+                ? `Unlock task (${unlockedCount}/${unlockLimit})`
+                : `Unlock limit reached (${unlockedCount}/${unlockLimit})`;
+            button.onclick = unlockAvailable ? e => {
+                e.preventDefault();
+                taskManager.setState(task.id, 'incomplete');
+                if (cell) {
+                    setCellState(cell, 'incomplete');
+                }
+
+                const unlockedTask = taskVerification.alignUnlockedTaskToLowestSeriesTask(task);
+
+                hudManager.updateUnlockHud();
+                refreshHiddenEdges({ animate: true });
+
+                this.hideModal();
+                requestAnimationFrame(() => {
+                    const unlockedTaskId = String(unlockedTask?.id || task.id);
+                    const unlockedCell = getCellById(unlockedTaskId);
+                    if (!unlockedCell || taskManager.getState(unlockedTaskId) !== 'incomplete') {
+                        return;
+                    }
+
+                    this.showModal(unlockedCell.task, this.createCellAnchor(unlockedCell));
+                });
+            } : null;
+        } else {
+            button.style.display = 'none';
+            button.disabled = false;
+            button.onclick = null;
+        }
+
+        if (tierBadge) {
+            const tier = task.tier || '';
+            const shouldHideTierBadge = hideTierHintOnLocked && state === 'locked';
+            if (tier && !shouldHideTierBadge) {
+                const bgColor = uiSettings.getTierColor(tier);
+                const textColor = uiSettings.getReadableTextColor(bgColor);
+                tierBadge.textContent = formatTierName(tier) || 'Unknown';
+                tierBadge.style.background = bgColor;
+                tierBadge.style.color = textColor;
+                tierBadge.style.display = 'inline-block';
+            } else {
+                tierBadge.style.display = 'none';
+            }
+        }
+
+        const itemsEl = document.getElementById('modal-items');
+        const requiredEl = document.getElementById('modal-items-required');
+        if (itemsEl) {
+            const isLockedState = state === 'locked';
+            const itemIds = !isLockedState ? taskVerification.getTaskVerificationItemIds(task) : [];
+            const skillRequirements = !isLockedState ? taskVerification.getTaskSkillExperienceRequirements(task) : [];
+            itemsEl.innerHTML = '';
+            if (itemIds.length > 0) {
+                const requiredItems = taskVerification.getTaskRequiredCount(task);
+                const obtainedItemCount = taskVerification.getTaskObtainedCount(task);
+                const obtainedForTask = Math.min(obtainedItemCount, requiredItems);
+
+                if (requiredEl) {
+                    requiredEl.textContent = `Obtained ${obtainedForTask}/${requiredItems} required for task`;
+                    requiredEl.style.display = 'block';
+                }
+
+                itemsEl.classList.toggle('is-scrollable', itemIds.length > 20);
+                itemIds.forEach(id => {
+                    const numericId = Number(id);
+                    const isObtained = playerProgress.hasObtainedItem(numericId);
+                    const info = collectionLogMap.get(numericId);
+                    const link = document.createElement('a');
+                    link.href = info ? info.wikiLink : '#';
+                    link.target = '_blank';
+                    link.rel = 'noopener noreferrer';
+                    link.title = info ? `${info.name}${info.category ? ` (${info.category})` : ''}` : `Item ID: ${id}`;
+                    link.className = 'modal-item-icon';
+                    link.classList.add(isObtained ? 'is-obtained' : 'is-missing');
+                    const img = document.createElement('img');
+                    img.width = 32;
+                    img.height = 32;
+                    img.loading = 'lazy';
+                    img.decoding = 'async';
+                    if (info) {
+                        setImageWithFallback(img, info.imageUrl, info.name);
+                    } else {
+                        setImageWithFallback(img, QUESTION_MARK_ICON, `Item ${id}`);
+                    }
+                    link.appendChild(img);
+                    itemsEl.appendChild(link);
+                });
+                itemsEl.style.display = 'grid';
+            } else if (skillRequirements.length > 0) {
+                const requiredItems = taskVerification.getTaskRequiredCount(task);
+                const obtainedSkillCount = taskVerification.getTaskObtainedCount(task);
+                const obtainedForTask = Math.min(obtainedSkillCount, requiredItems);
+                const requiredLevels = skillRequirements
+                    .map(requirement => taskVerification.getRequiredSkillLevelForRequirement(requirement))
+                    .filter(level => Number.isFinite(level));
+                const uniformRequiredLevel = requiredLevels.length > 0 && requiredLevels.every(level => level === requiredLevels[0])
+                    ? requiredLevels[0]
+                    : null;
+
+                if (requiredEl) {
+                    requiredEl.textContent = uniformRequiredLevel
+                        ? `Skills at level ${uniformRequiredLevel}: ${obtainedForTask}/${requiredItems}`
+                        : `Skills at required levels: ${obtainedForTask}/${requiredItems}`;
+                    requiredEl.style.display = 'block';
+                }
+
+                const sortedRequirements = skillRequirements
+                    .slice()
+                    .sort((requirementA, requirementB) => {
+                        const requiredLevelDelta = taskVerification.getRequiredSkillLevelForRequirement(requirementA) - taskVerification.getRequiredSkillLevelForRequirement(requirementB);
+                        if (requiredLevelDelta !== 0) {
+                            return requiredLevelDelta;
+                        }
+
+                        return formatSkillName(requirementA.skillName).localeCompare(formatSkillName(requirementB.skillName));
+                    });
+
+                itemsEl.classList.toggle('is-scrollable', sortedRequirements.length > 20);
+                sortedRequirements.forEach(requirement => {
+                    const skillName = formatSkillName(requirement.skillName);
+                    const requiredLevel = taskVerification.getRequiredSkillLevelForRequirement(requirement);
+                    const playerLevel = playerProgress.getSkillLevel(requirement.skillName);
+                    const normalizedLevel = Number.isFinite(playerLevel) ? Math.floor(playerLevel) : 0;
+                    const isObtained = playerProgress.isSkillRequirementMet(requirement, requiredLevel);
+                    const link = document.createElement('a');
+                    link.href = `https://oldschool.runescape.wiki/w/${encodeURIComponent(skillName.replace(/ /g, '_'))}`;
+                    link.target = '_blank';
+                    link.rel = 'noopener noreferrer';
+                    link.title = `${skillName}: lvl ${normalizedLevel}/${requiredLevel}`;
+                    link.className = 'modal-item-icon';
+                    link.classList.add(isObtained ? 'is-obtained' : 'is-missing');
+
+                    const img = document.createElement('img');
+                    img.width = 32;
+                    img.height = 32;
+                    img.loading = 'lazy';
+                    img.decoding = 'async';
+                    setImageWithFallback(img, getSkillBadgeIcon(requirement.skillName, isObtained), skillName);
+
+                    link.appendChild(img);
+                    itemsEl.appendChild(link);
+                });
+                itemsEl.style.display = 'grid';
+            } else {
+                if (requiredEl) {
+                    requiredEl.style.display = 'none';
+                    requiredEl.textContent = '';
+                }
+                itemsEl.classList.remove('is-scrollable');
+                itemsEl.style.display = 'none';
+            }
+        }
+
+        activePopoverAnchor = anchor || cell;
+        modal.classList.add('open');
+        requestAnimationFrame(() => {
+            this.refreshPopoverPosition();
+        });
+    }
 }
 
 const taskModal = new TaskModal();
+
+class ProgressSyncManager {
+    async syncCompletedTasksFromObtained(options = {}) {
+        const {
+            showToast = true,
+            refreshModal = true,
+            batchDelay = SYNC_STAGGER_MS
+        } = options;
+
+        const previousLimit = taskManager.getUnlockLimit();
+        let completedCount = 0;
+        const center = gameController.getCenterCoord(tasksGlobal);
+
+        const tasksToComplete = tasksGlobal
+            .filter(task => taskManager.getState(task.id) !== 'complete')
+            .filter(task => {
+                const requiredCount = taskVerification.getTaskRequiredCount(task);
+                return requiredCount > 0 && taskVerification.getTaskObtainedCount(task) >= requiredCount;
+            })
+            .map(task => {
+                const coord = gameController.getTaskCoord(task);
+                return {
+                    task,
+                    distance: Math.abs(coord.x - center.x) + Math.abs(coord.y - center.y)
+                };
+            })
+            .sort((a, b) => a.distance - b.distance);
+
+        const distanceBatches = [];
+        tasksToComplete.forEach(entry => {
+            const previousBatch = distanceBatches[distanceBatches.length - 1];
+            if (!previousBatch || previousBatch.distance !== entry.distance) {
+                distanceBatches.push({
+                    distance: entry.distance,
+                    tasks: [entry.task]
+                });
+                return;
+            }
+
+            previousBatch.tasks.push(entry.task);
+        });
+
+        const revealStagger = distanceBatches.length * batchDelay > INITIAL_REVEAL_DURATION_MS
+            ? INITIAL_REVEAL_DURATION_MS / Math.max(1, distanceBatches.length - 1)
+            : batchDelay;
+
+        for (let index = 0; index < distanceBatches.length; index++) {
+            const batch = distanceBatches[index].tasks;
+            batch.forEach(task => {
+                taskManager.applyTaskCompletion(task);
+            });
+
+            completedCount += batch.length;
+            taskManager.normalizeUnlockStates();
+            hudManager.updateUnlockHud();
+            refreshHiddenEdges({ animate: false });
+
+            if (index + 1 < distanceBatches.length) {
+                await wait(revealStagger * 2);
+            }
+        }
+
+        taskManager.revealFrontierFromCompletedTasks();
+        taskManager.normalizeUnlockStates();
+        hudManager.updateUnlockHud();
+
+        if (completedCount > 0) {
+            refreshHiddenEdges({ animate: false });
+        }
+
+        const nextLimit = taskManager.getUnlockLimit();
+        if (showToast && nextLimit > previousLimit) {
+            hudManager.showUnlockToast(nextLimit);
+        }
+
+        if (refreshModal) {
+            taskModal.refreshOpenModal();
+        }
+
+        return completedCount;
+    }
+
+    async syncPlayerProgress() {
+        if (!playerUsername) {
+            return 0;
+        }
+
+        const playerSnapshot = await wiki.loadPlayerData(playerUsername, { forceRefresh: true });
+        if (playerSnapshot) {
+            playerProgress.applySnapshot(playerSnapshot);
+        }
+
+        return this.syncCompletedTasksFromObtained({ animate: true, showToast: true, refreshModal: true });
+    }
+}
+
+const progressSyncManager = new ProgressSyncManager();
+
+class GridViewport {
+    getMinScale() {
+        const grid = document.getElementById('grid');
+        const container = document.getElementById('grid-container');
+        if (!grid || !container || !grid.scrollWidth || !grid.scrollHeight) {
+            return MIN_SCALE;
+        }
+
+        const widthFit = container.clientWidth / grid.scrollWidth;
+        const heightFit = container.clientHeight / grid.scrollHeight;
+        return clamp(Math.max(widthFit, heightFit), MIN_SCALE, MAX_SCALE);
+    }
+
+    updateGridScale(options = {}) {
+        const { deferCanvasRender = false } = options;
+        const grid = document.getElementById('grid');
+        const stage = document.getElementById('grid-stage');
+        if (!grid || !stage) {
+            return;
+        }
+
+        currentScale = clamp(currentScale, this.getMinScale(), MAX_SCALE);
+        grid.style.transform = `scale(${currentScale})`;
+        stage.style.width = `${grid.scrollWidth * currentScale}px`;
+        stage.style.height = `${grid.scrollHeight * currentScale}px`;
+
+        if (deferCanvasRender) {
+            scheduleZoomRender();
+            return;
+        }
+
+        flushZoomRender();
+    }
+
+    bindWheelZoom(container) {
+        container.addEventListener('wheel', e => {
+            e.preventDefault();
+
+            const previousScale = currentScale;
+
+            const minScale = this.getMinScale();
+            const nextScale = clamp(
+                e.deltaY < 0 ? currentScale * ZOOM_FACTOR : currentScale / ZOOM_FACTOR,
+                minScale,
+                MAX_SCALE
+            );
+
+            if (nextScale === currentScale) {
+                return;
+            }
+
+            const rect = container.getBoundingClientRect();
+            const pointerX = e.clientX - rect.left;
+            const pointerY = e.clientY - rect.top;
+            const contentX = container.scrollLeft + pointerX;
+            const contentY = container.scrollTop + pointerY;
+            const worldX = contentX / currentScale;
+            const worldY = contentY / currentScale;
+
+            currentScale = nextScale;
+            this.updateGridScale({ deferCanvasRender: true });
+
+            container.scrollLeft = worldX * currentScale - pointerX;
+            container.scrollTop = worldY * currentScale - pointerY;
+            if (nextScale < previousScale) {
+                prewarmVisibleCellSprites();
+                queueCanvasRender();
+            }
+            taskModal.refreshPopoverPosition();
+        }, { passive: false });
+
+        window.addEventListener('resize', () => {
+            this.updateGridScale();
+            taskModal.refreshPopoverPosition();
+        });
+    }
+}
+
+const gridViewport = new GridViewport();
+
+class CanvasInteractionManager {
+    getCellAtClientPoint(clientX, clientY) {
+        if (!gridCanvas) {
+            return null;
+        }
+
+        const canvasRect = gridCanvas.getBoundingClientRect();
+        if (
+            clientX < canvasRect.left ||
+            clientY < canvasRect.top ||
+            clientX > canvasRect.right ||
+            clientY > canvasRect.bottom
+        ) {
+            return null;
+        }
+
+        const localX = (clientX - canvasRect.left) / currentScale;
+        const localY = (clientY - canvasRect.top) / currentScale;
+        const gridX = localX - GRID_SAFE_PADDING_X;
+        const gridY = localY - GRID_SAFE_PADDING_Y;
+
+        if (gridX < 0 || gridY < 0) {
+            return null;
+        }
+
+        const coordX = Math.floor(gridX / CELL_STEP);
+        const coordY = Math.floor(gridY / CELL_STEP);
+        const withinCellX = gridX - (coordX * CELL_STEP);
+        const withinCellY = gridY - (coordY * CELL_STEP);
+        if (withinCellX < 0 || withinCellY < 0 || withinCellX >= CELL_SIZE || withinCellY >= CELL_SIZE) {
+            return null;
+        }
+
+        const taskId = coordToTaskId.get(`${coordX},${coordY}`);
+        return taskId ? getCellById(taskId) : null;
+    }
+
+    isCellHoverable(cell) {
+        if (!cell) {
+            return false;
+        }
+
+        const state = cell.state || 'hidden';
+        return state === 'locked' || state === 'incomplete' || state === 'complete';
+    }
+
+    setHoveredCellId(nextCellId) {
+        const normalized = nextCellId ? String(nextCellId) : '';
+        if (hoveredCellId === normalized) {
+            return;
+        }
+
+        const previousCell = hoveredCellId ? getCellById(hoveredCellId) : null;
+        hoveredCellId = normalized;
+        const nextCell = hoveredCellId ? getCellById(hoveredCellId) : null;
+
+        if (gridCanvas) {
+            gridCanvas.style.cursor = nextCell && this.isCellHoverable(nextCell) ? 'pointer' : 'default';
+        }
+
+        if (previousCell || nextCell) {
+            queueCanvasRender();
+        }
+    }
+
+    bindCanvasInteractions(canvas) {
+        if (!canvas || canvas.dataset.bound === '1') {
+            return;
+        }
+
+        canvas.dataset.bound = '1';
+        canvas.style.cursor = 'default';
+
+        canvas.addEventListener('mousemove', e => {
+            if (e.buttons !== 0) {
+                this.setHoveredCellId('');
+                return;
+            }
+
+            const cell = this.getCellAtClientPoint(e.clientX, e.clientY);
+            if (!cell || !this.isCellHoverable(cell)) {
+                this.setHoveredCellId('');
+                return;
+            }
+
+            this.setHoveredCellId(cell.id);
+        }, { passive: true });
+
+        canvas.addEventListener('mouseleave', () => {
+            this.setHoveredCellId('');
+        });
+
+        canvas.addEventListener('click', e => {
+            if (suppressTaskClick || e.button !== 0) {
+                return;
+            }
+
+            const cell = this.getCellAtClientPoint(e.clientX, e.clientY);
+            if (!cell) {
+                return;
+            }
+
+            const state = taskManager.getState(cell.id) || 'hidden';
+            if (state === 'hidden') {
+                return;
+            }
+
+            taskModal.showModal(cell.task, taskModal.createCellAnchor(cell));
+        });
+
+        canvas.addEventListener('contextmenu', e => {
+            const cell = this.getCellAtClientPoint(e.clientX, e.clientY);
+            if (!cell) {
+                return;
+            }
+
+            const state = taskManager.getState(cell.id) || 'hidden';
+            if (state === 'incomplete' || state === 'complete') {
+                e.preventDefault();
+                window.open(cell.task.wikiLink, '_blank');
+            }
+        });
+    }
+}
+
+const canvasInteractionManager = new CanvasInteractionManager();
 
 function ensureGridCanvas() {
     const grid = document.getElementById('grid');
@@ -2265,7 +2842,7 @@ function ensureGridCanvas() {
         grid.appendChild(canvas);
     }
 
-    bindCanvasInteractions(canvas);
+    canvasInteractionManager.bindCanvasInteractions(canvas);
 
     gridCanvas = canvas;
     gridContext = canvas.getContext('2d');
@@ -2886,7 +3463,7 @@ function drawCanvasCell(context, cell, now) {
         }
     }
 
-    const hoverTarget = hoveredCellId === cell.id && isCellHoverable(cell) ? 1 : 0;
+    const hoverTarget = hoveredCellId === cell.id && canvasInteractionManager.isCellHoverable(cell) ? 1 : 0;
     let hoverProgress = cell.hoverProgress ?? 0;
     const hoverDelta = hoverTarget - hoverProgress;
     if (Math.abs(hoverDelta) > 0.001) {
@@ -3054,141 +3631,6 @@ function renderGridCanvas(now = performance.now()) {
     }
 
     return keepAnimating;
-}
-
-function getCellAtClientPoint(clientX, clientY) {
-    if (!gridCanvas) {
-        return null;
-    }
-
-    const canvasRect = gridCanvas.getBoundingClientRect();
-    if (
-        clientX < canvasRect.left ||
-        clientY < canvasRect.top ||
-        clientX > canvasRect.right ||
-        clientY > canvasRect.bottom
-    ) {
-        return null;
-    }
-
-    const localX = (clientX - canvasRect.left) / currentScale;
-    const localY = (clientY - canvasRect.top) / currentScale;
-    const gridX = localX - GRID_SAFE_PADDING_X;
-    const gridY = localY - GRID_SAFE_PADDING_Y;
-
-    if (gridX < 0 || gridY < 0) {
-        return null;
-    }
-
-    const coordX = Math.floor(gridX / CELL_STEP);
-    const coordY = Math.floor(gridY / CELL_STEP);
-    const withinCellX = gridX - (coordX * CELL_STEP);
-    const withinCellY = gridY - (coordY * CELL_STEP);
-    if (withinCellX < 0 || withinCellY < 0 || withinCellX >= CELL_SIZE || withinCellY >= CELL_SIZE) {
-        return null;
-    }
-
-    const taskId = coordToTaskId.get(`${coordX},${coordY}`);
-    return taskId ? getCellById(taskId) : null;
-}
-
-function isCellHoverable(cell) {
-    if (!cell) {
-        return false;
-    }
-
-    const state = cell.state || 'hidden';
-    return state === 'locked' || state === 'incomplete' || state === 'complete';
-}
-
-function setHoveredCellId(nextCellId) {
-    const normalized = nextCellId ? String(nextCellId) : '';
-    if (hoveredCellId === normalized) {
-        return;
-    }
-
-    const previousCell = hoveredCellId ? getCellById(hoveredCellId) : null;
-    hoveredCellId = normalized;
-    const nextCell = hoveredCellId ? getCellById(hoveredCellId) : null;
-
-    if (gridCanvas) {
-        gridCanvas.style.cursor = nextCell && isCellHoverable(nextCell) ? 'pointer' : 'default';
-    }
-
-    if (previousCell || nextCell) {
-        queueCanvasRender();
-    }
-}
-
-function bindCanvasInteractions(canvas) {
-    if (!canvas || canvas.dataset.bound === '1') {
-        return;
-    }
-
-    canvas.dataset.bound = '1';
-    canvas.style.cursor = 'default';
-
-    canvas.addEventListener('mousemove', e => {
-        if (e.buttons !== 0) {
-            setHoveredCellId('');
-            return;
-        }
-
-        const cell = getCellAtClientPoint(e.clientX, e.clientY);
-        if (!cell || !isCellHoverable(cell)) {
-            setHoveredCellId('');
-            return;
-        }
-
-        setHoveredCellId(cell.id);
-    }, { passive: true });
-
-    canvas.addEventListener('mouseleave', () => {
-        setHoveredCellId('');
-    });
-
-    canvas.addEventListener('click', e => {
-        if (suppressTaskClick || e.button !== 0) {
-            return;
-        }
-
-        const cell = getCellAtClientPoint(e.clientX, e.clientY);
-        if (!cell) {
-            return;
-        }
-
-        const state = taskManager.getState(cell.id) || 'hidden';
-        if (state === 'hidden') {
-            return;
-        }
-
-        showModal(cell.task, taskModal.createCellAnchor(cell));
-    });
-
-    canvas.addEventListener('contextmenu', e => {
-        const cell = getCellAtClientPoint(e.clientX, e.clientY);
-        if (!cell) {
-            return;
-        }
-
-        const state = taskManager.getState(cell.id) || 'hidden';
-        if (state === 'incomplete' || state === 'complete') {
-            e.preventDefault();
-            window.open(cell.task.wikiLink, '_blank');
-        }
-    });
-}
-
-function normalizeUsername(value) {
-    return (value || '').trim().replace(/\s+/g, ' ');
-}
-
-function toSyncUsername(value) {
-    return normalizeUsername(value).replace(/\W/g, '_');
-}
-
-function getPlayerCacheKey(username) {
-    return `${PLAYER_CL_CACHE_PREFIX}:${normalizeUsername(username).toLowerCase()}`;
 }
 
 function normalizeAchievementDiaryRegion(value) {
@@ -3378,175 +3820,6 @@ function getTierSortIndex(tier) {
     return index === -1 ? Number.POSITIVE_INFINITY : index;
 }
 
-async function syncCompletedTasksFromObtained(options = {}) {
-    const {
-        showToast = true,
-        refreshModal = true,
-        batchDelay = SYNC_STAGGER_MS
-    } = options;
-
-    const previousLimit = taskManager.getUnlockLimit();
-    let completedCount = 0;
-    const center = gameController.getCenterCoord(tasksGlobal);
-
-    const tasksToComplete = tasksGlobal
-        .filter(task => taskManager.getState(task.id) !== 'complete')
-        .filter(task => {
-            const requiredCount = taskVerification.getTaskRequiredCount(task);
-            return requiredCount > 0 && taskVerification.getTaskObtainedCount(task) >= requiredCount;
-        })
-        .map(task => {
-            const coord = gameController.getTaskCoord(task);
-            return {
-                task,
-                distance: Math.abs(coord.x - center.x) + Math.abs(coord.y - center.y)
-            };
-        })
-        .sort((a, b) => a.distance - b.distance);
-
-    const distanceBatches = [];
-    tasksToComplete.forEach(entry => {
-        const previousBatch = distanceBatches[distanceBatches.length - 1];
-        if (!previousBatch || previousBatch.distance !== entry.distance) {
-            distanceBatches.push({
-                distance: entry.distance,
-                tasks: [entry.task]
-            });
-            return;
-        }
-
-        previousBatch.tasks.push(entry.task);
-    });
-
-    const revealStagger = distanceBatches.length * batchDelay > INITIAL_REVEAL_DURATION_MS
-        ? INITIAL_REVEAL_DURATION_MS / Math.max(1, distanceBatches.length - 1)
-        : batchDelay;
-
-    for (let index = 0; index < distanceBatches.length; index++) {
-        const batch = distanceBatches[index].tasks;
-        batch.forEach(task => {
-            taskManager.applyTaskCompletion(task);
-        });
-
-        completedCount += batch.length;
-        taskManager.normalizeUnlockStates();
-        hudManager.updateUnlockHud();
-        refreshHiddenEdges({ animate: false });
-
-        if (index + 1 < distanceBatches.length) {
-            await wait(revealStagger * 2);
-        }
-    }
-
-    taskManager.revealFrontierFromCompletedTasks();
-    taskManager.normalizeUnlockStates();
-    hudManager.updateUnlockHud();
-
-    if (completedCount > 0) {
-        refreshHiddenEdges({ animate: false });
-    }
-
-    const nextLimit = taskManager.getUnlockLimit();
-    if (showToast && nextLimit > previousLimit) {
-        hudManager.showUnlockToast(nextLimit);
-    }
-
-    if (refreshModal) {
-        taskModal.refreshOpenModal();
-    }
-
-    return completedCount;
-}
-
-async function syncPlayerProgress() {
-    if (!playerUsername) {
-        return 0;
-    }
-
-    const playerSnapshot = await wiki.loadPlayerData(playerUsername, { forceRefresh: true });
-    if (playerSnapshot) {
-        playerProgress.applySnapshot(playerSnapshot);
-    }
-
-    return syncCompletedTasksFromObtained({ animate: true, showToast: true, refreshModal: true });
-}
-
-function getMinScale() {
-    const grid = document.getElementById('grid');
-    const container = document.getElementById('grid-container');
-    if (!grid || !container || !grid.scrollWidth || !grid.scrollHeight) {
-        return MIN_SCALE;
-    }
-
-    const widthFit = container.clientWidth / grid.scrollWidth;
-    const heightFit = container.clientHeight / grid.scrollHeight;
-    return clamp(Math.max(widthFit, heightFit), MIN_SCALE, MAX_SCALE);
-}
-
-function updateGridScale(options = {}) {
-    const { deferCanvasRender = false } = options;
-    const grid = document.getElementById('grid');
-    const stage = document.getElementById('grid-stage');
-    if (!grid || !stage) {
-        return;
-    }
-
-    currentScale = clamp(currentScale, getMinScale(), MAX_SCALE);
-    grid.style.transform = `scale(${currentScale})`;
-    stage.style.width = `${grid.scrollWidth * currentScale}px`;
-    stage.style.height = `${grid.scrollHeight * currentScale}px`;
-
-    if (deferCanvasRender) {
-        scheduleZoomRender();
-        return;
-    }
-
-    flushZoomRender();
-}
-
-function bindWheelZoom(container) {
-    container.addEventListener('wheel', e => {
-        e.preventDefault();
-
-        const previousScale = currentScale;
-
-        const minScale = getMinScale();
-        const nextScale = clamp(
-            e.deltaY < 0 ? currentScale * ZOOM_FACTOR : currentScale / ZOOM_FACTOR,
-            minScale,
-            MAX_SCALE
-        );
-
-        if (nextScale === currentScale) {
-            return;
-        }
-
-        const rect = container.getBoundingClientRect();
-        const pointerX = e.clientX - rect.left;
-        const pointerY = e.clientY - rect.top;
-        const contentX = container.scrollLeft + pointerX;
-        const contentY = container.scrollTop + pointerY;
-        const worldX = contentX / currentScale;
-        const worldY = contentY / currentScale;
-
-        currentScale = nextScale;
-        updateGridScale({ deferCanvasRender: true });
-
-        container.scrollLeft = worldX * currentScale - pointerX;
-        container.scrollTop = worldY * currentScale - pointerY;
-        if (nextScale < previousScale) {
-            prewarmVisibleCellSprites();
-            queueCanvasRender();
-        }
-        taskModal.refreshPopoverPosition();
-    }, { passive: false });
-
-    window.addEventListener('resize', () => {
-        updateGridScale();
-        taskModal.refreshPopoverPosition();
-    });
-}
-
 function setCellState(cell, nextState) {
     if (!cell) {
         return;
@@ -3554,8 +3827,8 @@ function setCellState(cell, nextState) {
 
     cell.state = nextState;
     cell.spriteKey = '';
-    if (hoveredCellId === cell.id && !isCellHoverable(cell)) {
-        setHoveredCellId('');
+    if (hoveredCellId === cell.id && !canvasInteractionManager.isCellHoverable(cell)) {
+        canvasInteractionManager.setHoveredCellId('');
     }
     if (nextState !== 'hidden') {
         cell.edgeVisible = false;
@@ -3764,267 +4037,6 @@ function refreshHiddenEdges(options = {}) {
     queueCanvasRender();
 }
 
-function showModal(task, anchor) {
-    const modal = document.getElementById('task-modal');
-    const title = document.getElementById('modal-title');
-    const image = document.getElementById('modal-image');
-    const tip = document.getElementById('modal-tip');
-    const wiki = document.getElementById('modal-wiki');
-    const button = document.getElementById('modal-complete');
-    const tierBadge = document.getElementById('modal-tier-badge');
-    const cell = getCellById(task.id);
-    const state = taskManager.getState(task.id) || 'incomplete';
-
-    if (task.id === INTRO_TASK_ID) {
-        title.textContent = 'Welcome to the Task Grid!';
-        setImageWithFallback(image, INTRO_TASK_IMAGE, 'Task Grid');
-        tip.innerHTML =
-            'Complete randomly assigned OSRS collection log goals and work your way across the grid.<br><br>' +
-            '<strong>Unlocking tasks:</strong> Locked tiles can be revealed by spending unlock slots. ' +
-            'Complete tasks to earn more slots — the more you finish, the more you unlock.<br><br>' +
-            '<strong>Wiki Sync:</strong> In RuneLite, enable the <em>Wiki Sync</em> plugin. ' +
-            'Open your Collection Log in-game and click the Wiki Sync button. ' +
-            'Then use the Wiki Sync button here to automatically mark completed tasks.';
-        wiki.style.display = 'none';
-        if (tierBadge) {
-            tierBadge.style.display = 'none';
-        }
-        const itemsEl = document.getElementById('modal-items');
-        const requiredEl = document.getElementById('modal-items-required');
-        if (itemsEl) {
-            itemsEl.innerHTML = '';
-            itemsEl.classList.remove('is-scrollable');
-            itemsEl.style.display = 'none';
-        }
-        if (requiredEl) {
-            requiredEl.style.display = 'none';
-            requiredEl.textContent = '';
-        }
-        if (state === 'incomplete') {
-            button.type = 'button';
-            button.disabled = false;
-            button.textContent = "Let's go!";
-            button.style.display = 'block';
-            button.onclick = e => {
-                e.preventDefault();
-                taskManager.applyTaskCompletion(task);
-                hudManager.updateUnlockHud();
-                refreshHiddenEdges({ animate: true });
-                taskModal.hideModal();
-            };
-        } else {
-            button.style.display = 'none';
-            button.disabled = false;
-            button.onclick = null;
-        }
-        activePopoverAnchor = anchor || cell;
-        modal.classList.add('open');
-        requestAnimationFrame(() => {
-            taskModal.refreshPopoverPosition();
-        });
-        return;
-    }
-
-    if (state === 'locked') {
-        title.textContent = 'Locked Task';
-        setImageWithFallback(image, LOCKED_TILE_IMAGE, 'Locked task');
-        tip.textContent = 'Unlock this tile to reveal what task is here.';
-        wiki.style.display = 'none';
-    } else {
-        title.textContent = task.name;
-        setImageWithFallback(image, task.imageLink, task.name);
-        tip.textContent = task.tip || '';
-        wiki.href = task.wikiLink || '#';
-        wiki.style.display = 'inline-block';
-    }
-
-    if (state === 'incomplete') {
-        button.type = 'button';
-        button.disabled = false;
-        button.textContent = 'Mark complete';
-        button.style.display = 'block';
-        button.onclick = e => {
-            e.preventDefault();
-            const previousLimit = taskManager.getUnlockLimit();
-            taskManager.applyTaskCompletion(task);
-            hudManager.updateUnlockHud();
-            refreshHiddenEdges({ animate: true });
-            const nextLimit = taskManager.getUnlockLimit();
-            if (nextLimit > previousLimit) {
-                hudManager.showUnlockToast(nextLimit);
-            }
-            taskModal.hideModal();
-        };
-    } else if (state === 'locked') {
-        const unlockLimit = taskManager.getUnlockLimit();
-        const unlockedCount = taskManager.getUnlockedCount();
-        const unlockAvailable = taskManager.canUnlockMore();
-
-        button.type = 'button';
-        button.style.display = 'block';
-        button.disabled = !unlockAvailable;
-        button.textContent = unlockAvailable
-            ? `Unlock task (${unlockedCount}/${unlockLimit})`
-            : `Unlock limit reached (${unlockedCount}/${unlockLimit})`;
-        button.onclick = unlockAvailable ? e => {
-            e.preventDefault();
-            taskManager.setState(task.id, 'incomplete');
-            if (cell) {
-                setCellState(cell, 'incomplete');
-            }
-
-            const unlockedTask = taskVerification.alignUnlockedTaskToLowestSeriesTask(task);
-
-            hudManager.updateUnlockHud();
-            refreshHiddenEdges({ animate: true });
-
-            taskModal.hideModal();
-            requestAnimationFrame(() => {
-                const unlockedTaskId = String(unlockedTask?.id || task.id);
-                const unlockedCell = getCellById(unlockedTaskId);
-                if (!unlockedCell || taskManager.getState(unlockedTaskId) !== 'incomplete') {
-                    return;
-                }
-
-                showModal(unlockedCell.task, taskModal.createCellAnchor(unlockedCell));
-            });
-        } : null;
-    } else {
-        button.style.display = 'none';
-        button.disabled = false;
-        button.onclick = null;
-    }
-
-    if (tierBadge) {
-        const tier = task.tier || '';
-        const shouldHideTierBadge = hideTierHintOnLocked && state === 'locked';
-        if (tier && !shouldHideTierBadge) {
-            const bgColor = uiSettings.getTierColor(tier);
-            const textColor = uiSettings.getReadableTextColor(bgColor);
-            tierBadge.textContent = formatTierName(tier) || 'Unknown';
-            tierBadge.style.background = bgColor;
-            tierBadge.style.color = textColor;
-            tierBadge.style.display = 'inline-block';
-        } else {
-            tierBadge.style.display = 'none';
-        }
-    }
-
-    const itemsEl = document.getElementById('modal-items');
-    const requiredEl = document.getElementById('modal-items-required');
-    if (itemsEl) {
-        const isLockedState = state === 'locked';
-        const itemIds = !isLockedState ? taskVerification.getTaskVerificationItemIds(task) : [];
-        const skillRequirements = !isLockedState ? taskVerification.getTaskSkillExperienceRequirements(task) : [];
-        itemsEl.innerHTML = '';
-        if (itemIds.length > 0) {
-            const requiredItems = taskVerification.getTaskRequiredCount(task);
-            const obtainedItemCount = taskVerification.getTaskObtainedCount(task);
-            const obtainedForTask = Math.min(obtainedItemCount, requiredItems);
-
-            if (requiredEl) {
-                requiredEl.textContent = `Obtained ${obtainedForTask}/${requiredItems} required for task`;
-                requiredEl.style.display = 'block';
-            }
-
-            itemsEl.classList.toggle('is-scrollable', itemIds.length > 20);
-            itemIds.forEach(id => {
-                const numericId = Number(id);
-                const isObtained = playerProgress.hasObtainedItem(numericId);
-                const info = collectionLogMap.get(numericId);
-                const link = document.createElement('a');
-                link.href = info ? info.wikiLink : '#';
-                link.target = '_blank';
-                link.rel = 'noopener noreferrer';
-                link.title = info ? `${info.name}${info.category ? ` (${info.category})` : ''}` : `Item ID: ${id}`;
-                link.className = 'modal-item-icon';
-                link.classList.add(isObtained ? 'is-obtained' : 'is-missing');
-                const img = document.createElement('img');
-                img.width = 32;
-                img.height = 32;
-                img.loading = 'lazy';
-                img.decoding = 'async';
-                if (info) {
-                    setImageWithFallback(img, info.imageUrl, info.name);
-                } else {
-                    setImageWithFallback(img, QUESTION_MARK_ICON, `Item ${id}`);
-                }
-                link.appendChild(img);
-                itemsEl.appendChild(link);
-            });
-            itemsEl.style.display = 'grid';
-        } else if (skillRequirements.length > 0) {
-            const requiredItems = taskVerification.getTaskRequiredCount(task);
-            const obtainedSkillCount = taskVerification.getTaskObtainedCount(task);
-            const obtainedForTask = Math.min(obtainedSkillCount, requiredItems);
-            const requiredLevels = skillRequirements
-                .map(requirement => taskVerification.getRequiredSkillLevelForRequirement(requirement))
-                .filter(level => Number.isFinite(level));
-            const uniformRequiredLevel = requiredLevels.length > 0 && requiredLevels.every(level => level === requiredLevels[0])
-                ? requiredLevels[0]
-                : null;
-
-            if (requiredEl) {
-                requiredEl.textContent = uniformRequiredLevel
-                    ? `Skills at level ${uniformRequiredLevel}: ${obtainedForTask}/${requiredItems}`
-                    : `Skills at required levels: ${obtainedForTask}/${requiredItems}`;
-                requiredEl.style.display = 'block';
-            }
-
-            const sortedRequirements = skillRequirements
-                .slice()
-                .sort((requirementA, requirementB) => {
-                    const requiredLevelDelta = taskVerification.getRequiredSkillLevelForRequirement(requirementA) - taskVerification.getRequiredSkillLevelForRequirement(requirementB);
-                    if (requiredLevelDelta !== 0) {
-                        return requiredLevelDelta;
-                    }
-
-                    return formatSkillName(requirementA.skillName).localeCompare(formatSkillName(requirementB.skillName));
-                });
-
-            itemsEl.classList.toggle('is-scrollable', sortedRequirements.length > 20);
-            sortedRequirements.forEach(requirement => {
-                const skillName = formatSkillName(requirement.skillName);
-                const requiredLevel = taskVerification.getRequiredSkillLevelForRequirement(requirement);
-                const playerLevel = playerProgress.getSkillLevel(requirement.skillName);
-                const normalizedLevel = Number.isFinite(playerLevel) ? Math.floor(playerLevel) : 0;
-                const isObtained = playerProgress.isSkillRequirementMet(requirement, requiredLevel);
-                const link = document.createElement('a');
-                link.href = `https://oldschool.runescape.wiki/w/${encodeURIComponent(skillName.replace(/ /g, '_'))}`;
-                link.target = '_blank';
-                link.rel = 'noopener noreferrer';
-                link.title = `${skillName}: lvl ${normalizedLevel}/${requiredLevel}`;
-                link.className = 'modal-item-icon';
-                link.classList.add(isObtained ? 'is-obtained' : 'is-missing');
-
-                const img = document.createElement('img');
-                img.width = 32;
-                img.height = 32;
-                img.loading = 'lazy';
-                img.decoding = 'async';
-                setImageWithFallback(img, getSkillBadgeIcon(requirement.skillName, isObtained), skillName);
-
-                link.appendChild(img);
-                itemsEl.appendChild(link);
-            });
-            itemsEl.style.display = 'grid';
-        } else {
-            if (requiredEl) {
-                requiredEl.style.display = 'none';
-                requiredEl.textContent = '';
-            }
-            itemsEl.classList.remove('is-scrollable');
-            itemsEl.style.display = 'none';
-        }
-    }
-
-    activePopoverAnchor = anchor || cell;
-    modal.classList.add('open');
-    requestAnimationFrame(() => {
-        taskModal.refreshPopoverPosition();
-    });
-}
-
 function render(tasks) {
     const grid = document.getElementById('grid');
     if (!grid) {
@@ -4084,7 +4096,7 @@ function render(tasks) {
     });
 
     refreshHiddenEdges({ animate: true, center, revealDelayByCoord, staggerMs: revealStagger, revealEasing: 'ease-in' });
-    updateGridScale();
+    gridViewport.updateGridScale();
     hudManager.updateUnlockHud();
     scheduleSpritePrewarm(0);
     queueCanvasRender();
@@ -4177,7 +4189,7 @@ window.addEventListener('DOMContentLoaded', () => {
             syncButton.textContent = 'Wiki syncing...';
 
             try {
-                const completedCount = await syncPlayerProgress();
+                const completedCount = await progressSyncManager.syncPlayerProgress();
                 syncButton.disabled = false;
                 syncButton.textContent = completedCount === 1
                     ? 'Wiki synced 1 task'
@@ -4209,68 +4221,72 @@ const tierWeights = {
     pets: 100
 };
 
-async function preloadTaskImages(tasks) {
-    const sources = new Set([LOCKED_TILE_IMAGE, QUESTION_MARK_ICON]);
+class RenderWarmupManager {
+    async preloadTaskImages(tasks) {
+        const sources = new Set([LOCKED_TILE_IMAGE, QUESTION_MARK_ICON]);
 
-    tasks.forEach(task => {
-        const state = taskManager.getState(task.id);
-        if (state === 'incomplete' || state === 'complete' || state === 'locked') {
-            sources.add(task.imageLink);
-        }
-    });
-
-    await Promise.all(Array.from(sources).map(source => new Promise(resolve => {
-        const asset = getImageAsset(source);
-        const decodeReadyImage = async () => {
-            if (asset.status === 'ready' && typeof asset.image?.decode === 'function') {
-                try {
-                    await asset.image.decode();
-                } catch {
-                    // ignore decode failures; draw path still handles ready/error states
-                }
+        tasks.forEach(task => {
+            const state = taskManager.getState(task.id);
+            if (state === 'incomplete' || state === 'complete' || state === 'locked') {
+                sources.add(task.imageLink);
             }
+        });
 
-            resolve();
-        };
+        await Promise.all(Array.from(sources).map(source => new Promise(resolve => {
+            const asset = getImageAsset(source);
+            const decodeReadyImage = async () => {
+                if (asset.status === 'ready' && typeof asset.image?.decode === 'function') {
+                    try {
+                        await asset.image.decode();
+                    } catch {
+                        // ignore decode failures; draw path still handles ready/error states
+                    }
+                }
 
-        if (asset.status === 'ready' || asset.status === 'error') {
-            void decodeReadyImage();
-            return;
-        }
-
-        const onDone = () => {
-            asset.image.removeEventListener('load', onDone);
-            asset.image.removeEventListener('error', onDone);
-            void decodeReadyImage();
-        };
-        asset.image.addEventListener('load', onDone);
-        asset.image.addEventListener('error', onDone);
-    })));
-}
-
-function waitForAnimationFrames(frameCount = 1) {
-    const totalFrames = Math.max(1, Math.floor(frameCount));
-    return new Promise(resolve => {
-        let remaining = totalFrames;
-        const onFrame = () => {
-            remaining -= 1;
-            if (remaining <= 0) {
                 resolve();
+            };
+
+            if (asset.status === 'ready' || asset.status === 'error') {
+                void decodeReadyImage();
                 return;
             }
 
+            const onDone = () => {
+                asset.image.removeEventListener('load', onDone);
+                asset.image.removeEventListener('error', onDone);
+                void decodeReadyImage();
+            };
+            asset.image.addEventListener('load', onDone);
+            asset.image.addEventListener('error', onDone);
+        })));
+    }
+
+    waitForAnimationFrames(frameCount = 1) {
+        const totalFrames = Math.max(1, Math.floor(frameCount));
+        return new Promise(resolve => {
+            let remaining = totalFrames;
+            const onFrame = () => {
+                remaining -= 1;
+                if (remaining <= 0) {
+                    resolve();
+                    return;
+                }
+
+                requestAnimationFrame(onFrame);
+            };
+
             requestAnimationFrame(onFrame);
-        };
+        });
+    }
 
-        requestAnimationFrame(onFrame);
-    });
+    async prewarmInitialCanvasSprites() {
+        prewarmVisibleCellSprites();
+        queueCanvasRender();
+        await this.waitForAnimationFrames(2);
+    }
 }
 
-async function prewarmInitialCanvasSprites() {
-    prewarmVisibleCellSprites();
-    queueCanvasRender();
-    await waitForAnimationFrames(2);
-}
+const renderWarmupManager = new RenderWarmupManager();
 
 function startApp() {
     const loader = document.getElementById('loading');
@@ -4351,14 +4367,14 @@ function startApp() {
         image.src = icon.src;
     });
 
-    const preloadPromise = preloadTaskImages(all);
+    const preloadPromise = renderWarmupManager.preloadTaskImages(all);
 
     function animateIcons(index) {
         if (index >= loadingIcons.length) {
             const finish = async () => {
                 await Promise.all([preloadPromise, wait(500)]);
                 render(all);
-                await prewarmInitialCanvasSprites();
+                await renderWarmupManager.prewarmInitialCanvasSprites();
 
                 const loader = document.getElementById('loading');
                 if (loader) {
@@ -4396,7 +4412,7 @@ function startApp() {
     let lastX = 0;
     let lastY = 0;
 
-    bindWheelZoom(container);
+    gridViewport.bindWheelZoom(container);
 
     container.addEventListener('scroll', () => {
         if (!isZooming) {
@@ -4467,7 +4483,7 @@ function initUsernameGate() {
     const error = document.getElementById('username-error');
 
     const startWithUsername = username => {
-        playerUsername = normalizeUsername(username);
+        playerUsername = wiki.normalizeUsername(username);
         try {
             localStorage.setItem(USERNAME_KEY, playerUsername);
         } catch {
@@ -4484,7 +4500,7 @@ function initUsernameGate() {
         }
     };
 
-    const savedUsername = normalizeUsername(localStorage.getItem(USERNAME_KEY));
+    const savedUsername = wiki.normalizeUsername(localStorage.getItem(USERNAME_KEY));
     if (savedUsername) {
         startWithUsername(savedUsername);
         return;
@@ -4503,7 +4519,7 @@ function initUsernameGate() {
 
     form.addEventListener('submit', e => {
         e.preventDefault();
-        const username = normalizeUsername(input.value);
+        const username = wiki.normalizeUsername(input.value);
         if (!username) {
             error.textContent = 'Please enter a username.';
             return;
