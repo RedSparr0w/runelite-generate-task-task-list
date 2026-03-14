@@ -1490,7 +1490,7 @@ class TaskOrderManager {
             cell.pixelY = GRID_SAFE_PADDING_Y + (coord.y * CELL_STEP);
         });
 
-        refreshPopoverPosition();
+        taskModal.refreshPopoverPosition();
     }
 
     swapTaskStates(taskIdA, taskIdB) {
@@ -1712,399 +1712,545 @@ function normalizeTierFilterSelection(value) {
     return new Set(normalized);
 }
 
-function getFilterableTiers() {
-    const tierSet = new Set(tiers.map(tier => String(tier || '').trim()).filter(Boolean));
-    tierSet.add(LOCKED_FILTER_KEY);
-
-    tasksGlobal.forEach(task => {
-        const tier = String(task?.tier || '').trim();
-        if (tier) {
-            tierSet.add(tier);
-        }
-    });
-
-    return Array.from(tierSet).sort((a, b) => {
-        const sortA = getTierSortIndex(a);
-        const sortB = getTierSortIndex(b);
-        if (sortA !== sortB) {
-            return sortA - sortB;
-        }
-
-        return a.localeCompare(b);
-    });
-}
-
-function updateTierFilterControls() {
-    const controls = document.getElementById('tier-filter-controls');
-    const clearButton = document.getElementById('tier-filter-clear');
-    if (!controls) {
-        return;
+class UiSettings {
+    constructor(taskManager) {
+        this.taskManager = taskManager;
     }
 
-    const filterableTiers = getFilterableTiers();
-    controls.innerHTML = '';
+    getFilterableTiers() {
+        const tierSet = new Set(tiers.map(tier => String(tier || '').trim()).filter(Boolean));
+        tierSet.add(LOCKED_FILTER_KEY);
 
-    filterableTiers.forEach(filterKey => {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = 'tier-filter-button';
-        button.dataset.filterKey = filterKey;
-        const isActive = selectedTierFilters.has(filterKey);
-        button.classList.toggle('active', isActive);
-        button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+        tasksGlobal.forEach(task => {
+            const tier = String(task?.tier || '').trim();
+            if (tier) {
+                tierSet.add(tier);
+            }
+        });
 
-        const swatch = document.createElement('span');
-        swatch.className = 'tier-filter-swatch';
-        swatch.style.background = filterKey === LOCKED_FILTER_KEY
-            ? getActiveCellPalette().locked.border
-            : getTierColor(filterKey);
+        return Array.from(tierSet).sort((a, b) => {
+            const sortA = getTierSortIndex(a);
+            const sortB = getTierSortIndex(b);
+            if (sortA !== sortB) {
+                return sortA - sortB;
+            }
 
-        const text = document.createElement('span');
-        text.textContent = filterKey === LOCKED_FILTER_KEY
-            ? 'Locked'
-            : formatTierName(filterKey);
-
-        button.appendChild(swatch);
-        button.appendChild(text);
-        controls.appendChild(button);
-    });
-
-    if (clearButton) {
-        clearButton.disabled = selectedTierFilters.size === 0;
+            return a.localeCompare(b);
+        });
     }
-}
 
-function applyTierFilters(nextFilters, options = {}) {
-    const { persist = true, rerender = true } = options;
-    const filterableTierSet = new Set(getFilterableTiers());
-    const normalized = normalizeTierFilterSelection(Array.from(nextFilters || []));
+    updateTierFilterControls() {
+        const controls = document.getElementById('tier-filter-controls');
+        const clearButton = document.getElementById('tier-filter-clear');
+        if (!controls) {
+            return;
+        }
 
-    selectedTierFilters = new Set(Array.from(normalized).filter(tier => filterableTierSet.has(tier)));
+        const filterableTiers = this.getFilterableTiers();
+        controls.innerHTML = '';
 
-    updateTierFilterControls();
+        filterableTiers.forEach(filterKey => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'tier-filter-button';
+            button.dataset.filterKey = filterKey;
+            const isActive = selectedTierFilters.has(filterKey);
+            button.classList.toggle('active', isActive);
+            button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
 
-    if (persist) {
-        try {
-            localStorage.setItem(TIER_FILTER_KEY, JSON.stringify(Array.from(selectedTierFilters)));
-        } catch {
-            // ignore localStorage failures
+            const swatch = document.createElement('span');
+            swatch.className = 'tier-filter-swatch';
+            swatch.style.background = filterKey === LOCKED_FILTER_KEY
+                ? this.getActiveCellPalette().locked.border
+                : this.getTierColor(filterKey);
+
+            const text = document.createElement('span');
+            text.textContent = filterKey === LOCKED_FILTER_KEY
+                ? 'Locked'
+                : formatTierName(filterKey);
+
+            button.appendChild(swatch);
+            button.appendChild(text);
+            controls.appendChild(button);
+        });
+
+        if (clearButton) {
+            clearButton.disabled = selectedTierFilters.size === 0;
         }
     }
 
-    if (rerender) {
-        queueCanvasRender();
-    }
-}
+    applyTierFilters(nextFilters, options = {}) {
+        const { persist = true, rerender = true } = options;
+        const filterableTierSet = new Set(this.getFilterableTiers());
+        const normalized = normalizeTierFilterSelection(Array.from(nextFilters || []));
 
-function getTierOpacityForCell(cell) {
-    const task = cell?.task;
-    if (!cell || !task || task.id === INTRO_TASK_ID || selectedTierFilters.size === 0) {
-        return 1;
+        selectedTierFilters = new Set(Array.from(normalized).filter(tier => filterableTierSet.has(tier)));
+
+        this.updateTierFilterControls();
+
+        if (persist) {
+            try {
+                localStorage.setItem(TIER_FILTER_KEY, JSON.stringify(Array.from(selectedTierFilters)));
+            } catch {
+                // ignore localStorage failures
+            }
+        }
+
+        if (rerender) {
+            queueCanvasRender();
+        }
     }
 
-    const state = cell.state || taskManager.getState(task.id) || 'hidden';
-    if (state === 'hidden') {
-        return 1;
-    }
-
-    if (state === 'locked') {
-        if (selectedTierFilters.has(LOCKED_FILTER_KEY)) {
+    getTierOpacityForCell(cell) {
+        const task = cell?.task;
+        if (!cell || !task || task.id === INTRO_TASK_ID || selectedTierFilters.size === 0) {
             return 1;
         }
 
-        if (hideTierHintOnLocked) {
-            return FILTERED_TIER_OPACITY;
-        }
-    }
-
-    const tier = String(task.tier || '').trim();
-    if (!tier) {
-        return 1;
-    }
-
-    return selectedTierFilters.has(tier) ? 1 : FILTERED_TIER_OPACITY;
-}
-
-function getCompleteOpacityPercent(value = completeCellOpacity) {
-    return Math.round(value * 100);
-}
-
-function updateTierHintControls() {
-    const checkbox = document.getElementById('hide-tier-hint-input');
-    if (checkbox) {
-        checkbox.checked = hideTierHintOnLocked;
-    }
-}
-
-function updateCompleteOpacityControls() {
-    const slider = document.getElementById('complete-opacity-input');
-    const valueLabel = document.getElementById('complete-opacity-value');
-    const percent = getCompleteOpacityPercent();
-
-    if (slider && document.activeElement !== slider) {
-        slider.value = String(percent);
-    }
-
-    if (valueLabel) {
-        valueLabel.textContent = `${percent}%`;
-    }
-}
-
-function applyCompleteOpacity(value, options = {}) {
-    const { persist = true, rerender = true } = options;
-    const nextOpacity = normalizeCompleteOpacity(value);
-
-    completeCellOpacity = nextOpacity;
-
-    if (document.documentElement) {
-        document.documentElement.style.setProperty('--state-complete-opacity', String(nextOpacity));
-    }
-
-    updateCompleteOpacityControls();
-
-    if (persist) {
-        try {
-            localStorage.setItem(COMPLETE_OPACITY_KEY, String(nextOpacity));
-        } catch {
-            // ignore localStorage failures
-        }
-    }
-
-    if (rerender) {
-        queueCanvasRender();
-    }
-}
-
-function applyHideTierHintOnLocked(value, options = {}) {
-    const { persist = true, rerender = true } = options;
-    hideTierHintOnLocked = Boolean(value);
-    updateTierHintControls();
-
-    if (persist) {
-        try {
-            localStorage.setItem(HIDE_TIER_HINT_KEY, hideTierHintOnLocked ? '1' : '0');
-        } catch {
-            // ignore localStorage failures
-        }
-    }
-
-    if (rerender) {
-        queueCanvasRender();
-        refreshOpenModal();
-    }
-}
-
-function setOptionsPopoverOpen(isOpen) {
-    const popover = document.getElementById('options-popover');
-    const button = document.getElementById('options-button');
-    if (!popover || !button) {
-        return;
-    }
-
-    popover.classList.toggle('open', isOpen);
-    button.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-}
-
-function closeOptionsPopover() {
-    setOptionsPopoverOpen(false);
-}
-
-function initOptionsMenu() {
-    applyCompleteOpacity(completeCellOpacity, { persist: false, rerender: false });
-    applyHideTierHintOnLocked(hideTierHintOnLocked, { persist: false, rerender: false });
-    applyTierFilters(selectedTierFilters, { persist: false, rerender: false });
-
-    const optionsButton = document.getElementById('options-button');
-    const optionsPopover = document.getElementById('options-popover');
-    const opacityInput = document.getElementById('complete-opacity-input');
-    const hideTierHintInput = document.getElementById('hide-tier-hint-input');
-    const tierFilterControls = document.getElementById('tier-filter-controls');
-    const tierFilterClear = document.getElementById('tier-filter-clear');
-    if (!optionsButton || !optionsPopover || !opacityInput || !hideTierHintInput || !tierFilterControls || !tierFilterClear) {
-        return;
-    }
-
-    optionsButton.addEventListener('click', e => {
-        e.preventDefault();
-        const isOpen = optionsPopover.classList.contains('open');
-        setOptionsPopoverOpen(!isOpen);
-    });
-
-    opacityInput.addEventListener('input', e => {
-        const value = Number.parseFloat(e.currentTarget.value);
-        applyCompleteOpacity(value / 100, { persist: true, rerender: true });
-    });
-
-    hideTierHintInput.addEventListener('change', e => {
-        applyHideTierHintOnLocked(Boolean(e.currentTarget.checked), { persist: true, rerender: true });
-    });
-
-    tierFilterControls.addEventListener('click', e => {
-        const button = e.target.closest('.tier-filter-button');
-        if (!button) {
-            return;
+        const state = cell.state || this.taskManager.getState(task.id) || 'hidden';
+        if (state === 'hidden') {
+            return 1;
         }
 
-        const filterKey = String(button.dataset.filterKey || '').trim();
-        if (!filterKey) {
-            return;
-        }
-
-        const nextFilters = new Set(selectedTierFilters);
-        if (nextFilters.has(filterKey)) {
-            nextFilters.delete(filterKey);
-        } else {
-            nextFilters.add(filterKey);
-        }
-
-        applyTierFilters(nextFilters, { persist: true, rerender: true });
-    });
-
-    tierFilterClear.addEventListener('click', () => {
-        applyTierFilters(new Set(), { persist: true, rerender: true });
-    });
-}
-
-function getActiveTierColors() {
-    return TIER_COLORS_BY_THEME[activeTheme] || TIER_COLORS_BY_THEME.osrs;
-}
-
-function getActiveCellPalette() {
-    return CELL_PALETTES_BY_THEME[activeTheme] || CELL_PALETTES_BY_THEME.osrs;
-}
-
-function getTierColor(tier) {
-    return getActiveTierColors()[tier] || '#736559';
-}
-
-function getReadableTextColor(backgroundHex) {
-    const match = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(String(backgroundHex || ''));
-    if (!match) {
-        return '#f9f1de';
-    }
-
-    const red = Number.parseInt(match[1], 16) / 255;
-    const green = Number.parseInt(match[2], 16) / 255;
-    const blue = Number.parseInt(match[3], 16) / 255;
-    const luminance = (0.2126 * red) + (0.7152 * green) + (0.0722 * blue);
-
-    return luminance > 0.52 ? '#0F0F0F' : '#f9f1de';
-}
-
-function updateThemeToggleButtons() {
-    document.querySelectorAll('#theme-toggle .theme-option').forEach(button => {
-        button.classList.toggle('active', button.dataset.theme === activeTheme);
-    });
-}
-
-function applyTheme(theme, options = {}) {
-    const { persist = true } = options;
-    const nextTheme = normalizeTheme(theme);
-    const changed = nextTheme !== activeTheme || document.body?.dataset.theme !== nextTheme;
-
-    activeTheme = nextTheme;
-    if (document.body) {
-        document.body.dataset.theme = nextTheme;
-    }
-
-    if (persist) {
-        try {
-            localStorage.setItem(THEME_KEY, nextTheme);
-        } catch {
-            // ignore localStorage failures
-        }
-    }
-
-    updateThemeToggleButtons();
-    updateTierFilterControls();
-
-    if (!changed) {
-        return;
-    }
-
-    backgroundSpriteCache.clear();
-    idToCell.forEach(cell => {
-        cell.spriteKey = '';
-    });
-
-    queueCanvasRender();
-
-    if (document.getElementById('task-modal')?.classList.contains('open')) {
-        refreshOpenModal();
-    }
-
-    if (document.getElementById('tier-tasks-modal')?.classList.contains('open')) {
-        taskPanels.renderTierTasksModal();
-    }
-
-    taskPanels.updateCurrentTasksPopover();
-}
-
-function initThemeToggle() {
-    applyTheme(activeTheme, { persist: false });
-
-    const toggle = document.getElementById('theme-toggle');
-    if (!toggle) {
-        return;
-    }
-
-    toggle.addEventListener('click', e => {
-        const button = e.target.closest('.theme-option');
-        if (!button) {
-            return;
-        }
-
-        applyTheme(button.dataset.theme);
-    });
-}
-
-function isAnchorConnected(anchor) {
-    if (!anchor) {
-        return false;
-    }
-
-    if (anchor.__virtualAnchor) {
-        return Boolean(getCellById(anchor.taskId));
-    }
-
-    return anchor instanceof Node ? document.body.contains(anchor) : false;
-}
-
-function createCellAnchor(cell) {
-    return {
-        __virtualAnchor: true,
-        taskId: String(cell.id),
-        _task: cell.task,
-        getBoundingClientRect() {
-            const currentCell = getCellById(this.taskId);
-            const grid = document.getElementById('grid');
-            if (!currentCell || !grid) {
-                return {
-                    left: 0,
-                    top: 0,
-                    right: 0,
-                    bottom: 0,
-                    width: 0,
-                    height: 0
-                };
+        if (state === 'locked') {
+            if (selectedTierFilters.has(LOCKED_FILTER_KEY)) {
+                return 1;
             }
 
-            const gridRect = grid.getBoundingClientRect();
-            const scaledSize = CELL_SIZE * currentScale;
-            const left = gridRect.left + (currentCell.pixelX * currentScale);
-            const top = gridRect.top + (currentCell.pixelY * currentScale);
-
-            return {
-                left,
-                top,
-                right: left + scaledSize,
-                bottom: top + scaledSize,
-                width: scaledSize,
-                height: scaledSize
-            };
+            if (hideTierHintOnLocked) {
+                return FILTERED_TIER_OPACITY;
+            }
         }
-    };
+
+        const tier = String(task.tier || '').trim();
+        if (!tier) {
+            return 1;
+        }
+
+        return selectedTierFilters.has(tier) ? 1 : FILTERED_TIER_OPACITY;
+    }
+
+    getCompleteOpacityPercent(value = completeCellOpacity) {
+        return Math.round(value * 100);
+    }
+
+    updateTierHintControls() {
+        const checkbox = document.getElementById('hide-tier-hint-input');
+        if (checkbox) {
+            checkbox.checked = hideTierHintOnLocked;
+        }
+    }
+
+    updateCompleteOpacityControls() {
+        const slider = document.getElementById('complete-opacity-input');
+        const valueLabel = document.getElementById('complete-opacity-value');
+        const percent = this.getCompleteOpacityPercent();
+
+        if (slider && document.activeElement !== slider) {
+            slider.value = String(percent);
+        }
+
+        if (valueLabel) {
+            valueLabel.textContent = `${percent}%`;
+        }
+    }
+
+    applyCompleteOpacity(value, options = {}) {
+        const { persist = true, rerender = true } = options;
+        const nextOpacity = normalizeCompleteOpacity(value);
+
+        completeCellOpacity = nextOpacity;
+
+        if (document.documentElement) {
+            document.documentElement.style.setProperty('--state-complete-opacity', String(nextOpacity));
+        }
+
+        this.updateCompleteOpacityControls();
+
+        if (persist) {
+            try {
+                localStorage.setItem(COMPLETE_OPACITY_KEY, String(nextOpacity));
+            } catch {
+                // ignore localStorage failures
+            }
+        }
+
+        if (rerender) {
+            queueCanvasRender();
+        }
+    }
+
+    applyHideTierHintOnLocked(value, options = {}) {
+        const { persist = true, rerender = true } = options;
+        hideTierHintOnLocked = Boolean(value);
+        this.updateTierHintControls();
+
+        if (persist) {
+            try {
+                localStorage.setItem(HIDE_TIER_HINT_KEY, hideTierHintOnLocked ? '1' : '0');
+            } catch {
+                // ignore localStorage failures
+            }
+        }
+
+        if (rerender) {
+            queueCanvasRender();
+            taskModal.refreshOpenModal();
+        }
+    }
+
+    setOptionsPopoverOpen(isOpen) {
+        const popover = document.getElementById('options-popover');
+        const button = document.getElementById('options-button');
+        if (!popover || !button) {
+            return;
+        }
+
+        popover.classList.toggle('open', isOpen);
+        button.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    }
+
+    closeOptionsPopover() {
+        this.setOptionsPopoverOpen(false);
+    }
+
+    initOptionsMenu() {
+        this.applyCompleteOpacity(completeCellOpacity, { persist: false, rerender: false });
+        this.applyHideTierHintOnLocked(hideTierHintOnLocked, { persist: false, rerender: false });
+        this.applyTierFilters(selectedTierFilters, { persist: false, rerender: false });
+
+        const optionsButton = document.getElementById('options-button');
+        const optionsPopover = document.getElementById('options-popover');
+        const opacityInput = document.getElementById('complete-opacity-input');
+        const hideTierHintInput = document.getElementById('hide-tier-hint-input');
+        const tierFilterControls = document.getElementById('tier-filter-controls');
+        const tierFilterClear = document.getElementById('tier-filter-clear');
+        if (!optionsButton || !optionsPopover || !opacityInput || !hideTierHintInput || !tierFilterControls || !tierFilterClear) {
+            return;
+        }
+
+        optionsButton.addEventListener('click', e => {
+            e.preventDefault();
+            const isOpen = optionsPopover.classList.contains('open');
+            this.setOptionsPopoverOpen(!isOpen);
+        });
+
+        opacityInput.addEventListener('input', e => {
+            const value = Number.parseFloat(e.currentTarget.value);
+            this.applyCompleteOpacity(value / 100, { persist: true, rerender: true });
+        });
+
+        hideTierHintInput.addEventListener('change', e => {
+            this.applyHideTierHintOnLocked(Boolean(e.currentTarget.checked), { persist: true, rerender: true });
+        });
+
+        tierFilterControls.addEventListener('click', e => {
+            const button = e.target.closest('.tier-filter-button');
+            if (!button) {
+                return;
+            }
+
+            const filterKey = String(button.dataset.filterKey || '').trim();
+            if (!filterKey) {
+                return;
+            }
+
+            const nextFilters = new Set(selectedTierFilters);
+            if (nextFilters.has(filterKey)) {
+                nextFilters.delete(filterKey);
+            } else {
+                nextFilters.add(filterKey);
+            }
+
+            this.applyTierFilters(nextFilters, { persist: true, rerender: true });
+        });
+
+        tierFilterClear.addEventListener('click', () => {
+            this.applyTierFilters(new Set(), { persist: true, rerender: true });
+        });
+    }
+
+    getActiveTierColors() {
+        return TIER_COLORS_BY_THEME[activeTheme] || TIER_COLORS_BY_THEME.osrs;
+    }
+
+    getActiveCellPalette() {
+        return CELL_PALETTES_BY_THEME[activeTheme] || CELL_PALETTES_BY_THEME.osrs;
+    }
+
+    getTierColor(tier) {
+        return this.getActiveTierColors()[tier] || '#736559';
+    }
+
+    getReadableTextColor(backgroundHex) {
+        const match = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(String(backgroundHex || ''));
+        if (!match) {
+            return '#f9f1de';
+        }
+
+        const red = Number.parseInt(match[1], 16) / 255;
+        const green = Number.parseInt(match[2], 16) / 255;
+        const blue = Number.parseInt(match[3], 16) / 255;
+        const luminance = (0.2126 * red) + (0.7152 * green) + (0.0722 * blue);
+
+        return luminance > 0.52 ? '#0F0F0F' : '#f9f1de';
+    }
+
+    updateThemeToggleButtons() {
+        document.querySelectorAll('#theme-toggle .theme-option').forEach(button => {
+            button.classList.toggle('active', button.dataset.theme === activeTheme);
+        });
+    }
+
+    applyTheme(theme, options = {}) {
+        const { persist = true } = options;
+        const nextTheme = normalizeTheme(theme);
+        const changed = nextTheme !== activeTheme || document.body?.dataset.theme !== nextTheme;
+
+        activeTheme = nextTheme;
+        if (document.body) {
+            document.body.dataset.theme = nextTheme;
+        }
+
+        if (persist) {
+            try {
+                localStorage.setItem(THEME_KEY, nextTheme);
+            } catch {
+                // ignore localStorage failures
+            }
+        }
+
+        this.updateThemeToggleButtons();
+        this.updateTierFilterControls();
+
+        if (!changed) {
+            return;
+        }
+
+        backgroundSpriteCache.clear();
+        idToCell.forEach(cell => {
+            cell.spriteKey = '';
+        });
+
+        queueCanvasRender();
+
+        if (document.getElementById('task-modal')?.classList.contains('open')) {
+            taskModal.refreshOpenModal();
+        }
+
+        if (document.getElementById('tier-tasks-modal')?.classList.contains('open')) {
+            taskPanels.renderTierTasksModal();
+        }
+
+        taskPanels.updateCurrentTasksPopover();
+    }
+
+    initThemeToggle() {
+        this.applyTheme(activeTheme, { persist: false });
+
+        const toggle = document.getElementById('theme-toggle');
+        if (!toggle) {
+            return;
+        }
+
+        toggle.addEventListener('click', e => {
+            const button = e.target.closest('.theme-option');
+            if (!button) {
+                return;
+            }
+
+            this.applyTheme(button.dataset.theme);
+        });
+    }
 }
+
+class HudManager {
+    constructor(taskManager, taskPanels) {
+        this.taskManager = taskManager;
+        this.taskPanels = taskPanels;
+        this.unlockToastTimer = null;
+    }
+
+    updateUnlockHud() {
+        const unlocks = document.getElementById('hud-unlocks');
+        const nextUnlock = document.getElementById('hud-next-unlock');
+        if (!unlocks || !nextUnlock) {
+            return;
+        }
+
+        const completedCount = this.taskManager.getCompletedCount();
+        const totalUnlocks = this.taskManager.getUnlockLimit(completedCount);
+        const availableUnlocks = Math.max(0, totalUnlocks - this.taskManager.getUnlockedCount());
+        const tasksUntilNext = this.taskManager.getTasksUntilNextUnlock(completedCount);
+
+        unlocks.textContent = `${availableUnlocks} / ${totalUnlocks}`;
+        nextUnlock.textContent = tasksUntilNext === 1 ? '1 task' : `${tasksUntilNext} tasks`;
+        this.taskPanels.updateTierProgressMenu();
+        this.taskPanels.updateCurrentTasksPopover();
+
+        const tierTasksModal = document.getElementById('tier-tasks-modal');
+        if (tierTasksModal?.classList.contains('open')) {
+            this.taskPanels.renderTierTasksModal();
+        }
+    }
+
+    showUnlockToast(newLimit) {
+        const toast = document.getElementById('unlock-toast');
+        const slots = document.getElementById('unlock-toast-slots');
+        if (!toast || !slots) {
+            return;
+        }
+
+        slots.textContent = newLimit;
+
+        if (this.unlockToastTimer) {
+            clearTimeout(this.unlockToastTimer);
+            this.unlockToastTimer = null;
+        }
+
+        toast.classList.remove('leaving');
+        void toast.offsetWidth;
+        toast.classList.add('visible');
+
+        this.unlockToastTimer = setTimeout(() => {
+            toast.classList.add('leaving');
+            setTimeout(() => toast.classList.remove('visible', 'leaving'), 350);
+            this.unlockToastTimer = null;
+        }, UNLOCK_TOAST_DURATION_MS);
+    }
+
+    dismissUnlockToast() {
+        const toast = document.getElementById('unlock-toast');
+        if (!toast) {
+            return;
+        }
+
+        if (this.unlockToastTimer) {
+            clearTimeout(this.unlockToastTimer);
+            this.unlockToastTimer = null;
+        }
+
+        toast.classList.add('leaving');
+        setTimeout(() => toast.classList.remove('visible', 'leaving'), 350);
+    }
+}
+
+const uiSettings = new UiSettings(taskManager);
+const hudManager = new HudManager(taskManager, taskPanels);
+
+class TaskModal {
+    isAnchorConnected(anchor) {
+        if (!anchor) {
+            return false;
+        }
+
+        if (anchor.__virtualAnchor) {
+            return Boolean(getCellById(anchor.taskId));
+        }
+
+        return anchor instanceof Node ? document.body.contains(anchor) : false;
+    }
+
+    createCellAnchor(cell) {
+        return {
+            __virtualAnchor: true,
+            taskId: String(cell.id),
+            _task: cell.task,
+            getBoundingClientRect() {
+                const currentCell = getCellById(this.taskId);
+                const grid = document.getElementById('grid');
+                if (!currentCell || !grid) {
+                    return {
+                        left: 0,
+                        top: 0,
+                        right: 0,
+                        bottom: 0,
+                        width: 0,
+                        height: 0
+                    };
+                }
+
+                const gridRect = grid.getBoundingClientRect();
+                const scaledSize = CELL_SIZE * currentScale;
+                const left = gridRect.left + (currentCell.pixelX * currentScale);
+                const top = gridRect.top + (currentCell.pixelY * currentScale);
+
+                return {
+                    left,
+                    top,
+                    right: left + scaledSize,
+                    bottom: top + scaledSize,
+                    width: scaledSize,
+                    height: scaledSize
+                };
+            }
+        };
+    }
+
+    refreshOpenModal() {
+        const modal = document.getElementById('task-modal');
+        if (!modal?.classList.contains('open') || !activePopoverAnchor) {
+            return;
+        }
+
+        if (!this.isAnchorConnected(activePopoverAnchor)) {
+            this.hideModal();
+            return;
+        }
+
+        const task = activePopoverAnchor._task;
+        if (task) {
+            showModal(task, activePopoverAnchor);
+        }
+    }
+
+    refreshPopoverPosition() {
+        if (activePopoverAnchor && this.isAnchorConnected(activePopoverAnchor)) {
+            this.positionPopover(activePopoverAnchor);
+        } else if (activePopoverAnchor) {
+            this.hideModal();
+        }
+    }
+
+    positionPopover(anchor) {
+        const modal = document.getElementById('task-modal');
+        const content = modal.querySelector('.modal-content');
+        if (!anchor || !content || !modal.classList.contains('open')) {
+            return;
+        }
+
+        const gap = 14;
+        const pad = 12;
+        const anchorRect = anchor.getBoundingClientRect();
+        const contentRect = content.getBoundingClientRect();
+
+        let top = anchorRect.bottom + gap;
+        let side = 'bottom';
+        if (top + contentRect.height > window.innerHeight - pad && anchorRect.top - gap - contentRect.height >= pad) {
+            top = anchorRect.top - gap - contentRect.height;
+            side = 'top';
+        }
+
+        top = clamp(top, pad, window.innerHeight - contentRect.height - pad);
+
+        let left = anchorRect.left + (anchorRect.width / 2) - (contentRect.width / 2);
+        left = clamp(left, pad, window.innerWidth - contentRect.width - pad);
+
+        const arrowX = clamp(anchorRect.left + (anchorRect.width / 2) - left, 24, contentRect.width - 24);
+        content.style.top = `${top}px`;
+        content.style.left = `${left}px`;
+        content.style.setProperty('--popover-arrow-x', `${arrowX}px`);
+        modal.dataset.side = side;
+    }
+
+    hideModal() {
+        const modal = document.getElementById('task-modal');
+        modal.classList.remove('open');
+        activePopoverAnchor = null;
+    }
+}
+
+const taskModal = new TaskModal();
 
 function ensureGridCanvas() {
     const grid = document.getElementById('grid');
@@ -2408,7 +2554,7 @@ function drawCellBackgroundSprite(spriteContext, state, options = {}) {
     const x = 0;
     const y = 0;
 
-    const themePalette = getActiveCellPalette();
+    const themePalette = uiSettings.getActiveCellPalette();
     const palette = themePalette[state] || themePalette.hidden;
     const borderWidth = palette.borderWidth || 1;
 
@@ -2464,14 +2610,14 @@ function drawCellSpriteForeground(spriteContext, cell, palette, imageState) {
     if (imageState.image) {
         const imageRect = getContainedImageRect(imageState.image, imageX, imageY, imageSize, imageSize);
         spriteContext.save();
-        spriteContext.shadowColor = getActiveCellPalette().imageShadow;
+        spriteContext.shadowColor = uiSettings.getActiveCellPalette().imageShadow;
         spriteContext.shadowBlur = 6;
         spriteContext.shadowOffsetY = 2;
         spriteContext.drawImage(imageState.image, imageRect.x, imageRect.y, imageRect.width, imageRect.height);
         spriteContext.restore();
     } else if (imageState.hasImageSource) {
         drawRoundedRect(spriteContext, imageX + 2, imageY + 2, imageSize - 4, imageSize - 4, 8);
-        spriteContext.fillStyle = getActiveCellPalette().placeholderFill;
+        spriteContext.fillStyle = uiSettings.getActiveCellPalette().placeholderFill;
         spriteContext.fill();
         spriteContext.fillStyle = palette.text;
         spriteContext.font = '700 16px sans-serif';
@@ -2555,11 +2701,11 @@ function ensureCellSprite(cell) {
     spriteContext.imageSmoothingEnabled = false;
     spriteContext.clearRect(0, 0, CELL_SIZE, CELL_SIZE);
 
-    const themePalette = getActiveCellPalette();
+    const themePalette = uiSettings.getActiveCellPalette();
     const palette = themePalette[cell.state] || themePalette.hidden;
 
     const borderColor = cell.state === 'incomplete'
-        ? getTierColor(cell.task?.tier)
+        ? uiSettings.getTierColor(cell.task?.tier)
         : '';
 
     drawCellBackgroundSprite(spriteContext, cell.state, { borderColor });
@@ -2763,7 +2909,7 @@ function drawCanvasCell(context, cell, now) {
         alpha *= completeCellOpacity;
     }
 
-    alpha *= getTierOpacityForCell(cell);
+    alpha *= uiSettings.getTierOpacityForCell(cell);
 
     const x = cell.pixelX;
     const y = cell.pixelY;
@@ -2800,7 +2946,7 @@ function drawCanvasCell(context, cell, now) {
     if (!(hideTierHintOnLocked && state === 'locked')) {
         context.beginPath();
         context.arc(x + CELL_SIZE - 8, y + 8, 4, 0, Math.PI * 2);
-        context.fillStyle = getTierColor(cell.task.tier);
+        context.fillStyle = uiSettings.getTierColor(cell.task.tier);
         context.fill();
     }
 
@@ -3016,7 +3162,7 @@ function bindCanvasInteractions(canvas) {
             return;
         }
 
-        showModal(cell.task, createCellAnchor(cell));
+        showModal(cell.task, taskModal.createCellAnchor(cell));
     });
 
     canvas.addEventListener('contextmenu', e => {
@@ -3219,29 +3365,6 @@ function saveStates(map) {
     }
 }
 
-function updateUnlockHud() {
-    const unlocks = document.getElementById('hud-unlocks');
-    const nextUnlock = document.getElementById('hud-next-unlock');
-    if (!unlocks || !nextUnlock) {
-        return;
-    }
-
-    const completedCount = taskManager.getCompletedCount();
-    const totalUnlocks = taskManager.getUnlockLimit(completedCount);
-    const availableUnlocks = Math.max(0, totalUnlocks - taskManager.getUnlockedCount());
-    const tasksUntilNext = taskManager.getTasksUntilNextUnlock(completedCount);
-
-    unlocks.textContent = `${availableUnlocks} / ${totalUnlocks}`;
-    nextUnlock.textContent = tasksUntilNext === 1 ? '1 task' : `${tasksUntilNext} tasks`;
-    taskPanels.updateTierProgressMenu();
-    taskPanels.updateCurrentTasksPopover();
-
-    const tierTasksModal = document.getElementById('tier-tasks-modal');
-    if (tierTasksModal?.classList.contains('open')) {
-        taskPanels.renderTierTasksModal();
-    }
-}
-
 function formatTierName(tier) {
     return String(tier || '')
         .split('-')
@@ -3253,23 +3376,6 @@ function formatTierName(tier) {
 function getTierSortIndex(tier) {
     const index = TIER_DISPLAY_ORDER.indexOf(tier);
     return index === -1 ? Number.POSITIVE_INFINITY : index;
-}
-
-function refreshOpenModal() {
-    const modal = document.getElementById('task-modal');
-    if (!modal?.classList.contains('open') || !activePopoverAnchor) {
-        return;
-    }
-
-    if (!isAnchorConnected(activePopoverAnchor)) {
-        hideModal();
-        return;
-    }
-
-    const task = activePopoverAnchor._task;
-    if (task) {
-        showModal(task, activePopoverAnchor);
-    }
 }
 
 async function syncCompletedTasksFromObtained(options = {}) {
@@ -3324,7 +3430,7 @@ async function syncCompletedTasksFromObtained(options = {}) {
 
         completedCount += batch.length;
         taskManager.normalizeUnlockStates();
-        updateUnlockHud();
+        hudManager.updateUnlockHud();
         refreshHiddenEdges({ animate: false });
 
         if (index + 1 < distanceBatches.length) {
@@ -3334,7 +3440,7 @@ async function syncCompletedTasksFromObtained(options = {}) {
 
     taskManager.revealFrontierFromCompletedTasks();
     taskManager.normalizeUnlockStates();
-    updateUnlockHud();
+    hudManager.updateUnlockHud();
 
     if (completedCount > 0) {
         refreshHiddenEdges({ animate: false });
@@ -3342,11 +3448,11 @@ async function syncCompletedTasksFromObtained(options = {}) {
 
     const nextLimit = taskManager.getUnlockLimit();
     if (showToast && nextLimit > previousLimit) {
-        showUnlockToast(nextLimit);
+        hudManager.showUnlockToast(nextLimit);
     }
 
     if (refreshModal) {
-        refreshOpenModal();
+        taskModal.refreshOpenModal();
     }
 
     return completedCount;
@@ -3398,14 +3504,6 @@ function updateGridScale(options = {}) {
     flushZoomRender();
 }
 
-function refreshPopoverPosition() {
-    if (activePopoverAnchor && isAnchorConnected(activePopoverAnchor)) {
-        positionPopover(activePopoverAnchor);
-    } else if (activePopoverAnchor) {
-        hideModal();
-    }
-}
-
 function bindWheelZoom(container) {
     container.addEventListener('wheel', e => {
         e.preventDefault();
@@ -3440,12 +3538,12 @@ function bindWheelZoom(container) {
             prewarmVisibleCellSprites();
             queueCanvasRender();
         }
-        refreshPopoverPosition();
+        taskModal.refreshPopoverPosition();
     }, { passive: false });
 
     window.addEventListener('resize', () => {
         updateGridScale();
-        refreshPopoverPosition();
+        taskModal.refreshPopoverPosition();
     });
 }
 
@@ -3502,40 +3600,9 @@ function createCell(task, coord) {
             left: false
         },
         getBoundingClientRect() {
-            return createCellAnchor(this).getBoundingClientRect();
+            return taskModal.createCellAnchor(this).getBoundingClientRect();
         }
     };
-}
-
-function positionPopover(anchor) {
-    const modal = document.getElementById('task-modal');
-    const content = modal.querySelector('.modal-content');
-    if (!anchor || !content || !modal.classList.contains('open')) {
-        return;
-    }
-
-    const gap = 14;
-    const pad = 12;
-    const anchorRect = anchor.getBoundingClientRect();
-    const contentRect = content.getBoundingClientRect();
-
-    let top = anchorRect.bottom + gap;
-    let side = 'bottom';
-    if (top + contentRect.height > window.innerHeight - pad && anchorRect.top - gap - contentRect.height >= pad) {
-        top = anchorRect.top - gap - contentRect.height;
-        side = 'top';
-    }
-
-    top = clamp(top, pad, window.innerHeight - contentRect.height - pad);
-
-    let left = anchorRect.left + (anchorRect.width / 2) - (contentRect.width / 2);
-    left = clamp(left, pad, window.innerWidth - contentRect.width - pad);
-
-    const arrowX = clamp(anchorRect.left + (anchorRect.width / 2) - left, 24, contentRect.width - 24);
-    content.style.top = `${top}px`;
-    content.style.left = `${left}px`;
-    content.style.setProperty('--popover-arrow-x', `${arrowX}px`);
-    modal.dataset.side = side;
 }
 
 function revealNeighborAsLocked(id) {
@@ -3741,9 +3808,9 @@ function showModal(task, anchor) {
             button.onclick = e => {
                 e.preventDefault();
                 taskManager.applyTaskCompletion(task);
-                updateUnlockHud();
+                hudManager.updateUnlockHud();
                 refreshHiddenEdges({ animate: true });
-                hideModal();
+                taskModal.hideModal();
             };
         } else {
             button.style.display = 'none';
@@ -3753,7 +3820,7 @@ function showModal(task, anchor) {
         activePopoverAnchor = anchor || cell;
         modal.classList.add('open');
         requestAnimationFrame(() => {
-            refreshPopoverPosition();
+            taskModal.refreshPopoverPosition();
         });
         return;
     }
@@ -3780,13 +3847,13 @@ function showModal(task, anchor) {
             e.preventDefault();
             const previousLimit = taskManager.getUnlockLimit();
             taskManager.applyTaskCompletion(task);
-            updateUnlockHud();
+            hudManager.updateUnlockHud();
             refreshHiddenEdges({ animate: true });
             const nextLimit = taskManager.getUnlockLimit();
             if (nextLimit > previousLimit) {
-                showUnlockToast(nextLimit);
+                hudManager.showUnlockToast(nextLimit);
             }
-            hideModal();
+            taskModal.hideModal();
         };
     } else if (state === 'locked') {
         const unlockLimit = taskManager.getUnlockLimit();
@@ -3808,10 +3875,10 @@ function showModal(task, anchor) {
 
             const unlockedTask = taskVerification.alignUnlockedTaskToLowestSeriesTask(task);
 
-            updateUnlockHud();
+            hudManager.updateUnlockHud();
             refreshHiddenEdges({ animate: true });
 
-            hideModal();
+            taskModal.hideModal();
             requestAnimationFrame(() => {
                 const unlockedTaskId = String(unlockedTask?.id || task.id);
                 const unlockedCell = getCellById(unlockedTaskId);
@@ -3819,7 +3886,7 @@ function showModal(task, anchor) {
                     return;
                 }
 
-                showModal(unlockedCell.task, createCellAnchor(unlockedCell));
+                showModal(unlockedCell.task, taskModal.createCellAnchor(unlockedCell));
             });
         } : null;
     } else {
@@ -3832,8 +3899,8 @@ function showModal(task, anchor) {
         const tier = task.tier || '';
         const shouldHideTierBadge = hideTierHintOnLocked && state === 'locked';
         if (tier && !shouldHideTierBadge) {
-            const bgColor = getTierColor(tier);
-            const textColor = getReadableTextColor(bgColor);
+            const bgColor = uiSettings.getTierColor(tier);
+            const textColor = uiSettings.getReadableTextColor(bgColor);
             tierBadge.textContent = formatTierName(tier) || 'Unknown';
             tierBadge.style.background = bgColor;
             tierBadge.style.color = textColor;
@@ -3954,42 +4021,8 @@ function showModal(task, anchor) {
     activePopoverAnchor = anchor || cell;
     modal.classList.add('open');
     requestAnimationFrame(() => {
-        refreshPopoverPosition();
+        taskModal.refreshPopoverPosition();
     });
-}
-
-function hideModal() {
-    const modal = document.getElementById('task-modal');
-    modal.classList.remove('open');
-    activePopoverAnchor = null;
-}
-
-let unlockToastTimer = null;
-
-function showUnlockToast(newLimit) {
-    const toast = document.getElementById('unlock-toast');
-    const slots = document.getElementById('unlock-toast-slots');
-    if (!toast || !slots) {
-        return;
-    }
-
-    slots.textContent = newLimit;
-
-    if (unlockToastTimer) {
-        clearTimeout(unlockToastTimer);
-        unlockToastTimer = null;
-    }
-
-    toast.classList.remove('leaving');
-    // force reflow so transition plays even if already visible
-    void toast.offsetWidth;
-    toast.classList.add('visible');
-
-    unlockToastTimer = setTimeout(() => {
-        toast.classList.add('leaving');
-        setTimeout(() => toast.classList.remove('visible', 'leaving'), 350);
-        unlockToastTimer = null;
-    }, UNLOCK_TOAST_DURATION_MS);
 }
 
 function render(tasks) {
@@ -3998,7 +4031,7 @@ function render(tasks) {
         return;
     }
 
-    hideModal();
+    taskModal.hideModal();
     hoveredCellId = '';
     if (gridCanvas) {
         gridCanvas.style.cursor = 'default';
@@ -4052,7 +4085,7 @@ function render(tasks) {
 
     refreshHiddenEdges({ animate: true, center, revealDelayByCoord, staggerMs: revealStagger, revealEasing: 'ease-in' });
     updateGridScale();
-    updateUnlockHud();
+    hudManager.updateUnlockHud();
     scheduleSpritePrewarm(0);
     queueCanvasRender();
 
@@ -4069,10 +4102,10 @@ window.addEventListener('DOMContentLoaded', () => {
     const tierProgressButton = document.getElementById('tier-progress-button');
     const currentTasksButton = document.getElementById('current-tasks-button');
 
-    initThemeToggle();
-    initOptionsMenu();
+    uiSettings.initThemeToggle();
+    uiSettings.initOptionsMenu();
 
-    close.addEventListener('click', hideModal);
+    close.addEventListener('click', () => taskModal.hideModal());
 
     if (tierTasksClose) {
         tierTasksClose.addEventListener('click', () => taskPanels.hideTierTasksModal());
@@ -4096,20 +4129,14 @@ window.addEventListener('DOMContentLoaded', () => {
     const toastClose = document.querySelector('.unlock-toast-close');
     if (toastClose) {
         toastClose.addEventListener('click', () => {
-            const toast = document.getElementById('unlock-toast');
-            if (unlockToastTimer) {
-                clearTimeout(unlockToastTimer);
-                unlockToastTimer = null;
-            }
-            toast.classList.add('leaving');
-            setTimeout(() => toast.classList.remove('visible', 'leaving'), 350);
+            hudManager.dismissUnlockToast();
         });
     }
 
     document.addEventListener('mousedown', e => {
         const clickedPopover = e.target.closest('#task-modal .modal-content');
         if (modal.classList.contains('open') && !clickedPopover) {
-            hideModal();
+            taskModal.hideModal();
         }
 
         const clickedTierPopover = e.target.closest('#tier-tasks-modal .modal-content');
@@ -4125,16 +4152,16 @@ window.addEventListener('DOMContentLoaded', () => {
 
         const optionsWrap = document.getElementById('options-wrap');
         if (optionsWrap && !optionsWrap.contains(e.target)) {
-            closeOptionsPopover();
+            uiSettings.closeOptionsPopover();
         }
     });
 
     document.addEventListener('keydown', e => {
         if (e.key === 'Escape') {
-            hideModal();
+            taskModal.hideModal();
             taskPanels.hideTierTasksModal();
             taskPanels.closeCurrentTasksPopover();
-            closeOptionsPopover();
+            uiSettings.closeOptionsPopover();
         }
     });
 
@@ -4308,7 +4335,7 @@ function startApp() {
     }
 
     all = taskManager.setTasks(all);
-    applyTierFilters(selectedTierFilters, { persist: false, rerender: false });
+    uiSettings.applyTierFilters(selectedTierFilters, { persist: false, rerender: false });
     gridModel.updateTaskCoordinates(all);
 
     if (!freshOrder && taskListChanged) {
@@ -4316,7 +4343,7 @@ function startApp() {
     }
 
     taskManager.normalizeUnlockStates();
-    updateUnlockHud();
+    hudManager.updateUnlockHud();
 
     const loadingIcons = Array.from(document.querySelectorAll('#loading .loading-icon'));
     loadingIcons.forEach(icon => {
@@ -4375,7 +4402,7 @@ function startApp() {
         if (!isZooming) {
             queueCanvasRender();
         }
-        refreshPopoverPosition();
+        taskModal.refreshPopoverPosition();
     }, { passive: true });
 
     container.addEventListener('mousedown', e => {
@@ -4409,7 +4436,7 @@ function startApp() {
             container.scrollTop -= dy;
             lastX = e.clientX;
             lastY = e.clientY;
-            refreshPopoverPosition();
+            taskModal.refreshPopoverPosition();
             e.preventDefault();
         }
     });
