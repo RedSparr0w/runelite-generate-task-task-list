@@ -3101,20 +3101,35 @@ async function syncCompletedTasksFromObtained(options = {}) {
             const requiredCount = getTaskRequiredCount(task);
             return requiredCount > 0 && getTaskObtainedCount(task) >= requiredCount;
         })
-        .sort((a, b) => {
-            const coordA = getTaskCoord(a);
-            const coordB = getTaskCoord(b);
-            const distanceA = Math.abs(coordA.x - center.x) + Math.abs(coordA.y - center.y);
-            const distanceB = Math.abs(coordB.x - center.x) + Math.abs(coordB.y - center.y);
-            return distanceA - distanceB;
-        });
+        .map(task => {
+            const coord = getTaskCoord(task);
+            return {
+                task,
+                distance: Math.abs(coord.x - center.x) + Math.abs(coord.y - center.y)
+            };
+        })
+        .sort((a, b) => a.distance - b.distance);
 
-    const revealStagger = tasksToComplete.length * POP_STAGGER_MS > INITIAL_REVEAL_DURATION_MS
-        ? INITIAL_REVEAL_DURATION_MS / (tasksToComplete.length - 1)
-        : POP_STAGGER_MS;
+    const distanceBatches = [];
+    tasksToComplete.forEach(entry => {
+        const previousBatch = distanceBatches[distanceBatches.length - 1];
+        if (!previousBatch || previousBatch.distance !== entry.distance) {
+            distanceBatches.push({
+                distance: entry.distance,
+                tasks: [entry.task]
+            });
+            return;
+        }
 
-    for (let index = 0; index < tasksToComplete.length; index++) {
-        const batch = tasksToComplete.slice(index, index + 1);
+        previousBatch.tasks.push(entry.task);
+    });
+
+    const revealStagger = distanceBatches.length * batchDelay > INITIAL_REVEAL_DURATION_MS
+        ? INITIAL_REVEAL_DURATION_MS / Math.max(1, distanceBatches.length - 1)
+        : batchDelay;
+
+    for (let index = 0; index < distanceBatches.length; index++) {
+        const batch = distanceBatches[index].tasks;
         batch.forEach(task => {
             applyTaskCompletion(task);
         });
@@ -3124,8 +3139,8 @@ async function syncCompletedTasksFromObtained(options = {}) {
         updateUnlockHud();
         refreshHiddenEdges({ animate: false });
 
-        if (index + 1 < tasksToComplete.length) {
-            await wait(revealStagger);
+        if (index + 1 < distanceBatches.length) {
+            await wait(revealStagger * 2);
         }
     }
 
