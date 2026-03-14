@@ -129,10 +129,6 @@ let activePopoverAnchor = null;
 let stateMap = loadStates();
 let playerUsername = '';
 let hasStartedApp = false;
-let obtainedItemIds = new Set();
-let completedAchievementDiaryKeys = new Set();
-let playerSkillExperienceBySkill = new Map();
-let playerSkillLevelBySkill = new Map();
 let syncButtonStatusTimer = null;
 let activeTierTab = '';
 let gridCanvas = null;
@@ -358,9 +354,363 @@ class GameController {
     }
 }
 
+class PlayerProgress {
+    static finalizeSkillSnapshots(skillExperienceBySkill, skillLevelBySkill) {
+        skillLevelBySkill.forEach((level, skillName) => {
+            if (!Number.isFinite(skillExperienceBySkill.get(skillName))) {
+                const experience = levelToExperience(level);
+                if (Number.isFinite(experience) && experience >= 0) {
+                    skillExperienceBySkill.set(skillName, experience);
+                }
+            }
+        });
+
+        skillExperienceBySkill.forEach((experience, skillName) => {
+            if (!Number.isFinite(skillLevelBySkill.get(skillName))) {
+                const level = experienceToLevel(experience);
+                if (Number.isFinite(level) && level >= 1) {
+                    skillLevelBySkill.set(skillName, level);
+                }
+            }
+        });
+    }
+
+    constructor() {
+        this.clear();
+    }
+
+    clear() {
+        this.obtainedItemIds = new Set();
+        this.completedAchievementDiaryKeys = new Set();
+        this.skillExperienceBySkill = new Map();
+        this.skillLevelBySkill = new Map();
+    }
+
+    applySnapshot(playerSnapshot) {
+        if (!playerSnapshot || typeof playerSnapshot !== 'object') {
+            this.clear();
+            return;
+        }
+
+        this.obtainedItemIds = playerSnapshot.obtainedItemIds instanceof Set
+            ? new Set(playerSnapshot.obtainedItemIds)
+            : new Set();
+
+        this.completedAchievementDiaryKeys = playerSnapshot.completedAchievementDiaryKeys instanceof Set
+            ? new Set(playerSnapshot.completedAchievementDiaryKeys)
+            : new Set();
+
+        const nextSkillExperience = playerSnapshot.playerSkillExperienceBySkill instanceof Map
+            ? new Map(playerSnapshot.playerSkillExperienceBySkill)
+            : new Map();
+        const nextSkillLevels = playerSnapshot.playerSkillLevelBySkill instanceof Map
+            ? new Map(playerSnapshot.playerSkillLevelBySkill)
+            : new Map();
+
+        PlayerProgress.finalizeSkillSnapshots(nextSkillExperience, nextSkillLevels);
+        this.skillExperienceBySkill = nextSkillExperience;
+        this.skillLevelBySkill = nextSkillLevels;
+    }
+
+    getSkillLevel(skillName) {
+        const normalizedSkill = normalizeSkillName(skillName);
+        if (!normalizedSkill) {
+            return Number.NaN;
+        }
+
+        const storedLevel = this.skillLevelBySkill.get(normalizedSkill);
+        if (Number.isFinite(storedLevel) && storedLevel >= 1) {
+            return Math.floor(storedLevel);
+        }
+
+        const experience = this.skillExperienceBySkill.get(normalizedSkill);
+        const derivedLevel = experienceToLevel(experience);
+        if (Number.isFinite(derivedLevel) && derivedLevel >= 1) {
+            return Math.floor(derivedLevel);
+        }
+
+        return Number.NaN;
+    }
+
+    hasObtainedItem(itemId) {
+        const numericId = Number(itemId);
+        return Number.isFinite(numericId) && this.obtainedItemIds.has(numericId);
+    }
+
+    hasCompletedAchievementDiary(region, difficulty) {
+        if (!region || !difficulty) {
+            return false;
+        }
+
+        return this.completedAchievementDiaryKeys.has(getAchievementDiaryKey(region, difficulty));
+    }
+
+    isSkillRequirementMet(requirement, requiredLevel = Number.NaN) {
+        const resolvedRequiredLevel = Number.isFinite(requiredLevel)
+            ? requiredLevel
+            : (() => {
+                const computedLevel = experienceToLevel(requirement?.requiredExperience);
+                return Number.isFinite(computedLevel) && computedLevel >= 1
+                    ? Math.floor(computedLevel)
+                    : 1;
+            })();
+        const playerLevel = this.getSkillLevel(requirement?.skillName);
+        if (Number.isFinite(playerLevel)) {
+            return playerLevel >= resolvedRequiredLevel;
+        }
+
+        const playerExperience = this.skillExperienceBySkill.get(requirement?.skillName);
+        return Number.isFinite(playerExperience) && playerExperience >= requirement.requiredExperience;
+    }
+}
+
 class Wiki {
     constructor() {
         this.collectionLogMap = new Map();
+    }
+
+    getSkillExperienceValue(skillData) {
+        const numericValue = Number(skillData);
+        if (Number.isFinite(numericValue) && numericValue >= 0) {
+            return numericValue;
+        }
+
+        if (!skillData || typeof skillData !== 'object') {
+            return Number.NaN;
+        }
+
+        const experienceCandidates = [
+            skillData.experience,
+            skillData.xp,
+            skillData.exp,
+            skillData.experience_points,
+            skillData.experiencePoints
+        ];
+        for (const candidate of experienceCandidates) {
+            const parsed = Number(candidate);
+            if (Number.isFinite(parsed) && parsed >= 0) {
+                return parsed;
+            }
+        }
+
+        const levelExperience = levelToExperience(skillData.level);
+        if (Number.isFinite(levelExperience) && levelExperience >= 0) {
+            return levelExperience;
+        }
+
+        return Number.NaN;
+    }
+
+    getSkillLevelValue(skillData) {
+        const numericValue = Number(skillData);
+        if (Number.isFinite(numericValue) && numericValue >= 1) {
+            return Math.floor(numericValue);
+        }
+
+        if (!skillData || typeof skillData !== 'object') {
+            return Number.NaN;
+        }
+
+        const levelCandidates = [
+            skillData.level,
+            skillData.lvl,
+            skillData.skillLevel,
+            skillData.skill_level
+        ];
+        for (const candidate of levelCandidates) {
+            const parsed = Number(candidate);
+            if (Number.isFinite(parsed) && parsed >= 1) {
+                return Math.floor(parsed);
+            }
+        }
+
+        const experienceLevel = experienceToLevel(this.getSkillExperienceValue(skillData));
+        if (Number.isFinite(experienceLevel) && experienceLevel >= 1) {
+            return experienceLevel;
+        }
+
+        return Number.NaN;
+    }
+
+    addSkillExperienceEntry(targetMap, rawSkillName, skillData) {
+        const skillName = normalizeSkillName(rawSkillName);
+        if (!skillName) {
+            return;
+        }
+
+        const experience = this.getSkillExperienceValue(skillData);
+        if (!Number.isFinite(experience) || experience < 0) {
+            return;
+        }
+
+        const existing = targetMap.get(skillName);
+        if (!Number.isFinite(existing) || experience > existing) {
+            targetMap.set(skillName, experience);
+        }
+    }
+
+    addSkillLevelEntry(targetMap, rawSkillName, skillData) {
+        const skillName = normalizeSkillName(rawSkillName);
+        if (!skillName) {
+            return;
+        }
+
+        const level = this.getSkillLevelValue(skillData);
+        if (!Number.isFinite(level) || level < 1) {
+            return;
+        }
+
+        const existing = targetMap.get(skillName);
+        if (!Number.isFinite(existing) || level > existing) {
+            targetMap.set(skillName, level);
+        }
+    }
+
+    extractSkillExperienceFromContainer(container, targetMap) {
+        if (!container) {
+            return;
+        }
+
+        if (Array.isArray(container)) {
+            container.forEach(entry => {
+                if (!entry || typeof entry !== 'object') {
+                    return;
+                }
+
+                if (Array.isArray(entry) && entry.length >= 2) {
+                    this.addSkillExperienceEntry(targetMap, entry[0], entry[1]);
+                    return;
+                }
+
+                const rawSkillName = entry.skill ?? entry.name ?? entry.id ?? entry.type;
+                if (!rawSkillName) {
+                    return;
+                }
+
+                this.addSkillExperienceEntry(targetMap, rawSkillName, entry);
+            });
+            return;
+        }
+
+        if (typeof container !== 'object') {
+            return;
+        }
+
+        Object.entries(container).forEach(([rawSkillName, skillData]) => {
+            this.addSkillExperienceEntry(targetMap, rawSkillName, skillData);
+        });
+    }
+
+    extractSkillLevelsFromContainer(container, targetMap) {
+        if (!container) {
+            return;
+        }
+
+        if (Array.isArray(container)) {
+            container.forEach(entry => {
+                if (!entry || typeof entry !== 'object') {
+                    return;
+                }
+
+                if (Array.isArray(entry) && entry.length >= 2) {
+                    this.addSkillLevelEntry(targetMap, entry[0], entry[1]);
+                    return;
+                }
+
+                const rawSkillName = entry.skill ?? entry.name ?? entry.id ?? entry.type;
+                if (!rawSkillName) {
+                    return;
+                }
+
+                this.addSkillLevelEntry(targetMap, rawSkillName, entry);
+            });
+            return;
+        }
+
+        if (typeof container !== 'object') {
+            return;
+        }
+
+        Object.entries(container).forEach(([rawSkillName, skillData]) => {
+            this.addSkillLevelEntry(targetMap, rawSkillName, skillData);
+        });
+    }
+
+    extractPlayerSkillExperience(payload) {
+        const skillExperience = new Map();
+        if (!payload || typeof payload !== 'object') {
+            return skillExperience;
+        }
+
+        const containers = [
+            payload.skills,
+            payload.skill_experience,
+            payload.skillExperience,
+            payload.experience,
+            payload.experience?.skills,
+            payload.player_skills,
+            payload.playerSkills,
+            payload.player?.skills,
+            payload.hiscores?.skills,
+            payload.hiscore?.skills
+        ];
+
+        containers.forEach(container => {
+            this.extractSkillExperienceFromContainer(container, skillExperience);
+        });
+
+        return skillExperience;
+    }
+
+    extractPlayerSkillLevels(payload) {
+        const skillLevels = new Map();
+        if (!payload || typeof payload !== 'object') {
+            return skillLevels;
+        }
+
+        const containers = [
+            payload.levels,
+            payload.skill_levels,
+            payload.skillLevels,
+            payload.player_levels,
+            payload.playerLevels,
+            payload.player?.levels,
+            payload.hiscores?.levels,
+            payload.hiscore?.levels
+        ];
+
+        containers.forEach(container => {
+            this.extractSkillLevelsFromContainer(container, skillLevels);
+        });
+
+        return skillLevels;
+    }
+
+    extractCompletedAchievementDiaryKeys(achievementDiaries) {
+        const completedKeys = new Set();
+        if (!achievementDiaries || typeof achievementDiaries !== 'object') {
+            return completedKeys;
+        }
+
+        Object.entries(achievementDiaries).forEach(([rawRegion, regionData]) => {
+            const region = normalizeAchievementDiaryRegion(rawRegion);
+            if (!region || !regionData || typeof regionData !== 'object') {
+                return;
+            }
+
+            Object.entries(regionData).forEach(([rawDifficulty, difficultyData]) => {
+                const difficulty = normalizeAchievementDiaryDifficulty(rawDifficulty);
+                if (!difficulty || !difficultyData || typeof difficultyData !== 'object') {
+                    return;
+                }
+
+                if (difficultyData.complete === true) {
+                    completedKeys.add(getAchievementDiaryKey(region, difficulty));
+                }
+            });
+        });
+
+        return completedKeys;
     }
 
     buildCollectionLogEntry(name, category) {
@@ -446,12 +796,12 @@ class Wiki {
                     const { ts, ids, achievementDiaryKeys, skillExperience, skillLevels } = JSON.parse(raw);
                     if (Date.now() - ts < PLAYER_CL_CACHE_TTL && Array.isArray(ids)) {
                         const cachedSkillExperience = new Map();
-                        extractSkillExperienceFromContainer(skillExperience, cachedSkillExperience);
+                        this.extractSkillExperienceFromContainer(skillExperience, cachedSkillExperience);
 
                         const cachedSkillLevels = new Map();
-                        extractSkillLevelsFromContainer(skillLevels, cachedSkillLevels);
+                        this.extractSkillLevelsFromContainer(skillLevels, cachedSkillLevels);
 
-                        finalizePlayerSkillSnapshots(cachedSkillExperience, cachedSkillLevels);
+                        PlayerProgress.finalizeSkillSnapshots(cachedSkillExperience, cachedSkillLevels);
 
                         return {
                             obtainedItemIds: new Set(ids.map(id => Number(id)).filter(id => Number.isInteger(id) && id > 0)),
@@ -482,11 +832,11 @@ class Wiki {
             const ids = Array.isArray(payload.collection_log)
                 ? payload.collection_log.map(id => Number(id)).filter(id => Number.isInteger(id) && id > 0)
                 : [];
-            const completedAchievementDiaryKeys = extractCompletedAchievementDiaryKeys(payload.achievement_diaries);
-            const playerSkillExperienceBySkill = extractPlayerSkillExperience(payload);
-            const playerSkillLevelBySkill = extractPlayerSkillLevels(payload);
+            const completedAchievementDiaryKeys = this.extractCompletedAchievementDiaryKeys(payload.achievement_diaries);
+            const playerSkillExperienceBySkill = this.extractPlayerSkillExperience(payload);
+            const playerSkillLevelBySkill = this.extractPlayerSkillLevels(payload);
 
-            finalizePlayerSkillSnapshots(playerSkillExperienceBySkill, playerSkillLevelBySkill);
+            PlayerProgress.finalizeSkillSnapshots(playerSkillExperienceBySkill, playerSkillLevelBySkill);
 
             try {
                 localStorage.setItem(cacheKey, JSON.stringify({
@@ -513,10 +863,479 @@ class Wiki {
     }
 }
 
+class TaskVerification {
+    constructor(taskManager, playerProgress) {
+        this.taskManager = taskManager;
+        this.playerProgress = playerProgress;
+    }
+
+    getTaskVerificationItemIds(task) {
+        if (task?.verification?.method !== 'collection-log') {
+            return [];
+        }
+
+        return Array.isArray(task?.verification?.itemIds)
+            ? task.verification.itemIds
+            : [];
+    }
+
+    getTaskSkillExperienceRequirements(task) {
+        if (task?.verification?.method !== 'skill') {
+            return [];
+        }
+
+        const experienceRequirements = task?.verification?.experience;
+        if (!experienceRequirements || typeof experienceRequirements !== 'object') {
+            return [];
+        }
+
+        return Object.entries(experienceRequirements)
+            .map(([rawSkillName, rawExperience]) => {
+                const skillName = normalizeSkillName(rawSkillName);
+                const requiredExperience = Number(rawExperience);
+                return { skillName, requiredExperience };
+            })
+            .filter(requirement => {
+                return Boolean(requirement.skillName)
+                    && Number.isFinite(requirement.requiredExperience)
+                    && requirement.requiredExperience >= 0;
+            });
+    }
+
+    getRequiredSkillLevelForRequirement(requirement) {
+        const requiredLevel = experienceToLevel(requirement?.requiredExperience);
+        return Number.isFinite(requiredLevel) && requiredLevel >= 1
+            ? Math.floor(requiredLevel)
+            : 1;
+    }
+
+    getTaskRequiredCount(task) {
+        if (task?.verification?.method === 'achievement-diary') {
+            return 1;
+        }
+
+        if (task?.verification?.method === 'skill') {
+            const requirements = this.getTaskSkillExperienceRequirements(task);
+            if (requirements.length === 0) {
+                return 0;
+            }
+
+            const rawRequired = task?.verification?.count;
+            return Number.isFinite(rawRequired)
+                ? clamp(Math.floor(rawRequired), 1, requirements.length)
+                : requirements.length;
+        }
+
+        const totalItems = this.getTaskVerificationItemIds(task).length;
+        if (totalItems === 0) {
+            return 0;
+        }
+
+        const rawRequired = task?.verification?.count;
+        return Number.isFinite(rawRequired)
+            ? clamp(Math.floor(rawRequired), 1, totalItems)
+            : totalItems;
+    }
+
+    getTaskObtainedCount(task) {
+        if (task?.verification?.method === 'achievement-diary') {
+            const region = normalizeAchievementDiaryRegion(task?.verification?.region);
+            const difficulty = normalizeAchievementDiaryDifficulty(task?.verification?.difficulty);
+            return this.playerProgress.hasCompletedAchievementDiary(region, difficulty) ? 1 : 0;
+        }
+
+        if (task?.verification?.method === 'skill') {
+            return this.getTaskSkillExperienceRequirements(task).reduce((count, requirement) => {
+                const requiredLevel = this.getRequiredSkillLevelForRequirement(requirement);
+                return count + (this.playerProgress.isSkillRequirementMet(requirement, requiredLevel) ? 1 : 0);
+            }, 0);
+        }
+
+        return this.getTaskVerificationItemIds(task).reduce((count, id) => {
+            return count + (this.playerProgress.hasObtainedItem(id) ? 1 : 0);
+        }, 0);
+    }
+
+    getCollectionLogSeriesKey(task) {
+        if (task?.verification?.method === 'collection-log') {
+            const itemIds = this.getTaskVerificationItemIds(task)
+                .map(id => Number(id))
+                .filter(Number.isFinite)
+                .sort((a, b) => a - b);
+
+            if (itemIds.length === 0) {
+                return '';
+            }
+
+            return `cl:${itemIds.join(',')}`;
+        }
+
+        if (task?.verification?.method === 'skill') {
+            const requirements = this.getTaskSkillExperienceRequirements(task)
+                .slice()
+                .sort((requirementA, requirementB) => {
+                    const nameDelta = requirementA.skillName.localeCompare(requirementB.skillName);
+                    if (nameDelta !== 0) {
+                        return nameDelta;
+                    }
+
+                    return requirementA.requiredExperience - requirementB.requiredExperience;
+                })
+                .map(requirement => `${requirement.skillName}:${Math.floor(requirement.requiredExperience)}`);
+
+            if (requirements.length === 0) {
+                return '';
+            }
+
+            return `skill:${requirements.join('|')}`;
+        }
+
+        return '';
+    }
+
+    isSeriesSwapCandidateState(state) {
+        return state === 'locked' || state === 'hidden';
+    }
+
+    getLowestPendingSeriesTask(task) {
+        const seriesKey = this.getCollectionLogSeriesKey(task);
+        if (!seriesKey) {
+            return task;
+        }
+
+        const taskOrderById = new Map(tasksGlobal.map((candidate, index) => [String(candidate.id), index]));
+        const seriesCandidates = tasksGlobal
+            .filter(candidate => this.getCollectionLogSeriesKey(candidate) === seriesKey)
+            .filter(candidate => this.isSeriesSwapCandidateState(this.taskManager.getState(candidate.id) || 'hidden'))
+            .sort((taskA, taskB) => {
+                const requiredDelta = this.getTaskRequiredCount(taskA) - this.getTaskRequiredCount(taskB);
+                if (requiredDelta !== 0) {
+                    return requiredDelta;
+                }
+
+                const indexA = taskOrderById.get(String(taskA.id)) ?? Number.POSITIVE_INFINITY;
+                const indexB = taskOrderById.get(String(taskB.id)) ?? Number.POSITIVE_INFINITY;
+                if (indexA !== indexB) {
+                    return indexA - indexB;
+                }
+
+                return String(taskA.id).localeCompare(String(taskB.id));
+            });
+
+        return seriesCandidates[0] || task;
+    }
+
+    alignUnlockedTaskToLowestSeriesTask(task) {
+        const unlockedTask = tasksGlobal.find(candidate => String(candidate.id) === String(task?.id));
+        if (!unlockedTask) {
+            return task;
+        }
+
+        const targetTask = this.getLowestPendingSeriesTask(unlockedTask);
+        if (!targetTask || String(targetTask.id) === String(unlockedTask.id)) {
+            return unlockedTask;
+        }
+
+        if (this.getTaskRequiredCount(targetTask) >= this.getTaskRequiredCount(unlockedTask)) {
+            return unlockedTask;
+        }
+
+        const swapped = swapTasksById(unlockedTask.id, targetTask.id, { swapStates: true });
+        return swapped ? targetTask : unlockedTask;
+    }
+}
+
+class TaskPanels {
+    constructor(taskManager) {
+        this.taskManager = taskManager;
+    }
+
+    getTierProgressByTier() {
+        const grouped = new Map();
+
+        tasksGlobal.forEach(task => {
+            if (task.id === INTRO_TASK_ID) {
+                return;
+            }
+
+            const tier = task.tier || 'other';
+            if (!grouped.has(tier)) {
+                grouped.set(tier, {
+                    tier,
+                    total: 0,
+                    completed: 0,
+                    tasks: []
+                });
+            }
+
+            const bucket = grouped.get(tier);
+            bucket.total += 1;
+            if (this.taskManager.getState(task.id) === 'complete') {
+                bucket.completed += 1;
+            }
+            bucket.tasks.push(task);
+        });
+
+        return Array.from(grouped.values()).sort((a, b) => {
+            const sortA = getTierSortIndex(a.tier);
+            const sortB = getTierSortIndex(b.tier);
+            if (sortA !== sortB) {
+                return sortA - sortB;
+            }
+            return a.tier.localeCompare(b.tier);
+        });
+    }
+
+    updateTierProgressMenu() {
+        const linesEl = document.getElementById('tier-progress-lines');
+        if (!linesEl) {
+            return;
+        }
+
+        const tierData = this.getTierProgressByTier();
+        linesEl.innerHTML = '';
+
+        if (tierData.length === 0) {
+            linesEl.textContent = 'No tasks loaded';
+            return;
+        }
+
+        tierData.forEach(entry => {
+            const row = document.createElement('span');
+            row.className = 'tier-progress-row';
+
+            const name = document.createElement('span');
+            name.className = 'tier-progress-name';
+            name.textContent = formatTierName(entry.tier);
+
+            const value = document.createElement('span');
+            value.className = 'tier-progress-value';
+            value.textContent = `${entry.completed}/${entry.total}`;
+
+            row.appendChild(name);
+            row.appendChild(value);
+            linesEl.appendChild(row);
+        });
+    }
+
+    renderTierTasksModal() {
+        const titleEl = document.getElementById('tier-tasks-title');
+        const tabsEl = document.getElementById('tier-tabs');
+        const listEl = document.getElementById('tier-tasks-list');
+        if (!titleEl || !tabsEl || !listEl) {
+            return;
+        }
+
+        const tierData = this.getTierProgressByTier();
+        tabsEl.innerHTML = '';
+        listEl.innerHTML = '';
+
+        if (tierData.length === 0) {
+            titleEl.textContent = 'Tier Tasks';
+            listEl.textContent = 'No tasks loaded';
+            return;
+        }
+
+        if (!activeTierTab || !tierData.some(entry => entry.tier === activeTierTab)) {
+            activeTierTab = tierData[0].tier;
+        }
+
+        tierData.forEach(entry => {
+            const tab = document.createElement('button');
+            tab.type = 'button';
+            tab.className = 'tier-tab';
+            if (entry.tier === activeTierTab) {
+                tab.classList.add('active');
+            }
+            tab.textContent = `${formatTierName(entry.tier)} (${entry.completed}/${entry.total})`;
+            tab.addEventListener('click', () => {
+                activeTierTab = entry.tier;
+                this.renderTierTasksModal();
+            });
+            tabsEl.appendChild(tab);
+        });
+
+        const selectedTier = tierData.find(entry => entry.tier === activeTierTab) || tierData[0];
+        titleEl.textContent = `${formatTierName(selectedTier.tier)} Tasks`;
+
+        const getTierListStateGroup = (state) => {
+            if (state === 'locked' || state === 'hidden') {
+                return 'hidden';
+            }
+
+            return state;
+        };
+
+        const stateOrder = {
+            incomplete: 0,
+            hidden: 1,
+            complete: 2
+        };
+
+        selectedTier.tasks
+            .slice()
+            .sort((taskA, taskB) => {
+                const stateA = getTierListStateGroup(this.taskManager.getState(taskA.id) || 'hidden');
+                const stateB = getTierListStateGroup(this.taskManager.getState(taskB.id) || 'hidden');
+                const rankA = stateOrder[stateA] ?? 99;
+                const rankB = stateOrder[stateB] ?? 99;
+                if (rankA !== rankB) {
+                    return rankA - rankB;
+                }
+                return taskA.name.localeCompare(taskB.name);
+            })
+            .forEach(task => {
+                const state = getTierListStateGroup(this.taskManager.getState(task.id) || 'hidden');
+
+                const row = document.createElement('div');
+                row.className = 'tier-task-row';
+
+                const taskName = document.createElement('span');
+                taskName.className = 'tier-task-name';
+                taskName.textContent = task.name;
+
+                const status = document.createElement('span');
+                status.className = `tier-task-status status-${state}`;
+                status.textContent = TASK_STATE_LABELS[state] || state;
+
+                row.appendChild(taskName);
+                row.appendChild(status);
+                listEl.appendChild(row);
+            });
+    }
+
+    showTierTasksModal() {
+        const modal = document.getElementById('tier-tasks-modal');
+        if (!modal) {
+            return;
+        }
+
+        this.renderTierTasksModal();
+        modal.classList.add('open');
+    }
+
+    hideTierTasksModal() {
+        const modal = document.getElementById('tier-tasks-modal');
+        if (!modal) {
+            return;
+        }
+
+        modal.classList.remove('open');
+    }
+
+    centerTaskInView(taskId, options = {}) {
+        const { smooth = true } = options;
+        const container = document.getElementById('grid-container');
+        const cell = getCellById(taskId);
+        if (!container || !cell) {
+            return false;
+        }
+
+        const maxLeft = Math.max(0, container.scrollWidth - container.clientWidth);
+        const maxTop = Math.max(0, container.scrollHeight - container.clientHeight);
+        const scaledCellSize = CELL_SIZE * currentScale;
+        const targetLeft = (cell.pixelX * currentScale) - ((container.clientWidth - scaledCellSize) / 2);
+        const targetTop = (cell.pixelY * currentScale) - ((container.clientHeight - scaledCellSize) / 2);
+        const nextLeft = clamp(targetLeft, 0, maxLeft);
+        const nextTop = clamp(targetTop, 0, maxTop);
+
+        container.scrollTo({
+            left: nextLeft,
+            top: nextTop,
+            behavior: smooth ? 'smooth' : 'auto'
+        });
+
+        return true;
+    }
+
+    updateCurrentTasksPopover() {
+        const button = document.getElementById('current-tasks-button');
+        const listEl = document.getElementById('current-tasks-list');
+        const incompleteTasks = tasksGlobal
+            .filter(task => this.taskManager.getState(task.id) === 'incomplete')
+            .sort((taskA, taskB) => {
+                const tierSortA = getTierSortIndex(taskA.tier);
+                const tierSortB = getTierSortIndex(taskB.tier);
+                if (tierSortA !== tierSortB) {
+                    return tierSortA - tierSortB;
+                }
+                return taskA.name.localeCompare(taskB.name);
+            });
+
+        if (button) {
+            button.textContent = `Current Tasks (${incompleteTasks.length})`;
+        }
+
+        if (!listEl) {
+            return;
+        }
+
+        listEl.innerHTML = '';
+
+        if (incompleteTasks.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'current-task-empty';
+            empty.textContent = 'No available incomplete tasks right now.';
+            listEl.appendChild(empty);
+            return;
+        }
+
+        incompleteTasks.forEach(task => {
+            const item = document.createElement('button');
+            item.type = 'button';
+            item.className = 'current-task-item';
+
+            const tierDot = document.createElement('span');
+            tierDot.className = `current-task-tier-dot tier-dot-${task.tier || 'other'}`;
+            tierDot.ariaHidden = 'true';
+
+            const taskLabel = document.createElement('span');
+            taskLabel.className = 'current-task-label';
+            taskLabel.textContent = task.name;
+
+            item.appendChild(tierDot);
+            item.appendChild(taskLabel);
+            item.addEventListener('click', () => {
+                const centered = this.centerTaskInView(task.id, { smooth: true });
+                if (centered) {
+                    this.closeCurrentTasksPopover();
+                }
+            });
+            listEl.appendChild(item);
+        });
+    }
+
+    closeCurrentTasksPopover() {
+        const popover = document.getElementById('current-tasks-popover');
+        if (!popover) {
+            return;
+        }
+
+        popover.classList.remove('open');
+    }
+
+    toggleCurrentTasksPopover() {
+        const popover = document.getElementById('current-tasks-popover');
+        if (!popover) {
+            return;
+        }
+
+        const nextOpen = !popover.classList.contains('open');
+        if (nextOpen) {
+            this.updateCurrentTasksPopover();
+        }
+
+        popover.classList.toggle('open', nextOpen);
+    }
+}
+
 const gridModel = new Grid();
 const taskManager = new TaskManager();
 const gameController = new GameController(gridModel, taskManager);
+const playerProgress = new PlayerProgress();
 const wiki = new Wiki();
+const taskVerification = new TaskVerification(taskManager, playerProgress);
+const taskPanels = new TaskPanels(taskManager);
 
 // collection log item map: id -> { name, category, wikiLink, imageUrl }
 const collectionLogMap = wiki.collectionLogMap;
@@ -997,10 +1816,10 @@ function applyTheme(theme, options = {}) {
     }
 
     if (document.getElementById('tier-tasks-modal')?.classList.contains('open')) {
-        renderTierTasksModal();
+        taskPanels.renderTierTasksModal();
     }
 
-    updateCurrentTasksPopover();
+    taskPanels.updateCurrentTasksPopover();
 }
 
 function initThemeToggle() {
@@ -2110,295 +2929,6 @@ function experienceToLevel(experience) {
     return level;
 }
 
-function getSkillExperienceValue(skillData) {
-    const numericValue = Number(skillData);
-    if (Number.isFinite(numericValue) && numericValue >= 0) {
-        return numericValue;
-    }
-
-    if (!skillData || typeof skillData !== 'object') {
-        return Number.NaN;
-    }
-
-    const experienceCandidates = [
-        skillData.experience,
-        skillData.xp,
-        skillData.exp,
-        skillData.experience_points,
-        skillData.experiencePoints
-    ];
-    for (const candidate of experienceCandidates) {
-        const parsed = Number(candidate);
-        if (Number.isFinite(parsed) && parsed >= 0) {
-            return parsed;
-        }
-    }
-
-    const levelExperience = levelToExperience(skillData.level);
-    if (Number.isFinite(levelExperience) && levelExperience >= 0) {
-        return levelExperience;
-    }
-
-    return Number.NaN;
-}
-
-function getSkillLevelValue(skillData) {
-    const numericValue = Number(skillData);
-    if (Number.isFinite(numericValue) && numericValue >= 1) {
-        return Math.floor(numericValue);
-    }
-
-    if (!skillData || typeof skillData !== 'object') {
-        return Number.NaN;
-    }
-
-    const levelCandidates = [
-        skillData.level,
-        skillData.lvl,
-        skillData.skillLevel,
-        skillData.skill_level
-    ];
-    for (const candidate of levelCandidates) {
-        const parsed = Number(candidate);
-        if (Number.isFinite(parsed) && parsed >= 1) {
-            return Math.floor(parsed);
-        }
-    }
-
-    const experienceLevel = experienceToLevel(getSkillExperienceValue(skillData));
-    if (Number.isFinite(experienceLevel) && experienceLevel >= 1) {
-        return experienceLevel;
-    }
-
-    return Number.NaN;
-}
-
-function addSkillExperienceEntry(targetMap, rawSkillName, skillData) {
-    const skillName = normalizeSkillName(rawSkillName);
-    if (!skillName) {
-        return;
-    }
-
-    const experience = getSkillExperienceValue(skillData);
-    if (!Number.isFinite(experience) || experience < 0) {
-        return;
-    }
-
-    const existing = targetMap.get(skillName);
-    if (!Number.isFinite(existing) || experience > existing) {
-        targetMap.set(skillName, experience);
-    }
-}
-
-function addSkillLevelEntry(targetMap, rawSkillName, skillData) {
-    const skillName = normalizeSkillName(rawSkillName);
-    if (!skillName) {
-        return;
-    }
-
-    const level = getSkillLevelValue(skillData);
-    if (!Number.isFinite(level) || level < 1) {
-        return;
-    }
-
-    const existing = targetMap.get(skillName);
-    if (!Number.isFinite(existing) || level > existing) {
-        targetMap.set(skillName, level);
-    }
-}
-
-function extractSkillExperienceFromContainer(container, targetMap) {
-    if (!container) {
-        return;
-    }
-
-    if (Array.isArray(container)) {
-        container.forEach(entry => {
-            if (!entry || typeof entry !== 'object') {
-                return;
-            }
-
-            if (Array.isArray(entry) && entry.length >= 2) {
-                addSkillExperienceEntry(targetMap, entry[0], entry[1]);
-                return;
-            }
-
-            const rawSkillName = entry.skill ?? entry.name ?? entry.id ?? entry.type;
-            if (!rawSkillName) {
-                return;
-            }
-
-            addSkillExperienceEntry(targetMap, rawSkillName, entry);
-        });
-        return;
-    }
-
-    if (typeof container !== 'object') {
-        return;
-    }
-
-    Object.entries(container).forEach(([rawSkillName, skillData]) => {
-        addSkillExperienceEntry(targetMap, rawSkillName, skillData);
-    });
-}
-
-function extractSkillLevelsFromContainer(container, targetMap) {
-    if (!container) {
-        return;
-    }
-
-    if (Array.isArray(container)) {
-        container.forEach(entry => {
-            if (!entry || typeof entry !== 'object') {
-                return;
-            }
-
-            if (Array.isArray(entry) && entry.length >= 2) {
-                addSkillLevelEntry(targetMap, entry[0], entry[1]);
-                return;
-            }
-
-            const rawSkillName = entry.skill ?? entry.name ?? entry.id ?? entry.type;
-            if (!rawSkillName) {
-                return;
-            }
-
-            addSkillLevelEntry(targetMap, rawSkillName, entry);
-        });
-        return;
-    }
-
-    if (typeof container !== 'object') {
-        return;
-    }
-
-    Object.entries(container).forEach(([rawSkillName, skillData]) => {
-        addSkillLevelEntry(targetMap, rawSkillName, skillData);
-    });
-}
-
-function extractPlayerSkillExperience(payload) {
-    const skillExperience = new Map();
-    if (!payload || typeof payload !== 'object') {
-        return skillExperience;
-    }
-
-    const containers = [
-        payload.skills,
-        payload.skill_experience,
-        payload.skillExperience,
-        payload.experience,
-        payload.experience?.skills,
-        payload.player_skills,
-        payload.playerSkills,
-        payload.player?.skills,
-        payload.hiscores?.skills,
-        payload.hiscore?.skills
-    ];
-
-    containers.forEach(container => {
-        extractSkillExperienceFromContainer(container, skillExperience);
-    });
-
-    return skillExperience;
-}
-
-function extractPlayerSkillLevels(payload) {
-    const skillLevels = new Map();
-    if (!payload || typeof payload !== 'object') {
-        return skillLevels;
-    }
-
-    const containers = [
-        payload.levels,
-        payload.skill_levels,
-        payload.skillLevels,
-        payload.player_levels,
-        payload.playerLevels,
-        payload.player?.levels,
-        payload.hiscores?.levels,
-        payload.hiscore?.levels
-    ];
-
-    containers.forEach(container => {
-        extractSkillLevelsFromContainer(container, skillLevels);
-    });
-
-    return skillLevels;
-}
-
-function finalizePlayerSkillSnapshots(skillExperienceBySkill, skillLevelBySkill) {
-    skillLevelBySkill.forEach((level, skillName) => {
-        if (!Number.isFinite(skillExperienceBySkill.get(skillName))) {
-            const experience = levelToExperience(level);
-            if (Number.isFinite(experience) && experience >= 0) {
-                skillExperienceBySkill.set(skillName, experience);
-            }
-        }
-    });
-
-    skillExperienceBySkill.forEach((experience, skillName) => {
-        if (!Number.isFinite(skillLevelBySkill.get(skillName))) {
-            const level = experienceToLevel(experience);
-            if (Number.isFinite(level) && level >= 1) {
-                skillLevelBySkill.set(skillName, level);
-            }
-        }
-    });
-}
-
-function extractCompletedAchievementDiaryKeys(achievementDiaries) {
-    const completedKeys = new Set();
-    if (!achievementDiaries || typeof achievementDiaries !== 'object') {
-        return completedKeys;
-    }
-
-    Object.entries(achievementDiaries).forEach(([rawRegion, regionData]) => {
-        const region = normalizeAchievementDiaryRegion(rawRegion);
-        if (!region || !regionData || typeof regionData !== 'object') {
-            return;
-        }
-
-        Object.entries(regionData).forEach(([rawDifficulty, difficultyData]) => {
-            const difficulty = normalizeAchievementDiaryDifficulty(rawDifficulty);
-            if (!difficulty || !difficultyData || typeof difficultyData !== 'object') {
-                return;
-            }
-
-            if (difficultyData.complete === true) {
-                completedKeys.add(getAchievementDiaryKey(region, difficulty));
-            }
-        });
-    });
-
-    return completedKeys;
-}
-
-function applyPlayerSnapshot(playerSnapshot) {
-    if (!playerSnapshot || typeof playerSnapshot !== 'object') {
-        return;
-    }
-
-    obtainedItemIds = playerSnapshot.obtainedItemIds instanceof Set
-        ? new Set(playerSnapshot.obtainedItemIds)
-        : new Set();
-
-    completedAchievementDiaryKeys = playerSnapshot.completedAchievementDiaryKeys instanceof Set
-        ? new Set(playerSnapshot.completedAchievementDiaryKeys)
-        : new Set();
-
-    const nextSkillExperience = playerSnapshot.playerSkillExperienceBySkill instanceof Map
-        ? new Map(playerSnapshot.playerSkillExperienceBySkill)
-        : new Map();
-    const nextSkillLevels = playerSnapshot.playerSkillLevelBySkill instanceof Map
-        ? new Map(playerSnapshot.playerSkillLevelBySkill)
-        : new Map();
-
-    finalizePlayerSkillSnapshots(nextSkillExperience, nextSkillLevels);
-    playerSkillExperienceBySkill = nextSkillExperience;
-    playerSkillLevelBySkill = nextSkillLevels;
-}
-
 async function loadAll() {
     const promises = tiers.map(name => fetch(`./tiers/${name}.json`).then(r => r.json()));
     return Promise.all(promises);
@@ -2609,12 +3139,12 @@ function updateUnlockHud() {
 
     unlocks.textContent = `${availableUnlocks} / ${totalUnlocks}`;
     nextUnlock.textContent = tasksUntilNext === 1 ? '1 task' : `${tasksUntilNext} tasks`;
-    updateTierProgressMenu();
-    updateCurrentTasksPopover();
+    taskPanels.updateTierProgressMenu();
+    taskPanels.updateCurrentTasksPopover();
 
     const tierTasksModal = document.getElementById('tier-tasks-modal');
     if (tierTasksModal?.classList.contains('open')) {
-        renderTierTasksModal();
+        taskPanels.renderTierTasksModal();
     }
 }
 
@@ -2629,474 +3159,6 @@ function formatTierName(tier) {
 function getTierSortIndex(tier) {
     const index = TIER_DISPLAY_ORDER.indexOf(tier);
     return index === -1 ? Number.POSITIVE_INFINITY : index;
-}
-
-function getTierProgressByTier() {
-    const grouped = new Map();
-
-    tasksGlobal.forEach(task => {
-        if (task.id === INTRO_TASK_ID) {
-            return;
-        }
-
-        const tier = task.tier || 'other';
-        if (!grouped.has(tier)) {
-            grouped.set(tier, {
-                tier,
-                total: 0,
-                completed: 0,
-                tasks: []
-            });
-        }
-
-        const bucket = grouped.get(tier);
-        bucket.total += 1;
-        if (taskManager.getState(task.id) === 'complete') {
-            bucket.completed += 1;
-        }
-        bucket.tasks.push(task);
-    });
-
-    return Array.from(grouped.values()).sort((a, b) => {
-        const sortA = getTierSortIndex(a.tier);
-        const sortB = getTierSortIndex(b.tier);
-        if (sortA !== sortB) {
-            return sortA - sortB;
-        }
-        return a.tier.localeCompare(b.tier);
-    });
-}
-
-function updateTierProgressMenu() {
-    const linesEl = document.getElementById('tier-progress-lines');
-    if (!linesEl) {
-        return;
-    }
-
-    const tierData = getTierProgressByTier();
-    linesEl.innerHTML = '';
-
-    if (tierData.length === 0) {
-        linesEl.textContent = 'No tasks loaded';
-        return;
-    }
-
-    tierData.forEach(entry => {
-        const row = document.createElement('span');
-        row.className = 'tier-progress-row';
-
-        const name = document.createElement('span');
-        name.className = 'tier-progress-name';
-        name.textContent = formatTierName(entry.tier);
-
-        const value = document.createElement('span');
-        value.className = 'tier-progress-value';
-        value.textContent = `${entry.completed}/${entry.total}`;
-
-        row.appendChild(name);
-        row.appendChild(value);
-        linesEl.appendChild(row);
-    });
-}
-
-function renderTierTasksModal() {
-    const titleEl = document.getElementById('tier-tasks-title');
-    const tabsEl = document.getElementById('tier-tabs');
-    const listEl = document.getElementById('tier-tasks-list');
-    if (!titleEl || !tabsEl || !listEl) {
-        return;
-    }
-
-    const tierData = getTierProgressByTier();
-    tabsEl.innerHTML = '';
-    listEl.innerHTML = '';
-
-    if (tierData.length === 0) {
-        titleEl.textContent = 'Tier Tasks';
-        listEl.textContent = 'No tasks loaded';
-        return;
-    }
-
-    if (!activeTierTab || !tierData.some(entry => entry.tier === activeTierTab)) {
-        activeTierTab = tierData[0].tier;
-    }
-
-    tierData.forEach(entry => {
-        const tab = document.createElement('button');
-        tab.type = 'button';
-        tab.className = 'tier-tab';
-        if (entry.tier === activeTierTab) {
-            tab.classList.add('active');
-        }
-        tab.textContent = `${formatTierName(entry.tier)} (${entry.completed}/${entry.total})`;
-        tab.addEventListener('click', () => {
-            activeTierTab = entry.tier;
-            renderTierTasksModal();
-        });
-        tabsEl.appendChild(tab);
-    });
-
-    const selectedTier = tierData.find(entry => entry.tier === activeTierTab) || tierData[0];
-    titleEl.textContent = `${formatTierName(selectedTier.tier)} Tasks`;
-
-    const getTierListStateGroup = (state) => {
-        if (state === 'locked' || state === 'hidden') {
-            return 'hidden';
-        }
-
-        return state;
-    };
-
-    const stateOrder = {
-        incomplete: 0,
-        hidden: 1,
-        complete: 2
-    };
-
-    selectedTier.tasks
-        .slice()
-        .sort((taskA, taskB) => {
-            const stateA = getTierListStateGroup(taskManager.getState(taskA.id) || 'hidden');
-            const stateB = getTierListStateGroup(taskManager.getState(taskB.id) || 'hidden');
-            const rankA = stateOrder[stateA] ?? 99;
-            const rankB = stateOrder[stateB] ?? 99;
-            if (rankA !== rankB) {
-                return rankA - rankB;
-            }
-            return taskA.name.localeCompare(taskB.name);
-        })
-        .forEach(task => {
-            const state = getTierListStateGroup(taskManager.getState(task.id) || 'hidden');
-
-            const row = document.createElement('div');
-            row.className = 'tier-task-row';
-
-            const taskName = document.createElement('span');
-            taskName.className = 'tier-task-name';
-            taskName.textContent = task.name;
-
-            const status = document.createElement('span');
-            status.className = `tier-task-status status-${state}`;
-            status.textContent = TASK_STATE_LABELS[state] || state;
-
-            row.appendChild(taskName);
-            row.appendChild(status);
-            listEl.appendChild(row);
-        });
-}
-
-function showTierTasksModal() {
-    const modal = document.getElementById('tier-tasks-modal');
-    if (!modal) {
-        return;
-    }
-
-    renderTierTasksModal();
-    modal.classList.add('open');
-}
-
-function hideTierTasksModal() {
-    const modal = document.getElementById('tier-tasks-modal');
-    if (!modal) {
-        return;
-    }
-
-    modal.classList.remove('open');
-}
-
-function centerTaskInView(taskId, options = {}) {
-    const { smooth = true } = options;
-    const container = document.getElementById('grid-container');
-    const cell = getCellById(taskId);
-    if (!container || !cell) {
-        return false;
-    }
-
-    const maxLeft = Math.max(0, container.scrollWidth - container.clientWidth);
-    const maxTop = Math.max(0, container.scrollHeight - container.clientHeight);
-    const scaledCellSize = CELL_SIZE * currentScale;
-    const targetLeft = (cell.pixelX * currentScale) - ((container.clientWidth - scaledCellSize) / 2);
-    const targetTop = (cell.pixelY * currentScale) - ((container.clientHeight - scaledCellSize) / 2);
-    const nextLeft = clamp(targetLeft, 0, maxLeft);
-    const nextTop = clamp(targetTop, 0, maxTop);
-
-    container.scrollTo({
-        left: nextLeft,
-        top: nextTop,
-        behavior: smooth ? 'smooth' : 'auto'
-    });
-
-    return true;
-}
-
-function updateCurrentTasksPopover() {
-    const button = document.getElementById('current-tasks-button');
-    const listEl = document.getElementById('current-tasks-list');
-    const incompleteTasks = tasksGlobal
-        .filter(task => taskManager.getState(task.id) === 'incomplete')
-        .sort((taskA, taskB) => {
-            const tierSortA = getTierSortIndex(taskA.tier);
-            const tierSortB = getTierSortIndex(taskB.tier);
-            if (tierSortA !== tierSortB) {
-                return tierSortA - tierSortB;
-            }
-            return taskA.name.localeCompare(taskB.name);
-        });
-
-    if (button) {
-        button.textContent = `Current Tasks (${incompleteTasks.length})`;
-    }
-
-    if (!listEl) {
-        return;
-    }
-
-    listEl.innerHTML = '';
-
-    if (incompleteTasks.length === 0) {
-        const empty = document.createElement('div');
-        empty.className = 'current-task-empty';
-        empty.textContent = 'No available incomplete tasks right now.';
-        listEl.appendChild(empty);
-        return;
-    }
-
-    incompleteTasks.forEach(task => {
-        const item = document.createElement('button');
-        item.type = 'button';
-        item.className = 'current-task-item';
-
-        const tierDot = document.createElement('span');
-        tierDot.className = `current-task-tier-dot tier-dot-${task.tier || 'other'}`;
-        tierDot.ariaHidden = 'true';
-
-        const taskLabel = document.createElement('span');
-        taskLabel.className = 'current-task-label';
-        taskLabel.textContent = task.name;
-
-        item.appendChild(tierDot);
-        item.appendChild(taskLabel);
-        item.addEventListener('click', () => {
-            const centered = centerTaskInView(task.id, { smooth: true });
-            if (centered) {
-                closeCurrentTasksPopover();
-            }
-        });
-        listEl.appendChild(item);
-    });
-}
-
-function closeCurrentTasksPopover() {
-    const popover = document.getElementById('current-tasks-popover');
-    if (!popover) {
-        return;
-    }
-
-    popover.classList.remove('open');
-}
-
-function toggleCurrentTasksPopover() {
-    const popover = document.getElementById('current-tasks-popover');
-    if (!popover) {
-        return;
-    }
-
-    const nextOpen = !popover.classList.contains('open');
-    if (nextOpen) {
-        updateCurrentTasksPopover();
-    }
-
-    popover.classList.toggle('open', nextOpen);
-}
-
-function getTaskVerificationItemIds(task) {
-    if (task?.verification?.method !== 'collection-log') {
-        return [];
-    }
-
-    return Array.isArray(task?.verification?.itemIds)
-        ? task.verification.itemIds
-        : [];
-}
-
-function getTaskSkillExperienceRequirements(task) {
-    if (task?.verification?.method !== 'skill') {
-        return [];
-    }
-
-    const experienceRequirements = task?.verification?.experience;
-    if (!experienceRequirements || typeof experienceRequirements !== 'object') {
-        return [];
-    }
-
-    return Object.entries(experienceRequirements)
-        .map(([rawSkillName, rawExperience]) => {
-            const skillName = normalizeSkillName(rawSkillName);
-            const requiredExperience = Number(rawExperience);
-            return { skillName, requiredExperience };
-        })
-        .filter(requirement => {
-            return Boolean(requirement.skillName)
-                && Number.isFinite(requirement.requiredExperience)
-                && requirement.requiredExperience >= 0;
-        });
-}
-
-function getRequiredSkillLevelForRequirement(requirement) {
-    const requiredLevel = experienceToLevel(requirement?.requiredExperience);
-    return Number.isFinite(requiredLevel) && requiredLevel >= 1
-        ? Math.floor(requiredLevel)
-        : 1;
-}
-
-function getPlayerSkillLevel(skillName) {
-    const normalizedSkill = normalizeSkillName(skillName);
-    if (!normalizedSkill) {
-        return Number.NaN;
-    }
-
-    const storedLevel = playerSkillLevelBySkill.get(normalizedSkill);
-    if (Number.isFinite(storedLevel) && storedLevel >= 1) {
-        return Math.floor(storedLevel);
-    }
-
-    const experience = playerSkillExperienceBySkill.get(normalizedSkill);
-    const derivedLevel = experienceToLevel(experience);
-    if (Number.isFinite(derivedLevel) && derivedLevel >= 1) {
-        return Math.floor(derivedLevel);
-    }
-
-    return Number.NaN;
-}
-
-function isSkillRequirementMet(requirement) {
-    const requiredLevel = getRequiredSkillLevelForRequirement(requirement);
-    const playerLevel = getPlayerSkillLevel(requirement?.skillName);
-    if (Number.isFinite(playerLevel)) {
-        return playerLevel >= requiredLevel;
-    }
-
-    const playerExperience = playerSkillExperienceBySkill.get(requirement?.skillName);
-    return Number.isFinite(playerExperience) && playerExperience >= requirement.requiredExperience;
-}
-
-function getTaskRequiredCount(task) {
-    if (task?.verification?.method === 'achievement-diary') {
-        return 1;
-    }
-
-    if (task?.verification?.method === 'skill') {
-        const requirements = getTaskSkillExperienceRequirements(task);
-        if (requirements.length === 0) {
-            return 0;
-        }
-
-        const rawRequired = task?.verification?.count;
-        return Number.isFinite(rawRequired)
-            ? clamp(Math.floor(rawRequired), 1, requirements.length)
-            : requirements.length;
-    }
-
-    const totalItems = getTaskVerificationItemIds(task).length;
-    if (totalItems === 0) {
-        return 0;
-    }
-
-    const rawRequired = task?.verification?.count;
-    return Number.isFinite(rawRequired)
-        ? clamp(Math.floor(rawRequired), 1, totalItems)
-        : totalItems;
-}
-
-function getTaskObtainedCount(task) {
-    if (task?.verification?.method === 'achievement-diary') {
-        const region = normalizeAchievementDiaryRegion(task?.verification?.region);
-        const difficulty = normalizeAchievementDiaryDifficulty(task?.verification?.difficulty);
-        if (!region || !difficulty) {
-            return 0;
-        }
-
-        return completedAchievementDiaryKeys.has(getAchievementDiaryKey(region, difficulty)) ? 1 : 0;
-    }
-
-    if (task?.verification?.method === 'skill') {
-        return getTaskSkillExperienceRequirements(task).reduce((count, requirement) => {
-            return count + (isSkillRequirementMet(requirement) ? 1 : 0);
-        }, 0);
-    }
-
-    return getTaskVerificationItemIds(task).reduce((count, id) => {
-        return count + (obtainedItemIds.has(Number(id)) ? 1 : 0);
-    }, 0);
-}
-
-function getCollectionLogSeriesKey(task) {
-    if (task?.verification?.method === 'collection-log') {
-        const itemIds = getTaskVerificationItemIds(task)
-            .map(id => Number(id))
-            .filter(Number.isFinite)
-            .sort((a, b) => a - b);
-
-        if (itemIds.length === 0) {
-            return '';
-        }
-
-        return `cl:${itemIds.join(',')}`;
-    }
-
-    if (task?.verification?.method === 'skill') {
-        const requirements = getTaskSkillExperienceRequirements(task)
-            .slice()
-            .sort((requirementA, requirementB) => {
-                const nameDelta = requirementA.skillName.localeCompare(requirementB.skillName);
-                if (nameDelta !== 0) {
-                    return nameDelta;
-                }
-
-                return requirementA.requiredExperience - requirementB.requiredExperience;
-            })
-            .map(requirement => `${requirement.skillName}:${Math.floor(requirement.requiredExperience)}`);
-
-        if (requirements.length === 0) {
-            return '';
-        }
-
-        return `skill:${requirements.join('|')}`;
-    }
-
-    return '';
-}
-
-function isSeriesSwapCandidateState(state) {
-    return state === 'locked' || state === 'hidden';
-}
-
-function getLowestPendingSeriesTask(task) {
-    const seriesKey = getCollectionLogSeriesKey(task);
-    if (!seriesKey) {
-        return task;
-    }
-
-    const taskOrderById = new Map(tasksGlobal.map((candidate, index) => [String(candidate.id), index]));
-    const seriesCandidates = tasksGlobal
-        .filter(candidate => getCollectionLogSeriesKey(candidate) === seriesKey)
-        .filter(candidate => isSeriesSwapCandidateState(taskManager.getState(candidate.id) || 'hidden'))
-        .sort((taskA, taskB) => {
-            const requiredDelta = getTaskRequiredCount(taskA) - getTaskRequiredCount(taskB);
-            if (requiredDelta !== 0) {
-                return requiredDelta;
-            }
-
-            const indexA = taskOrderById.get(String(taskA.id)) ?? Number.POSITIVE_INFINITY;
-            const indexB = taskOrderById.get(String(taskB.id)) ?? Number.POSITIVE_INFINITY;
-            if (indexA !== indexB) {
-                return indexA - indexB;
-            }
-
-            return String(taskA.id).localeCompare(String(taskB.id));
-        });
-
-    return seriesCandidates[0] || task;
 }
 
 function saveTaskGridOrder(tasks = tasksGlobal) {
@@ -3184,28 +3246,6 @@ function swapTasksById(taskIdA, taskIdB, options = {}) {
     return true;
 }
 
-function alignUnlockedTaskToLowestSeriesTask(task) {
-    const unlockedTask = tasksGlobal.find(candidate => String(candidate.id) === String(task?.id));
-    if (!unlockedTask) {
-        return task;
-    }
-
-    const targetTask = getLowestPendingSeriesTask(unlockedTask);
-    if (!targetTask || String(targetTask.id) === String(unlockedTask.id)) {
-        return unlockedTask;
-    }
-
-    // Only swap if the target has a strictly lower required count than the just-unlocked task.
-    // If the unlocked task is already the lowest unrevealed count, leave it in place.
-    if (getTaskRequiredCount(targetTask) >= getTaskRequiredCount(unlockedTask)) {
-        return unlockedTask;
-    }
-
-    const swapped = swapTasksById(unlockedTask.id, targetTask.id, { swapStates: true });
-    return swapped ? targetTask : unlockedTask;
-}
-
-
 function refreshOpenModal() {
     const modal = document.getElementById('task-modal');
     if (!modal?.classList.contains('open') || !activePopoverAnchor) {
@@ -3237,8 +3277,8 @@ async function syncCompletedTasksFromObtained(options = {}) {
     const tasksToComplete = tasksGlobal
         .filter(task => taskManager.getState(task.id) !== 'complete')
         .filter(task => {
-            const requiredCount = getTaskRequiredCount(task);
-            return requiredCount > 0 && getTaskObtainedCount(task) >= requiredCount;
+            const requiredCount = taskVerification.getTaskRequiredCount(task);
+            return requiredCount > 0 && taskVerification.getTaskObtainedCount(task) >= requiredCount;
         })
         .map(task => {
             const coord = gameController.getTaskCoord(task);
@@ -3310,7 +3350,7 @@ async function syncPlayerProgress() {
 
     const playerSnapshot = await wiki.loadPlayerData(playerUsername, { forceRefresh: true });
     if (playerSnapshot) {
-        applyPlayerSnapshot(playerSnapshot);
+        playerProgress.applySnapshot(playerSnapshot);
     }
 
     return syncCompletedTasksFromObtained({ animate: true, showToast: true, refreshModal: true });
@@ -3757,7 +3797,7 @@ function showModal(task, anchor) {
                 setCellState(cell, 'incomplete');
             }
 
-            const unlockedTask = alignUnlockedTaskToLowestSeriesTask(task);
+            const unlockedTask = taskVerification.alignUnlockedTaskToLowestSeriesTask(task);
 
             updateUnlockHud();
             refreshHiddenEdges({ animate: true });
@@ -3798,12 +3838,12 @@ function showModal(task, anchor) {
     const requiredEl = document.getElementById('modal-items-required');
     if (itemsEl) {
         const isLockedState = state === 'locked';
-        const itemIds = !isLockedState ? getTaskVerificationItemIds(task) : [];
-        const skillRequirements = !isLockedState ? getTaskSkillExperienceRequirements(task) : [];
+        const itemIds = !isLockedState ? taskVerification.getTaskVerificationItemIds(task) : [];
+        const skillRequirements = !isLockedState ? taskVerification.getTaskSkillExperienceRequirements(task) : [];
         itemsEl.innerHTML = '';
         if (itemIds.length > 0) {
-            const requiredItems = getTaskRequiredCount(task);
-            const obtainedItemCount = getTaskObtainedCount(task);
+            const requiredItems = taskVerification.getTaskRequiredCount(task);
+            const obtainedItemCount = taskVerification.getTaskObtainedCount(task);
             const obtainedForTask = Math.min(obtainedItemCount, requiredItems);
 
             if (requiredEl) {
@@ -3814,7 +3854,7 @@ function showModal(task, anchor) {
             itemsEl.classList.toggle('is-scrollable', itemIds.length > 20);
             itemIds.forEach(id => {
                 const numericId = Number(id);
-                const isObtained = obtainedItemIds.has(numericId);
+                const isObtained = playerProgress.hasObtainedItem(numericId);
                 const info = collectionLogMap.get(numericId);
                 const link = document.createElement('a');
                 link.href = info ? info.wikiLink : '#';
@@ -3838,11 +3878,11 @@ function showModal(task, anchor) {
             });
             itemsEl.style.display = 'grid';
         } else if (skillRequirements.length > 0) {
-            const requiredItems = getTaskRequiredCount(task);
-            const obtainedSkillCount = getTaskObtainedCount(task);
+            const requiredItems = taskVerification.getTaskRequiredCount(task);
+            const obtainedSkillCount = taskVerification.getTaskObtainedCount(task);
             const obtainedForTask = Math.min(obtainedSkillCount, requiredItems);
             const requiredLevels = skillRequirements
-                .map(requirement => getRequiredSkillLevelForRequirement(requirement))
+                .map(requirement => taskVerification.getRequiredSkillLevelForRequirement(requirement))
                 .filter(level => Number.isFinite(level));
             const uniformRequiredLevel = requiredLevels.length > 0 && requiredLevels.every(level => level === requiredLevels[0])
                 ? requiredLevels[0]
@@ -3858,7 +3898,7 @@ function showModal(task, anchor) {
             const sortedRequirements = skillRequirements
                 .slice()
                 .sort((requirementA, requirementB) => {
-                    const requiredLevelDelta = getRequiredSkillLevelForRequirement(requirementA) - getRequiredSkillLevelForRequirement(requirementB);
+                    const requiredLevelDelta = taskVerification.getRequiredSkillLevelForRequirement(requirementA) - taskVerification.getRequiredSkillLevelForRequirement(requirementB);
                     if (requiredLevelDelta !== 0) {
                         return requiredLevelDelta;
                     }
@@ -3869,10 +3909,10 @@ function showModal(task, anchor) {
             itemsEl.classList.toggle('is-scrollable', sortedRequirements.length > 20);
             sortedRequirements.forEach(requirement => {
                 const skillName = formatSkillName(requirement.skillName);
-                const requiredLevel = getRequiredSkillLevelForRequirement(requirement);
-                const playerLevel = getPlayerSkillLevel(requirement.skillName);
+                const requiredLevel = taskVerification.getRequiredSkillLevelForRequirement(requirement);
+                const playerLevel = playerProgress.getSkillLevel(requirement.skillName);
                 const normalizedLevel = Number.isFinite(playerLevel) ? Math.floor(playerLevel) : 0;
-                const isObtained = isSkillRequirementMet(requirement);
+                const isObtained = playerProgress.isSkillRequirementMet(requirement, requiredLevel);
                 const link = document.createElement('a');
                 link.href = `https://oldschool.runescape.wiki/w/${encodeURIComponent(skillName.replace(/ /g, '_'))}`;
                 link.target = '_blank';
@@ -4008,7 +4048,7 @@ function render(tasks) {
     queueCanvasRender();
 
     if (tasks.length > 0) {
-        centerTaskInView(tasks[0].id, { smooth: false });
+        taskPanels.centerTaskInView(tasks[0].id, { smooth: false });
     }
 }
 
@@ -4026,21 +4066,21 @@ window.addEventListener('DOMContentLoaded', () => {
     close.addEventListener('click', hideModal);
 
     if (tierTasksClose) {
-        tierTasksClose.addEventListener('click', hideTierTasksModal);
+        tierTasksClose.addEventListener('click', () => taskPanels.hideTierTasksModal());
     }
 
     if (tierProgressButton) {
         tierProgressButton.addEventListener('click', () => {
-            closeCurrentTasksPopover();
-            showTierTasksModal();
+            taskPanels.closeCurrentTasksPopover();
+            taskPanels.showTierTasksModal();
         });
     }
 
     if (currentTasksButton) {
         currentTasksButton.addEventListener('click', e => {
             e.preventDefault();
-            hideTierTasksModal();
-            toggleCurrentTasksPopover();
+            taskPanels.hideTierTasksModal();
+            taskPanels.toggleCurrentTasksPopover();
         });
     }
 
@@ -4066,12 +4106,12 @@ window.addEventListener('DOMContentLoaded', () => {
         const clickedTierPopover = e.target.closest('#tier-tasks-modal .modal-content');
         const clickedTierButton = e.target.closest('#tier-progress-button');
         if (tierTasksModal?.classList.contains('open') && !clickedTierPopover && !clickedTierButton) {
-            hideTierTasksModal();
+            taskPanels.hideTierTasksModal();
         }
 
         const currentTasksWrap = document.getElementById('current-tasks-wrap');
         if (currentTasksWrap && !currentTasksWrap.contains(e.target)) {
-            closeCurrentTasksPopover();
+            taskPanels.closeCurrentTasksPopover();
         }
 
         const optionsWrap = document.getElementById('options-wrap');
@@ -4083,8 +4123,8 @@ window.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('keydown', e => {
         if (e.key === 'Escape') {
             hideModal();
-            hideTierTasksModal();
-            closeCurrentTasksPopover();
+            taskPanels.hideTierTasksModal();
+            taskPanels.closeCurrentTasksPopover();
             closeOptionsPopover();
         }
     });
@@ -4208,7 +4248,7 @@ function startApp() {
 
     Promise.all([loadAll(), wiki.loadCollectionLogItems(), wiki.loadPlayerData(playerUsername)]).then(([data, _, playerSnapshot]) => {
     if (playerSnapshot) {
-        applyPlayerSnapshot(playerSnapshot);
+        playerProgress.applySnapshot(playerSnapshot);
     }
 
     const currentTasks = taskManager.buildTasksFromTierData(data);
