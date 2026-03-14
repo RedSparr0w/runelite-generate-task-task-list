@@ -358,58 +358,168 @@ class GameController {
     }
 }
 
-const gridModel = new Grid();
-const taskManager = new TaskManager();
-const gameController = new GameController(gridModel, taskManager);
+class Wiki {
+    constructor() {
+        this.collectionLogMap = new Map();
+    }
 
-// collection log item map: id -> { name, category, wikiLink, imageUrl }
-let collectionLogMap = new Map();
+    buildCollectionLogEntry(name, category) {
+        const encoded = encodeURIComponent(name.replace(/ /g, '_'));
+        return {
+            name,
+            category,
+            wikiLink: `https://oldschool.runescape.wiki/w/${encoded}`,
+            imageUrl: `https://oldschool.runescape.wiki/w/Special:Redirect/file/${encoded}.png`
+        };
+    }
 
-async function loadCollectionLogItems() {
-    try {
-        const raw = localStorage.getItem(CL_CACHE_KEY);
-        if (raw) {
-            const { ts, data } = JSON.parse(raw);
-            if (Date.now() - ts < CL_CACHE_TTL) {
-                data.forEach(item => {
-                    collectionLogMap.set(item.id, buildClEntry(item.name, item.category));
-                });
-                return;
-            }
-        }
-    } catch { /* ignore corrupt cache */ }
-
-    try {
-        const url = 'https://oldschool.runescape.wiki/api.php?action=query&titles=Module:Collection_log%2Fdata.json&prop=revisions&rvprop=content&rvslots=main&format=json&formatversion=2&origin=*';
-        const resp = await fetch(url);
-        const json = await resp.json();
-        const content = json.query.pages[0].revisions[0].slots.main.content;
-        const items = JSON.parse(content);
-
-        const cacheData = [];
+    setCollectionLogItems(items = []) {
+        this.collectionLogMap.clear();
         items.forEach(item => {
-            const category = item.tabs?.[0] || '';
-            collectionLogMap.set(item.id, buildClEntry(item.name, category));
-            cacheData.push({ id: item.id, name: item.name, category });
+            const numericId = Number(item.id);
+            const itemId = Number.isFinite(numericId) ? numericId : item.id;
+            this.collectionLogMap.set(itemId, this.buildCollectionLogEntry(item.name, item.category));
         });
+    }
+
+    async loadCollectionLogItems() {
+        try {
+            const raw = localStorage.getItem(CL_CACHE_KEY);
+            if (raw) {
+                const { ts, data } = JSON.parse(raw);
+                if (Date.now() - ts < CL_CACHE_TTL && Array.isArray(data)) {
+                    this.setCollectionLogItems(data);
+                    return this.collectionLogMap;
+                }
+            }
+        } catch {
+            // ignore corrupt cache
+        }
 
         try {
-            localStorage.setItem(CL_CACHE_KEY, JSON.stringify({ ts: Date.now(), data: cacheData }));
-        } catch { /* ignore localStorage failures */ }
-    } catch (e) {
-        console.warn('Failed to load collection log data', e);
+            const url = 'https://oldschool.runescape.wiki/api.php?action=query&titles=Module:Collection_log%2Fdata.json&prop=revisions&rvprop=content&rvslots=main&format=json&formatversion=2&origin=*';
+            const resp = await fetch(url);
+            const json = await resp.json();
+            const content = json.query.pages[0].revisions[0].slots.main.content;
+            const items = JSON.parse(content);
+
+            const cacheData = [];
+            items.forEach(item => {
+                cacheData.push({
+                    id: item.id,
+                    name: item.name,
+                    category: item.tabs?.[0] || ''
+                });
+            });
+
+            this.setCollectionLogItems(cacheData);
+
+            try {
+                localStorage.setItem(CL_CACHE_KEY, JSON.stringify({ ts: Date.now(), data: cacheData }));
+            } catch {
+                // ignore localStorage failures
+            }
+        } catch (error) {
+            console.warn('Failed to load collection log data', error);
+        }
+
+        return this.collectionLogMap;
+    }
+
+    async loadPlayerData(username, options = {}) {
+        const { forceRefresh = false } = options;
+        const normalized = normalizeUsername(username);
+        if (!normalized) {
+            return {
+                obtainedItemIds: new Set(),
+                completedAchievementDiaryKeys: new Set(),
+                playerSkillExperienceBySkill: new Map(),
+                playerSkillLevelBySkill: new Map()
+            };
+        }
+
+        const cacheKey = getPlayerCacheKey(normalized);
+        if (!forceRefresh) {
+            try {
+                const raw = localStorage.getItem(cacheKey);
+                if (raw) {
+                    const { ts, ids, achievementDiaryKeys, skillExperience, skillLevels } = JSON.parse(raw);
+                    if (Date.now() - ts < PLAYER_CL_CACHE_TTL && Array.isArray(ids)) {
+                        const cachedSkillExperience = new Map();
+                        extractSkillExperienceFromContainer(skillExperience, cachedSkillExperience);
+
+                        const cachedSkillLevels = new Map();
+                        extractSkillLevelsFromContainer(skillLevels, cachedSkillLevels);
+
+                        finalizePlayerSkillSnapshots(cachedSkillExperience, cachedSkillLevels);
+
+                        return {
+                            obtainedItemIds: new Set(ids.map(id => Number(id)).filter(id => Number.isInteger(id) && id > 0)),
+                            completedAchievementDiaryKeys: new Set(
+                                Array.isArray(achievementDiaryKeys)
+                                    ? achievementDiaryKeys.map(value => String(value))
+                                    : []
+                            ),
+                            playerSkillExperienceBySkill: cachedSkillExperience,
+                            playerSkillLevelBySkill: cachedSkillLevels
+                        };
+                    }
+                }
+            } catch {
+                // ignore corrupt cache
+            }
+        }
+
+        try {
+            const syncName = encodeURIComponent(toSyncUsername(normalized));
+            const url = `https://sync.runescape.wiki/runelite/player/${syncName}/STANDARD`;
+            const response = await fetch(url, { cache: forceRefresh ? 'no-store' : 'default' });
+            if (!response.ok) {
+                throw new Error(`sync request failed (${response.status})`);
+            }
+
+            const payload = await response.json();
+            const ids = Array.isArray(payload.collection_log)
+                ? payload.collection_log.map(id => Number(id)).filter(id => Number.isInteger(id) && id > 0)
+                : [];
+            const completedAchievementDiaryKeys = extractCompletedAchievementDiaryKeys(payload.achievement_diaries);
+            const playerSkillExperienceBySkill = extractPlayerSkillExperience(payload);
+            const playerSkillLevelBySkill = extractPlayerSkillLevels(payload);
+
+            finalizePlayerSkillSnapshots(playerSkillExperienceBySkill, playerSkillLevelBySkill);
+
+            try {
+                localStorage.setItem(cacheKey, JSON.stringify({
+                    ts: Date.now(),
+                    ids,
+                    achievementDiaryKeys: Array.from(completedAchievementDiaryKeys),
+                    skillExperience: Object.fromEntries(playerSkillExperienceBySkill),
+                    skillLevels: Object.fromEntries(playerSkillLevelBySkill)
+                }));
+            } catch {
+                // ignore localStorage failures
+            }
+
+            return {
+                obtainedItemIds: new Set(ids),
+                completedAchievementDiaryKeys,
+                playerSkillExperienceBySkill,
+                playerSkillLevelBySkill
+            };
+        } catch (error) {
+            console.warn('Failed to load player collection log', error);
+            return null;
+        }
     }
 }
 
-function buildClEntry(name, category) {
-    const encoded = encodeURIComponent(name.replace(/ /g, '_'));
-    return {
-        name,
-        category,
-        wikiLink: `https://oldschool.runescape.wiki/w/${encoded}`,
-        imageUrl: `https://oldschool.runescape.wiki/w/Special:Redirect/file/${encoded}.png`
-    };
-}
+const gridModel = new Grid();
+const taskManager = new TaskManager();
+const gameController = new GameController(gridModel, taskManager);
+const wiki = new Wiki();
+
+// collection log item map: id -> { name, category, wikiLink, imageUrl }
+const collectionLogMap = wiki.collectionLogMap;
 
 function formatSkillName(skillName) {
     const normalized = normalizeSkillName(skillName);
@@ -2264,81 +2374,29 @@ function extractCompletedAchievementDiaryKeys(achievementDiaries) {
     return completedKeys;
 }
 
-async function loadPlayerCollectionLog(username, options = {}) {
-    const { forceRefresh = false } = options;
-    const normalized = normalizeUsername(username);
-    if (!normalized) {
-        obtainedItemIds = new Set();
-        completedAchievementDiaryKeys = new Set();
-        playerSkillExperienceBySkill = new Map();
-        playerSkillLevelBySkill = new Map();
+function applyPlayerSnapshot(playerSnapshot) {
+    if (!playerSnapshot || typeof playerSnapshot !== 'object') {
         return;
     }
 
-    const cacheKey = getPlayerCacheKey(normalized);
-    if (!forceRefresh) {
-        try {
-            const raw = localStorage.getItem(cacheKey);
-            if (raw) {
-                const { ts, ids, achievementDiaryKeys, skillExperience, skillLevels } = JSON.parse(raw);
-                if (Date.now() - ts < PLAYER_CL_CACHE_TTL && Array.isArray(ids)) {
-                    obtainedItemIds = new Set(ids.map(id => Number(id)).filter(id => Number.isInteger(id) && id > 0));
-                    completedAchievementDiaryKeys = new Set(
-                        Array.isArray(achievementDiaryKeys)
-                            ? achievementDiaryKeys.map(value => String(value))
-                            : []
-                    );
-                    const cachedSkillExperience = new Map();
-                    extractSkillExperienceFromContainer(skillExperience, cachedSkillExperience);
-                    const cachedSkillLevels = new Map();
-                    extractSkillLevelsFromContainer(skillLevels, cachedSkillLevels);
-                    finalizePlayerSkillSnapshots(cachedSkillExperience, cachedSkillLevels);
-                    playerSkillExperienceBySkill = cachedSkillExperience;
-                    playerSkillLevelBySkill = cachedSkillLevels;
-                    return;
-                }
-            }
-        } catch {
-            // ignore corrupt cache
-        }
-    }
+    obtainedItemIds = playerSnapshot.obtainedItemIds instanceof Set
+        ? new Set(playerSnapshot.obtainedItemIds)
+        : new Set();
 
-    try {
-        const syncName = encodeURIComponent(toSyncUsername(normalized));
-        const url = `https://sync.runescape.wiki/runelite/player/${syncName}/STANDARD`;
-        const response = await fetch(url, { cache: forceRefresh ? 'no-store' : 'default' });
-        if (!response.ok) {
-            throw new Error(`sync request failed (${response.status})`);
-        }
+    completedAchievementDiaryKeys = playerSnapshot.completedAchievementDiaryKeys instanceof Set
+        ? new Set(playerSnapshot.completedAchievementDiaryKeys)
+        : new Set();
 
-        const payload = await response.json();
-        const ids = Array.isArray(payload.collection_log)
-            ? payload.collection_log.map(id => Number(id)).filter(id => Number.isInteger(id) && id > 0)
-            : [];
-        const diaryKeys = extractCompletedAchievementDiaryKeys(payload.achievement_diaries);
-        const skillExperience = extractPlayerSkillExperience(payload);
-        const skillLevels = extractPlayerSkillLevels(payload);
-        finalizePlayerSkillSnapshots(skillExperience, skillLevels);
+    const nextSkillExperience = playerSnapshot.playerSkillExperienceBySkill instanceof Map
+        ? new Map(playerSnapshot.playerSkillExperienceBySkill)
+        : new Map();
+    const nextSkillLevels = playerSnapshot.playerSkillLevelBySkill instanceof Map
+        ? new Map(playerSnapshot.playerSkillLevelBySkill)
+        : new Map();
 
-        obtainedItemIds = new Set(ids);
-        completedAchievementDiaryKeys = diaryKeys;
-        playerSkillExperienceBySkill = skillExperience;
-        playerSkillLevelBySkill = skillLevels;
-
-        try {
-            localStorage.setItem(cacheKey, JSON.stringify({
-                ts: Date.now(),
-                ids,
-                achievementDiaryKeys: Array.from(diaryKeys),
-                skillExperience: Object.fromEntries(skillExperience),
-                skillLevels: Object.fromEntries(skillLevels)
-            }));
-        } catch {
-            // ignore localStorage failures
-        }
-    } catch (error) {
-        console.warn('Failed to load player collection log', error);
-    }
+    finalizePlayerSkillSnapshots(nextSkillExperience, nextSkillLevels);
+    playerSkillExperienceBySkill = nextSkillExperience;
+    playerSkillLevelBySkill = nextSkillLevels;
 }
 
 async function loadAll() {
@@ -3250,7 +3308,11 @@ async function syncPlayerProgress() {
         return 0;
     }
 
-    await loadPlayerCollectionLog(playerUsername, { forceRefresh: true });
+    const playerSnapshot = await wiki.loadPlayerData(playerUsername, { forceRefresh: true });
+    if (playerSnapshot) {
+        applyPlayerSnapshot(playerSnapshot);
+    }
+
     return syncCompletedTasksFromObtained({ animate: true, showToast: true, refreshModal: true });
 }
 
@@ -4144,7 +4206,11 @@ function startApp() {
     loadingIcons.forEach(icon => icon.classList.remove('visible'));
     loadingIcons.forEach(icon => bindImageErrorFallback(icon));
 
-    Promise.all([loadAll(), loadCollectionLogItems(), loadPlayerCollectionLog(playerUsername)]).then(([data]) => {
+    Promise.all([loadAll(), wiki.loadCollectionLogItems(), wiki.loadPlayerData(playerUsername)]).then(([data, _, playerSnapshot]) => {
+    if (playerSnapshot) {
+        applyPlayerSnapshot(playerSnapshot);
+    }
+
     const currentTasks = taskManager.buildTasksFromTierData(data);
     let all = [];
     let taskListChanged = false;
