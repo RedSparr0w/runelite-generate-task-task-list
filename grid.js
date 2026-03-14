@@ -232,9 +232,8 @@ class Grid {
     }
 }
 
-class GameController {
-    constructor(grid) {
-        this.grid = grid;
+class TaskManager {
+    constructor() {
         this.tasks = [];
     }
 
@@ -252,6 +251,10 @@ class GameController {
         return this.tasks;
     }
 
+    getTaskList() {
+        return this.tasks.length > 0 ? this.tasks : tasksGlobal;
+    }
+
     buildTasksFromTierData(data) {
         const tasks = [];
         data.forEach(tierObj => {
@@ -262,17 +265,102 @@ class GameController {
         return tasks;
     }
 
+    getState(id) {
+        return stateMap[id];
+    }
+
+    setState(id, state) {
+        stateMap[id] = state;
+        saveStates(stateMap);
+    }
+
+    getCompletedCount() {
+        return this.getTaskList().filter(task => task.id !== INTRO_TASK_ID && this.getState(task.id) === 'complete').length;
+    }
+
+    getUnlockLimit(completedCount = this.getCompletedCount()) {
+        return Math.max(1, Math.floor(Math.sqrt(completedCount / 5)) + 1);
+    }
+
+    getUnlockedCount() {
+        return this.getTaskList().filter(task => this.getState(task.id) === 'incomplete').length;
+    }
+
+    canUnlockMore() {
+        return this.getUnlockedCount() < this.getUnlockLimit();
+    }
+
+    getTasksUntilNextUnlock(completedCount = this.getCompletedCount()) {
+        const currentLimit = this.getUnlockLimit(completedCount);
+        const nextThreshold = 5 * currentLimit * currentLimit;
+        return Math.max(0, nextThreshold - completedCount);
+    }
+
+    normalizeUnlockStates() {
+        const unlockLimit = this.getUnlockLimit();
+        const incompleteTasks = this.getTaskList().filter(task => this.getState(task.id) === 'incomplete');
+        incompleteTasks.slice(unlockLimit).forEach(task => {
+            this.setState(task.id, 'locked');
+            const cell = getCellById(task.id);
+            if (cell) {
+                setCellState(cell, 'locked');
+            }
+        });
+    }
+
+    revealTaskNeighbors(taskId) {
+        const coords = idToCoords.get(taskId) || idToCoords.get(String(taskId));
+        if (!coords) {
+            return;
+        }
+
+        const { x, y } = coords;
+        idToCoords.forEach((coord, id) => {
+            const isNeighbor =
+                (coord.x === x && (coord.y === y - 1 || coord.y === y + 1)) ||
+                (coord.y === y && (coord.x === x - 1 || coord.x === x + 1));
+            if (isNeighbor && this.getState(id) === 'hidden') {
+                revealNeighborAsLocked(id);
+            }
+        });
+    }
+
+    applyTaskCompletion(task) {
+        this.setState(task.id, 'complete');
+        const cell = getCellById(task.id);
+        if (cell) {
+            setCellState(cell, 'complete');
+        }
+        this.revealTaskNeighbors(task.id);
+    }
+
+    revealFrontierFromCompletedTasks() {
+        this.getTaskList().forEach(task => {
+            if (this.getState(task.id) === 'complete') {
+                this.revealTaskNeighbors(task.id);
+            }
+        });
+    }
+}
+
+class GameController {
+    constructor(grid, taskManager) {
+        this.grid = grid;
+        this.taskManager = taskManager;
+    }
+
     getTaskCoord(taskOrId) {
         return this.grid.getTaskCoord(taskOrId);
     }
 
-    getCenterCoord(tasks = this.tasks) {
+    getCenterCoord(tasks = this.taskManager.getTasks()) {
         return this.grid.getCenterCoord(tasks);
     }
 }
 
 const gridModel = new Grid();
-const gameController = new GameController(gridModel);
+const taskManager = new TaskManager();
+const gameController = new GameController(gridModel, taskManager);
 
 // collection log item map: id -> { name, category, wikiLink, imageUrl }
 let collectionLogMap = new Map();
@@ -567,7 +655,7 @@ function getTierOpacityForCell(cell) {
         return 1;
     }
 
-    const state = cell.state || getState(task.id) || 'hidden';
+    const state = cell.state || taskManager.getState(task.id) || 'hidden';
     if (state === 'hidden') {
         return 1;
     }
@@ -1776,7 +1864,7 @@ function bindCanvasInteractions(canvas) {
             return;
         }
 
-        const state = getState(cell.id) || 'hidden';
+        const state = taskManager.getState(cell.id) || 'hidden';
         if (state === 'hidden') {
             return;
         }
@@ -1790,7 +1878,7 @@ function bindCanvasInteractions(canvas) {
             return;
         }
 
-        const state = getState(cell.id) || 'hidden';
+        const state = taskManager.getState(cell.id) || 'hidden';
         if (state === 'incomplete' || state === 'complete') {
             e.preventDefault();
             window.open(cell.task.wikiLink, '_blank');
@@ -2265,10 +2353,6 @@ function shuffle(array) {
     }
 }
 
-function buildTaskListFromTierData(data) {
-    return gameController.buildTasksFromTierData(data);
-}
-
 function buildWeightedTaskOrder(tasks) {
     const weightedTasks = tasks.map(task => ({
         task,
@@ -2305,7 +2389,7 @@ function mergeSavedTaskOrder(savedIds, currentTasks) {
 
     const hiddenPool = [...newTasks];
     const rebuiltTasks = orderedTasks.map(task => {
-        const state = getState(task.id);
+        const state = taskManager.getState(task.id);
         const isHiddenTask = String(task.id) !== INTRO_TASK_ID && (!state || state === 'hidden');
         if (!isHiddenTask) {
             return task;
@@ -2343,7 +2427,7 @@ function rebuildHiddenAndLockedStatesFromProgress(tasks) {
 
     tasks.forEach(task => {
         const id = String(task.id);
-        const previousState = getState(id);
+        const previousState = taskManager.getState(id);
 
         if (id === INTRO_TASK_ID) {
             nextStateMap[id] = previousState === 'complete' ? 'complete' : 'incomplete';
@@ -2453,37 +2537,6 @@ function saveStates(map) {
     }
 }
 
-function getState(id) {
-    return stateMap[id];
-}
-
-function setState(id, state) {
-    stateMap[id] = state;
-    saveStates(stateMap);
-}
-
-function getCompletedCount() {
-    return tasksGlobal.filter(task => task.id !== INTRO_TASK_ID && getState(task.id) === 'complete').length;
-}
-
-function getUnlockLimit(completedCount = getCompletedCount()) {
-    return Math.max(1, Math.floor(Math.sqrt(completedCount / 5)) + 1);
-}
-
-function getUnlockedCount() {
-    return tasksGlobal.filter(task => getState(task.id) === 'incomplete').length;
-}
-
-function canUnlockMore() {
-    return getUnlockedCount() < getUnlockLimit();
-}
-
-function getTasksUntilNextUnlock(completedCount = getCompletedCount()) {
-    const currentLimit = getUnlockLimit(completedCount);
-    const nextThreshold = 5 * currentLimit * currentLimit;
-    return Math.max(0, nextThreshold - completedCount);
-}
-
 function updateUnlockHud() {
     const unlocks = document.getElementById('hud-unlocks');
     const nextUnlock = document.getElementById('hud-next-unlock');
@@ -2491,10 +2544,10 @@ function updateUnlockHud() {
         return;
     }
 
-    const completedCount = getCompletedCount();
-    const totalUnlocks = getUnlockLimit(completedCount);
-    const availableUnlocks = Math.max(0, totalUnlocks - getUnlockedCount());
-    const tasksUntilNext = getTasksUntilNextUnlock(completedCount);
+    const completedCount = taskManager.getCompletedCount();
+    const totalUnlocks = taskManager.getUnlockLimit(completedCount);
+    const availableUnlocks = Math.max(0, totalUnlocks - taskManager.getUnlockedCount());
+    const tasksUntilNext = taskManager.getTasksUntilNextUnlock(completedCount);
 
     unlocks.textContent = `${availableUnlocks} / ${totalUnlocks}`;
     nextUnlock.textContent = tasksUntilNext === 1 ? '1 task' : `${tasksUntilNext} tasks`;
@@ -2505,18 +2558,6 @@ function updateUnlockHud() {
     if (tierTasksModal?.classList.contains('open')) {
         renderTierTasksModal();
     }
-}
-
-function normalizeUnlockStates() {
-    const unlockLimit = getUnlockLimit();
-    const incompleteTasks = tasksGlobal.filter(task => getState(task.id) === 'incomplete');
-    incompleteTasks.slice(unlockLimit).forEach(task => {
-        setState(task.id, 'locked');
-        const cell = getCellById(task.id);
-        if (cell) {
-            setCellState(cell, 'locked');
-        }
-    });
 }
 
 function formatTierName(tier) {
@@ -2552,7 +2593,7 @@ function getTierProgressByTier() {
 
         const bucket = grouped.get(tier);
         bucket.total += 1;
-        if (getState(task.id) === 'complete') {
+        if (taskManager.getState(task.id) === 'complete') {
             bucket.completed += 1;
         }
         bucket.tasks.push(task);
@@ -2657,8 +2698,8 @@ function renderTierTasksModal() {
     selectedTier.tasks
         .slice()
         .sort((taskA, taskB) => {
-            const stateA = getTierListStateGroup(getState(taskA.id) || 'hidden');
-            const stateB = getTierListStateGroup(getState(taskB.id) || 'hidden');
+            const stateA = getTierListStateGroup(taskManager.getState(taskA.id) || 'hidden');
+            const stateB = getTierListStateGroup(taskManager.getState(taskB.id) || 'hidden');
             const rankA = stateOrder[stateA] ?? 99;
             const rankB = stateOrder[stateB] ?? 99;
             if (rankA !== rankB) {
@@ -2667,7 +2708,7 @@ function renderTierTasksModal() {
             return taskA.name.localeCompare(taskB.name);
         })
         .forEach(task => {
-            const state = getTierListStateGroup(getState(task.id) || 'hidden');
+            const state = getTierListStateGroup(taskManager.getState(task.id) || 'hidden');
 
             const row = document.createElement('div');
             row.className = 'tier-task-row';
@@ -2734,7 +2775,7 @@ function updateCurrentTasksPopover() {
     const button = document.getElementById('current-tasks-button');
     const listEl = document.getElementById('current-tasks-list');
     const incompleteTasks = tasksGlobal
-        .filter(task => getState(task.id) === 'incomplete')
+        .filter(task => taskManager.getState(task.id) === 'incomplete')
         .sort((taskA, taskB) => {
             const tierSortA = getTierSortIndex(taskA.tier);
             const tierSortB = getTierSortIndex(taskB.tier);
@@ -2981,7 +3022,7 @@ function getLowestPendingSeriesTask(task) {
     const taskOrderById = new Map(tasksGlobal.map((candidate, index) => [String(candidate.id), index]));
     const seriesCandidates = tasksGlobal
         .filter(candidate => getCollectionLogSeriesKey(candidate) === seriesKey)
-        .filter(candidate => isSeriesSwapCandidateState(getState(candidate.id) || 'hidden'))
+        .filter(candidate => isSeriesSwapCandidateState(taskManager.getState(candidate.id) || 'hidden'))
         .sort((taskA, taskB) => {
             const requiredDelta = getTaskRequiredCount(taskA) - getTaskRequiredCount(taskB);
             if (requiredDelta !== 0) {
@@ -3009,7 +3050,7 @@ function saveTaskGridOrder(tasks = tasksGlobal) {
 }
 
 function syncCellPositionsFromTaskOrder() {
-    updateTaskCoordinates(tasksGlobal);
+    gridModel.updateTaskCoordinates(tasksGlobal);
     coordToTaskId.clear();
 
     tasksGlobal.forEach(task => {
@@ -3040,11 +3081,11 @@ function swapTaskStates(taskIdA, taskIdB) {
         return;
     }
 
-    const stateA = getState(idA) || 'hidden';
-    const stateB = getState(idB) || 'hidden';
+    const stateA = taskManager.getState(idA) || 'hidden';
+    const stateB = taskManager.getState(idB) || 'hidden';
 
-    setState(idA, stateB);
-    setState(idB, stateA);
+    taskManager.setState(idA, stateB);
+    taskManager.setState(idB, stateA);
 
     const cellA = getCellById(idA);
     const cellB = getCellById(idB);
@@ -3106,31 +3147,6 @@ function alignUnlockedTaskToLowestSeriesTask(task) {
     return swapped ? targetTask : unlockedTask;
 }
 
-function revealTaskNeighbors(taskId) {
-    const coords = idToCoords.get(taskId);
-    if (!coords) {
-        return;
-    }
-
-    const { x, y } = coords;
-    idToCoords.forEach((coord, id) => {
-        const isNeighbor =
-            (coord.x === x && (coord.y === y - 1 || coord.y === y + 1)) ||
-            (coord.y === y && (coord.x === x - 1 || coord.x === x + 1));
-        if (isNeighbor && getState(id) === 'hidden') {
-            revealNeighborAsLocked(id);
-        }
-    });
-}
-
-function applyTaskCompletion(task) {
-    setState(task.id, 'complete');
-    const cell = getCellById(task.id);
-    if (cell) {
-        setCellState(cell, 'complete');
-    }
-    revealTaskNeighbors(task.id);
-}
 
 function refreshOpenModal() {
     const modal = document.getElementById('task-modal');
@@ -3149,14 +3165,6 @@ function refreshOpenModal() {
     }
 }
 
-function revealFrontierFromCompletedTasks() {
-    tasksGlobal.forEach(task => {
-        if (getState(task.id) === 'complete') {
-            revealTaskNeighbors(task.id);
-        }
-    });
-}
-
 async function syncCompletedTasksFromObtained(options = {}) {
     const {
         showToast = true,
@@ -3164,12 +3172,12 @@ async function syncCompletedTasksFromObtained(options = {}) {
         batchDelay = SYNC_STAGGER_MS
     } = options;
 
-    const previousLimit = getUnlockLimit();
+    const previousLimit = taskManager.getUnlockLimit();
     let completedCount = 0;
     const center = gameController.getCenterCoord(tasksGlobal);
 
     const tasksToComplete = tasksGlobal
-        .filter(task => getState(task.id) !== 'complete')
+        .filter(task => taskManager.getState(task.id) !== 'complete')
         .filter(task => {
             const requiredCount = getTaskRequiredCount(task);
             return requiredCount > 0 && getTaskObtainedCount(task) >= requiredCount;
@@ -3204,11 +3212,11 @@ async function syncCompletedTasksFromObtained(options = {}) {
     for (let index = 0; index < distanceBatches.length; index++) {
         const batch = distanceBatches[index].tasks;
         batch.forEach(task => {
-            applyTaskCompletion(task);
+            taskManager.applyTaskCompletion(task);
         });
 
         completedCount += batch.length;
-        normalizeUnlockStates();
+        taskManager.normalizeUnlockStates();
         updateUnlockHud();
         refreshHiddenEdges({ animate: false });
 
@@ -3217,15 +3225,15 @@ async function syncCompletedTasksFromObtained(options = {}) {
         }
     }
 
-    revealFrontierFromCompletedTasks();
-    normalizeUnlockStates();
+    taskManager.revealFrontierFromCompletedTasks();
+    taskManager.normalizeUnlockStates();
     updateUnlockHud();
 
     if (completedCount > 0) {
         refreshHiddenEdges({ animate: false });
     }
 
-    const nextLimit = getUnlockLimit();
+    const nextLimit = taskManager.getUnlockLimit();
     if (showToast && nextLimit > previousLimit) {
         showUnlockToast(nextLimit);
     }
@@ -3355,7 +3363,7 @@ function setCellState(cell, nextState) {
 }
 
 function createCell(task, coord) {
-    const state = getState(task.id) || 'incomplete';
+    const state = taskManager.getState(task.id) || 'incomplete';
     const nameLines = buildTaskNameLines(task.name, {
         maxCharsPerLine: 15,
         maxLines: 2
@@ -3420,7 +3428,7 @@ function positionPopover(anchor) {
 }
 
 function revealNeighborAsLocked(id) {
-    setState(id, 'locked');
+    taskManager.setState(id, 'locked');
     const cell = getCellById(id);
     if (!cell) {
         return;
@@ -3457,7 +3465,7 @@ function refreshHiddenEdges(options = {}) {
     const newlyVisibleEdges = [];
 
     idToCoords.forEach((coord, id) => {
-        stateByCoord.set(`${coord.x},${coord.y}`, getState(id));
+        stateByCoord.set(`${coord.x},${coord.y}`, taskManager.getState(id));
     });
 
     idToCoords.forEach((coord, id) => {
@@ -3559,7 +3567,7 @@ function refreshHiddenEdges(options = {}) {
         const startDelay = Math.max(item.startDelay ?? edgeDelayOffset, index * staggerMs);
         setTimeout(() => {
             const cellId = item.cell.id;
-            if (getState(cellId) !== 'hidden') {
+            if (taskManager.getState(cellId) !== 'hidden') {
                 return;
             }
             const stillHasEdgeSide =
@@ -3587,7 +3595,7 @@ function showModal(task, anchor) {
     const button = document.getElementById('modal-complete');
     const tierBadge = document.getElementById('modal-tier-badge');
     const cell = getCellById(task.id);
-    const state = getState(task.id) || 'incomplete';
+    const state = taskManager.getState(task.id) || 'incomplete';
 
     if (task.id === INTRO_TASK_ID) {
         title.textContent = 'Welcome to the Task Grid!';
@@ -3621,7 +3629,7 @@ function showModal(task, anchor) {
             button.style.display = 'block';
             button.onclick = e => {
                 e.preventDefault();
-                applyTaskCompletion(task);
+                taskManager.applyTaskCompletion(task);
                 updateUnlockHud();
                 refreshHiddenEdges({ animate: true });
                 hideModal();
@@ -3659,20 +3667,20 @@ function showModal(task, anchor) {
         button.style.display = 'block';
         button.onclick = e => {
             e.preventDefault();
-            const previousLimit = getUnlockLimit();
-            applyTaskCompletion(task);
+            const previousLimit = taskManager.getUnlockLimit();
+            taskManager.applyTaskCompletion(task);
             updateUnlockHud();
             refreshHiddenEdges({ animate: true });
-            const nextLimit = getUnlockLimit();
+            const nextLimit = taskManager.getUnlockLimit();
             if (nextLimit > previousLimit) {
                 showUnlockToast(nextLimit);
             }
             hideModal();
         };
     } else if (state === 'locked') {
-        const unlockLimit = getUnlockLimit();
-        const unlockedCount = getUnlockedCount();
-        const unlockAvailable = canUnlockMore();
+        const unlockLimit = taskManager.getUnlockLimit();
+        const unlockedCount = taskManager.getUnlockedCount();
+        const unlockAvailable = taskManager.canUnlockMore();
 
         button.type = 'button';
         button.style.display = 'block';
@@ -3682,7 +3690,7 @@ function showModal(task, anchor) {
             : `Unlock limit reached (${unlockedCount}/${unlockLimit})`;
         button.onclick = unlockAvailable ? e => {
             e.preventDefault();
-            setState(task.id, 'incomplete');
+            taskManager.setState(task.id, 'incomplete');
             if (cell) {
                 setCellState(cell, 'incomplete');
             }
@@ -3696,7 +3704,7 @@ function showModal(task, anchor) {
             requestAnimationFrame(() => {
                 const unlockedTaskId = String(unlockedTask?.id || task.id);
                 const unlockedCell = getCellById(unlockedTaskId);
-                if (!unlockedCell || getState(unlockedTaskId) !== 'incomplete') {
+                if (!unlockedCell || taskManager.getState(unlockedTaskId) !== 'incomplete') {
                     return;
                 }
 
@@ -3873,10 +3881,6 @@ function showUnlockToast(newLimit) {
     }, UNLOCK_TOAST_DURATION_MS);
 }
 
-function updateTaskCoordinates(tasks) {
-    return gridModel.updateTaskCoordinates(tasks);
-}
-
 function render(tasks) {
     const grid = document.getElementById('grid');
     if (!grid) {
@@ -3892,7 +3896,7 @@ function render(tasks) {
     idToCell.clear();
     coordToTaskId.clear();
 
-    const { size, coords, center } = updateTaskCoordinates(tasks);
+    const { size, coords, center } = gridModel.updateTaskCoordinates(tasks);
     gridCellCount = size;
     const canvas = ensureGridCanvas();
     if (!canvas || !gridContext) {
@@ -3917,7 +3921,7 @@ function render(tasks) {
         cells.push({ cell, x, y });
     });
 
-    const visibleCells = cells.filter(item => getState(item.cell.id) !== 'hidden');
+    const visibleCells = cells.filter(item => taskManager.getState(item.cell.id) !== 'hidden');
     const sortedVisibleCells = visibleCells
         .sort((a, b) => {
             const distanceA = Math.abs(a.x - center.x) + Math.abs(a.y - center.y);
@@ -4071,7 +4075,7 @@ async function preloadTaskImages(tasks) {
     const sources = new Set([LOCKED_TILE_IMAGE, QUESTION_MARK_ICON]);
 
     tasks.forEach(task => {
-        const state = getState(task.id);
+        const state = taskManager.getState(task.id);
         if (state === 'incomplete' || state === 'complete' || state === 'locked') {
             sources.add(task.imageLink);
         }
@@ -4141,7 +4145,7 @@ function startApp() {
     loadingIcons.forEach(icon => bindImageErrorFallback(icon));
 
     Promise.all([loadAll(), loadCollectionLogItems(), loadPlayerCollectionLog(playerUsername)]).then(([data]) => {
-    const currentTasks = buildTaskListFromTierData(data);
+    const currentTasks = taskManager.buildTasksFromTierData(data);
     let all = [];
     let taskListChanged = false;
 
@@ -4176,27 +4180,27 @@ function startApp() {
     }
 
     all.forEach(task => {
-        if (!getState(task.id)) {
-            setState(task.id, task.id === INTRO_TASK_ID ? 'incomplete' : 'hidden');
+        if (!taskManager.getState(task.id)) {
+            taskManager.setState(task.id, task.id === INTRO_TASK_ID ? 'incomplete' : 'hidden');
         }
     });
 
     if (freshOrder && all.length > 0) {
         all.forEach((task, index) => {
-            setState(task.id, index === 0 ? 'incomplete' : 'hidden');
+            taskManager.setState(task.id, index === 0 ? 'incomplete' : 'hidden');
         });
         stateMap = loadStates();
     }
 
-    all = gameController.setTasks(all);
+    all = taskManager.setTasks(all);
     applyTierFilters(selectedTierFilters, { persist: false, rerender: false });
-    updateTaskCoordinates(all);
+    gridModel.updateTaskCoordinates(all);
 
     if (!freshOrder && taskListChanged) {
         rebuildHiddenAndLockedStatesFromProgress(all);
     }
 
-    normalizeUnlockStates();
+    taskManager.normalizeUnlockStates();
     updateUnlockHud();
 
     const loadingIcons = Array.from(document.querySelectorAll('#loading .loading-icon'));
