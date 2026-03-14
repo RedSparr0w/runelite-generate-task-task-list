@@ -864,9 +864,10 @@ class Wiki {
 }
 
 class TaskVerification {
-    constructor(taskManager, playerProgress) {
+    constructor(taskManager, playerProgress, taskOrderManager) {
         this.taskManager = taskManager;
         this.playerProgress = playerProgress;
+        this.taskOrderManager = taskOrderManager;
     }
 
     getTaskVerificationItemIds(task) {
@@ -1040,7 +1041,7 @@ class TaskVerification {
             return unlockedTask;
         }
 
-        const swapped = swapTasksById(unlockedTask.id, targetTask.id, { swapStates: true });
+        const swapped = this.taskOrderManager.swapTasksById(unlockedTask.id, targetTask.id, { swapStates: true });
         return swapped ? targetTask : unlockedTask;
     }
 }
@@ -1329,12 +1330,229 @@ class TaskPanels {
     }
 }
 
+class TaskOrderManager {
+    constructor(taskManager, gridModel) {
+        this.taskManager = taskManager;
+        this.gridModel = gridModel;
+    }
+
+    async loadAllTierData() {
+        const promises = tiers.map(name => fetch(`./tiers/${name}.json`).then(r => r.json()));
+        return Promise.all(promises);
+    }
+
+    shuffle(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+    }
+
+    buildWeightedTaskOrder(tasks) {
+        const weightedTasks = tasks.map(task => ({
+            task,
+            priority: Math.random() / (tierWeights[task.tier] || 1)
+        }));
+
+        this.shuffle(weightedTasks);
+        weightedTasks.sort((a, b) => a.priority - b.priority);
+
+        return weightedTasks.map(entry => entry.task);
+    }
+
+    mergeSavedTaskOrder(savedIds, currentTasks) {
+        const taskById = new Map(currentTasks.map(task => [String(task.id), task]));
+        taskById.set(String(INTRO_TASK_ID), INTRO_TASK);
+
+        const normalizedSavedIds = savedIds.map(id => String(id));
+        const savedIdSet = new Set(normalizedSavedIds);
+        const removedTaskCount = normalizedSavedIds.reduce((count, id) => {
+            return count + (taskById.has(id) ? 0 : 1);
+        }, 0);
+        const orderedTasks = normalizedSavedIds
+            .map(id => taskById.get(id))
+            .filter(Boolean);
+        const newTasks = currentTasks.filter(task => !savedIdSet.has(String(task.id)));
+        const taskListChanged = newTasks.length > 0 || removedTaskCount > 0;
+
+        if (newTasks.length === 0) {
+            return {
+                tasks: orderedTasks,
+                taskListChanged
+            };
+        }
+
+        const hiddenPool = [...newTasks];
+        const rebuiltTasks = orderedTasks.map(task => {
+            const state = this.taskManager.getState(task.id);
+            const isHiddenTask = String(task.id) !== INTRO_TASK_ID && (!state || state === 'hidden');
+            if (!isHiddenTask) {
+                return task;
+            }
+
+            hiddenPool.push(task);
+            return null;
+        });
+
+        const reshuffledHiddenTasks = this.buildWeightedTaskOrder(hiddenPool);
+        let hiddenIndex = 0;
+
+        return {
+            tasks: rebuiltTasks
+                .map(task => task || reshuffledHiddenTasks[hiddenIndex++] || null)
+                .filter(Boolean)
+                .concat(reshuffledHiddenTasks.slice(hiddenIndex)),
+            taskListChanged
+        };
+    }
+
+    rebuildHiddenAndLockedStatesFromProgress(tasks) {
+        const nextStateMap = {};
+        const nextCoordToTaskId = new Map();
+        const neighborOffsets = [
+            [0, -1],
+            [1, 0],
+            [0, 1],
+            [-1, 0]
+        ];
+
+        idToCoords.forEach((coord, id) => {
+            nextCoordToTaskId.set(`${coord.x},${coord.y}`, String(id));
+        });
+
+        tasks.forEach(task => {
+            const id = String(task.id);
+            const previousState = this.taskManager.getState(id);
+
+            if (id === INTRO_TASK_ID) {
+                nextStateMap[id] = previousState === 'complete' ? 'complete' : 'incomplete';
+                return;
+            }
+
+            if (previousState === 'complete' || previousState === 'incomplete') {
+                nextStateMap[id] = previousState;
+                return;
+            }
+
+            nextStateMap[id] = 'hidden';
+        });
+
+        tasks.forEach(task => {
+            const id = String(task.id);
+            if (nextStateMap[id] !== 'complete') {
+                return;
+            }
+
+            const coords = idToCoords.get(task.id) || idToCoords.get(id);
+            if (!coords) {
+                return;
+            }
+
+            neighborOffsets.forEach(([dx, dy]) => {
+                const neighborId = nextCoordToTaskId.get(`${coords.x + dx},${coords.y + dy}`);
+                if (neighborId && nextStateMap[neighborId] === 'hidden') {
+                    nextStateMap[neighborId] = 'locked';
+                }
+            });
+        });
+
+        stateMap = nextStateMap;
+        saveStates(stateMap);
+    }
+
+    saveTaskGridOrder(tasks = tasksGlobal) {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks.map(task => task.id)));
+        } catch {
+            // ignore localStorage failures
+        }
+    }
+
+    syncCellPositionsFromTaskOrder() {
+        this.gridModel.updateTaskCoordinates(tasksGlobal);
+        coordToTaskId.clear();
+
+        tasksGlobal.forEach(task => {
+            const taskId = String(task.id);
+            const coord = idToCoords.get(task.id);
+            if (!coord) {
+                return;
+            }
+
+            coordToTaskId.set(`${coord.x},${coord.y}`, taskId);
+
+            const cell = getCellById(taskId);
+            if (!cell) {
+                return;
+            }
+
+            cell.pixelX = GRID_SAFE_PADDING_X + (coord.x * CELL_STEP);
+            cell.pixelY = GRID_SAFE_PADDING_Y + (coord.y * CELL_STEP);
+        });
+
+        refreshPopoverPosition();
+    }
+
+    swapTaskStates(taskIdA, taskIdB) {
+        const idA = String(taskIdA);
+        const idB = String(taskIdB);
+        if (idA === idB) {
+            return;
+        }
+
+        const stateA = this.taskManager.getState(idA) || 'hidden';
+        const stateB = this.taskManager.getState(idB) || 'hidden';
+
+        this.taskManager.setState(idA, stateB);
+        this.taskManager.setState(idB, stateA);
+
+        const cellA = getCellById(idA);
+        const cellB = getCellById(idB);
+        if (cellA) {
+            setCellState(cellA, stateB);
+        }
+        if (cellB) {
+            setCellState(cellB, stateA);
+        }
+    }
+
+    swapTasksById(taskIdA, taskIdB, options = {}) {
+        const { swapStates = false } = options;
+        const idA = String(taskIdA);
+        const idB = String(taskIdB);
+        if (idA === idB) {
+            return false;
+        }
+
+        const indexA = tasksGlobal.findIndex(task => String(task.id) === idA);
+        const indexB = tasksGlobal.findIndex(task => String(task.id) === idB);
+        if (indexA < 0 || indexB < 0) {
+            return false;
+        }
+
+        if (swapStates) {
+            this.swapTaskStates(idA, idB);
+        }
+
+        [tasksGlobal[indexA], tasksGlobal[indexB]] = [tasksGlobal[indexB], tasksGlobal[indexA]];
+
+        this.syncCellPositionsFromTaskOrder();
+        this.saveTaskGridOrder(tasksGlobal);
+        setHoveredCellId('');
+        scheduleSpritePrewarm(0);
+        queueCanvasRender();
+
+        return true;
+    }
+}
+
 const gridModel = new Grid();
 const taskManager = new TaskManager();
 const gameController = new GameController(gridModel, taskManager);
 const playerProgress = new PlayerProgress();
 const wiki = new Wiki();
-const taskVerification = new TaskVerification(taskManager, playerProgress);
+const taskOrderManager = new TaskOrderManager(taskManager, gridModel);
+const taskVerification = new TaskVerification(taskManager, playerProgress, taskOrderManager);
 const taskPanels = new TaskPanels(taskManager);
 
 // collection log item map: id -> { name, category, wikiLink, imageUrl }
@@ -2929,130 +3147,6 @@ function experienceToLevel(experience) {
     return level;
 }
 
-async function loadAll() {
-    const promises = tiers.map(name => fetch(`./tiers/${name}.json`).then(r => r.json()));
-    return Promise.all(promises);
-}
-
-function shuffle(array) {
-    for (let i = array.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
-    }
-}
-
-function buildWeightedTaskOrder(tasks) {
-    const weightedTasks = tasks.map(task => ({
-        task,
-        priority: Math.random() / (tierWeights[task.tier] || 1)
-    }));
-
-    shuffle(weightedTasks);
-    weightedTasks.sort((a, b) => a.priority - b.priority);
-
-    return weightedTasks.map(entry => entry.task);
-}
-
-function mergeSavedTaskOrder(savedIds, currentTasks) {
-    const taskById = new Map(currentTasks.map(task => [String(task.id), task]));
-    taskById.set(String(INTRO_TASK_ID), INTRO_TASK);
-
-    const normalizedSavedIds = savedIds.map(id => String(id));
-    const savedIdSet = new Set(normalizedSavedIds);
-    const removedTaskCount = normalizedSavedIds.reduce((count, id) => {
-        return count + (taskById.has(id) ? 0 : 1);
-    }, 0);
-    const orderedTasks = normalizedSavedIds
-        .map(id => taskById.get(id))
-        .filter(Boolean);
-    const newTasks = currentTasks.filter(task => !savedIdSet.has(String(task.id)));
-    const taskListChanged = newTasks.length > 0 || removedTaskCount > 0;
-
-    if (newTasks.length === 0) {
-        return {
-            tasks: orderedTasks,
-            taskListChanged
-        };
-    }
-
-    const hiddenPool = [...newTasks];
-    const rebuiltTasks = orderedTasks.map(task => {
-        const state = taskManager.getState(task.id);
-        const isHiddenTask = String(task.id) !== INTRO_TASK_ID && (!state || state === 'hidden');
-        if (!isHiddenTask) {
-            return task;
-        }
-
-        hiddenPool.push(task);
-        return null;
-    });
-
-    const reshuffledHiddenTasks = buildWeightedTaskOrder(hiddenPool);
-    let hiddenIndex = 0;
-
-    return {
-        tasks: rebuiltTasks
-            .map(task => task || reshuffledHiddenTasks[hiddenIndex++] || null)
-            .filter(Boolean)
-            .concat(reshuffledHiddenTasks.slice(hiddenIndex)),
-        taskListChanged
-    };
-}
-
-function rebuildHiddenAndLockedStatesFromProgress(tasks) {
-    const nextStateMap = {};
-    const coordToTaskId = new Map();
-    const neighborOffsets = [
-        [0, -1],
-        [1, 0],
-        [0, 1],
-        [-1, 0]
-    ];
-
-    idToCoords.forEach((coord, id) => {
-        coordToTaskId.set(`${coord.x},${coord.y}`, String(id));
-    });
-
-    tasks.forEach(task => {
-        const id = String(task.id);
-        const previousState = taskManager.getState(id);
-
-        if (id === INTRO_TASK_ID) {
-            nextStateMap[id] = previousState === 'complete' ? 'complete' : 'incomplete';
-            return;
-        }
-
-        if (previousState === 'complete' || previousState === 'incomplete') {
-            nextStateMap[id] = previousState;
-            return;
-        }
-
-        nextStateMap[id] = 'hidden';
-    });
-
-    tasks.forEach(task => {
-        const id = String(task.id);
-        if (nextStateMap[id] !== 'complete') {
-            return;
-        }
-
-        const coords = idToCoords.get(task.id) || idToCoords.get(id);
-        if (!coords) {
-            return;
-        }
-
-        neighborOffsets.forEach(([dx, dy]) => {
-            const neighborId = coordToTaskId.get(`${coords.x + dx},${coords.y + dy}`);
-            if (neighborId && nextStateMap[neighborId] === 'hidden') {
-                nextStateMap[neighborId] = 'locked';
-            }
-        });
-    });
-
-    stateMap = nextStateMap;
-    saveStates(stateMap);
-}
-
 function computeGridSize(count) {
     let size = Math.ceil(Math.sqrt(count));
     if (size % 2 === 0) {
@@ -3159,91 +3253,6 @@ function formatTierName(tier) {
 function getTierSortIndex(tier) {
     const index = TIER_DISPLAY_ORDER.indexOf(tier);
     return index === -1 ? Number.POSITIVE_INFINITY : index;
-}
-
-function saveTaskGridOrder(tasks = tasksGlobal) {
-    try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks.map(task => task.id)));
-    } catch {
-        // ignore localStorage failures
-    }
-}
-
-function syncCellPositionsFromTaskOrder() {
-    gridModel.updateTaskCoordinates(tasksGlobal);
-    coordToTaskId.clear();
-
-    tasksGlobal.forEach(task => {
-        const taskId = String(task.id);
-        const coord = idToCoords.get(task.id);
-        if (!coord) {
-            return;
-        }
-
-        coordToTaskId.set(`${coord.x},${coord.y}`, taskId);
-
-        const cell = getCellById(taskId);
-        if (!cell) {
-            return;
-        }
-
-        cell.pixelX = GRID_SAFE_PADDING_X + (coord.x * CELL_STEP);
-        cell.pixelY = GRID_SAFE_PADDING_Y + (coord.y * CELL_STEP);
-    });
-
-    refreshPopoverPosition();
-}
-
-function swapTaskStates(taskIdA, taskIdB) {
-    const idA = String(taskIdA);
-    const idB = String(taskIdB);
-    if (idA === idB) {
-        return;
-    }
-
-    const stateA = taskManager.getState(idA) || 'hidden';
-    const stateB = taskManager.getState(idB) || 'hidden';
-
-    taskManager.setState(idA, stateB);
-    taskManager.setState(idB, stateA);
-
-    const cellA = getCellById(idA);
-    const cellB = getCellById(idB);
-    if (cellA) {
-        setCellState(cellA, stateB);
-    }
-    if (cellB) {
-        setCellState(cellB, stateA);
-    }
-}
-
-function swapTasksById(taskIdA, taskIdB, options = {}) {
-    const { swapStates = false } = options;
-    const idA = String(taskIdA);
-    const idB = String(taskIdB);
-    if (idA === idB) {
-        return false;
-    }
-
-    const indexA = tasksGlobal.findIndex(task => String(task.id) === idA);
-    const indexB = tasksGlobal.findIndex(task => String(task.id) === idB);
-    if (indexA < 0 || indexB < 0) {
-        return false;
-    }
-
-    if (swapStates) {
-        swapTaskStates(idA, idB);
-    }
-
-    [tasksGlobal[indexA], tasksGlobal[indexB]] = [tasksGlobal[indexB], tasksGlobal[indexA]];
-
-    syncCellPositionsFromTaskOrder();
-    saveTaskGridOrder(tasksGlobal);
-    setHoveredCellId('');
-    scheduleSpritePrewarm(0);
-    queueCanvasRender();
-
-    return true;
 }
 
 function refreshOpenModal() {
@@ -4246,7 +4255,7 @@ function startApp() {
     loadingIcons.forEach(icon => icon.classList.remove('visible'));
     loadingIcons.forEach(icon => bindImageErrorFallback(icon));
 
-    Promise.all([loadAll(), wiki.loadCollectionLogItems(), wiki.loadPlayerData(playerUsername)]).then(([data, _, playerSnapshot]) => {
+    Promise.all([taskOrderManager.loadAllTierData(), wiki.loadCollectionLogItems(), wiki.loadPlayerData(playerUsername)]).then(([data, _, playerSnapshot]) => {
     if (playerSnapshot) {
         playerProgress.applySnapshot(playerSnapshot);
     }
@@ -4263,7 +4272,7 @@ function startApp() {
                 throw new Error('saved order must be an array');
             }
 
-            const mergedOrder = mergeSavedTaskOrder(ids, currentTasks);
+            const mergedOrder = taskOrderManager.mergeSavedTaskOrder(ids, currentTasks);
             all = mergedOrder.tasks;
             taskListChanged = mergedOrder.taskListChanged;
         } catch (error) {
@@ -4273,7 +4282,7 @@ function startApp() {
 
     const freshOrder = all.length === 0;
     if (freshOrder) {
-        all = buildWeightedTaskOrder(currentTasks);
+        all = taskOrderManager.buildWeightedTaskOrder(currentTasks);
     }
 
     // Ensure the intro tile is always at position 0, regardless of saved order or fresh shuffle.
@@ -4303,7 +4312,7 @@ function startApp() {
     gridModel.updateTaskCoordinates(all);
 
     if (!freshOrder && taskListChanged) {
-        rebuildHiddenAndLockedStatesFromProgress(all);
+        taskOrderManager.rebuildHiddenAndLockedStatesFromProgress(all);
     }
 
     taskManager.normalizeUnlockStates();
@@ -4349,7 +4358,7 @@ function startApp() {
 
     animateIcons(0);
 
-    saveTaskGridOrder(all);
+    taskOrderManager.saveTaskGridOrder(all);
 
     const container = document.getElementById('grid-container');
     let isPointerDown = false;
