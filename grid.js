@@ -2210,13 +2210,20 @@ function mergeSavedTaskOrder(savedIds, currentTasks) {
 
     const normalizedSavedIds = savedIds.map(id => String(id));
     const savedIdSet = new Set(normalizedSavedIds);
+    const removedTaskCount = normalizedSavedIds.reduce((count, id) => {
+        return count + (taskById.has(id) ? 0 : 1);
+    }, 0);
     const orderedTasks = normalizedSavedIds
         .map(id => taskById.get(id))
         .filter(Boolean);
     const newTasks = currentTasks.filter(task => !savedIdSet.has(String(task.id)));
+    const taskListChanged = newTasks.length > 0 || removedTaskCount > 0;
 
     if (newTasks.length === 0) {
-        return orderedTasks;
+        return {
+            tasks: orderedTasks,
+            taskListChanged
+        };
     }
 
     const hiddenPool = [...newTasks];
@@ -2234,10 +2241,67 @@ function mergeSavedTaskOrder(savedIds, currentTasks) {
     const reshuffledHiddenTasks = buildWeightedTaskOrder(hiddenPool);
     let hiddenIndex = 0;
 
-    return rebuiltTasks
-        .map(task => task || reshuffledHiddenTasks[hiddenIndex++] || null)
-        .filter(Boolean)
-        .concat(reshuffledHiddenTasks.slice(hiddenIndex));
+    return {
+        tasks: rebuiltTasks
+            .map(task => task || reshuffledHiddenTasks[hiddenIndex++] || null)
+            .filter(Boolean)
+            .concat(reshuffledHiddenTasks.slice(hiddenIndex)),
+        taskListChanged
+    };
+}
+
+function rebuildHiddenAndLockedStatesFromProgress(tasks) {
+    const nextStateMap = {};
+    const coordToTaskId = new Map();
+    const neighborOffsets = [
+        [0, -1],
+        [1, 0],
+        [0, 1],
+        [-1, 0]
+    ];
+
+    idToCoords.forEach((coord, id) => {
+        coordToTaskId.set(`${coord.x},${coord.y}`, String(id));
+    });
+
+    tasks.forEach(task => {
+        const id = String(task.id);
+        const previousState = getState(id);
+
+        if (id === INTRO_TASK_ID) {
+            nextStateMap[id] = previousState === 'complete' ? 'complete' : 'incomplete';
+            return;
+        }
+
+        if (previousState === 'complete' || previousState === 'incomplete') {
+            nextStateMap[id] = previousState;
+            return;
+        }
+
+        nextStateMap[id] = 'hidden';
+    });
+
+    tasks.forEach(task => {
+        const id = String(task.id);
+        if (nextStateMap[id] !== 'complete') {
+            return;
+        }
+
+        const coords = idToCoords.get(task.id) || idToCoords.get(id);
+        if (!coords) {
+            return;
+        }
+
+        neighborOffsets.forEach(([dx, dy]) => {
+            const neighborId = coordToTaskId.get(`${coords.x + dx},${coords.y + dy}`);
+            if (neighborId && nextStateMap[neighborId] === 'hidden') {
+                nextStateMap[neighborId] = 'locked';
+            }
+        });
+    });
+
+    stateMap = nextStateMap;
+    saveStates(stateMap);
 }
 
 function computeGridSize(count) {
@@ -4000,6 +4064,7 @@ function startApp() {
     Promise.all([loadAll(), loadCollectionLogItems(), loadPlayerCollectionLog(playerUsername)]).then(([data]) => {
     const currentTasks = buildTaskListFromTierData(data);
     let all = [];
+    let taskListChanged = false;
 
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
@@ -4009,7 +4074,9 @@ function startApp() {
                 throw new Error('saved order must be an array');
             }
 
-            all = mergeSavedTaskOrder(ids, currentTasks);
+            const mergedOrder = mergeSavedTaskOrder(ids, currentTasks);
+            all = mergedOrder.tasks;
+            taskListChanged = mergedOrder.taskListChanged;
         } catch (error) {
             console.error('corrupt saved order', error);
         }
@@ -4045,6 +4112,11 @@ function startApp() {
     tasksGlobal = all;
     applyTierFilters(selectedTierFilters, { persist: false, rerender: false });
     updateTaskCoordinates(all);
+
+    if (!freshOrder && taskListChanged) {
+        rebuildHiddenAndLockedStatesFromProgress(all);
+    }
+
     normalizeUnlockStates();
     updateUnlockHud();
 
