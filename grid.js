@@ -1666,6 +1666,52 @@ class TaskOrderManager {
         taskModal.refreshPopoverPosition();
     }
 
+    syncSingleCellPosition(taskId, coord) {
+        const cell = CoreUtils.getCellById(taskId);
+        if (!cell || !coord) {
+            return;
+        }
+
+        cell.pixelX = GRID_SAFE_PADDING_X + (coord.x * CELL_STEP);
+        cell.pixelY = GRID_SAFE_PADDING_Y + (coord.y * CELL_STEP);
+    }
+
+    swapTaskCoordinatesInPlace(taskA, taskB, options = {}) {
+        const { refreshPopover = true } = options;
+        const coordA = idToCoords.get(taskA.id) || idToCoords.get(String(taskA.id));
+        const coordB = idToCoords.get(taskB.id) || idToCoords.get(String(taskB.id));
+        if (!coordA || !coordB) {
+            this.syncCellPositionsFromTaskOrder();
+            return false;
+        }
+
+        const nextCoordA = { x: coordB.x, y: coordB.y };
+        const nextCoordB = { x: coordA.x, y: coordA.y };
+
+        idToCoords.set(taskA.id, nextCoordA);
+        idToCoords.set(taskB.id, nextCoordB);
+
+        coordToTaskId.set(`${nextCoordA.x},${nextCoordA.y}`, String(taskA.id));
+        coordToTaskId.set(`${nextCoordB.x},${nextCoordB.y}`, String(taskB.id));
+
+        this.syncSingleCellPosition(taskA.id, nextCoordA);
+        this.syncSingleCellPosition(taskB.id, nextCoordB);
+
+        if (refreshPopover) {
+            taskModal.refreshPopoverPosition();
+        }
+
+        return true;
+    }
+
+    finalizeTaskOrderMutation() {
+        this.saveTaskGridOrder(tasksGlobal);
+        taskModal.refreshPopoverPosition();
+        canvasInteractionManager.setHoveredCellId('');
+        renderWarmupManager.scheduleSpritePrewarm(0);
+        queueCanvasRender();
+    }
+
     swapTaskStates(taskIdA, taskIdB) {
         const idA = String(taskIdA);
         const idB = String(taskIdB);
@@ -1690,7 +1736,10 @@ class TaskOrderManager {
     }
 
     swapTasksById(taskIdA, taskIdB, options = {}) {
-        const { swapStates = false } = options;
+        const {
+            swapStates = false,
+            deferPostSwapEffects = false
+        } = options;
         const idA = String(taskIdA);
         const idB = String(taskIdB);
         if (idA === idB) {
@@ -1707,13 +1756,20 @@ class TaskOrderManager {
             this.swapTaskStates(idA, idB);
         }
 
+        const taskA = tasksGlobal[indexA];
+        const taskB = tasksGlobal[indexB];
         [tasksGlobal[indexA], tasksGlobal[indexB]] = [tasksGlobal[indexB], tasksGlobal[indexA]];
 
-        this.syncCellPositionsFromTaskOrder();
-        this.saveTaskGridOrder(tasksGlobal);
-        canvasInteractionManager.setHoveredCellId('');
-        renderWarmupManager.scheduleSpritePrewarm(0);
-        queueCanvasRender();
+        const updatedInPlace = this.swapTaskCoordinatesInPlace(taskA, taskB, {
+            refreshPopover: !deferPostSwapEffects
+        });
+        if (!updatedInPlace) {
+            this.syncCellPositionsFromTaskOrder();
+        }
+
+        if (!deferPostSwapEffects) {
+            this.finalizeTaskOrderMutation();
+        }
 
         return true;
     }
@@ -2027,7 +2083,9 @@ class TaskOrderManager {
                     return;
                 }
 
-                const swapped = this.swapTasksById(pendingTaskId, targetTaskId);
+                const swapped = this.swapTasksById(pendingTaskId, targetTaskId, {
+                    deferPostSwapEffects: true
+                });
                 if (!swapped) {
                     return;
                 }
@@ -2062,7 +2120,9 @@ class TaskOrderManager {
             });
 
             if (target) {
-                const swapped = this.swapTasksById(taskId, target.candidateId);
+                const swapped = this.swapTasksById(taskId, target.candidateId, {
+                    deferPostSwapEffects: true
+                });
                 if (swapped) {
                     movedCount += 1;
                     pendingIdSet.delete(taskId);
@@ -2073,6 +2133,10 @@ class TaskOrderManager {
                 completedAnchorIds.add(taskId);
             }
         });
+
+        if (movedCount > 0) {
+            this.finalizeTaskOrderMutation();
+        }
 
         return movedCount;
     }
@@ -4894,10 +4958,10 @@ class AppBootstrap {
         loadingIcons.forEach(icon => icon.classList.remove('visible'));
         loadingIcons.forEach(icon => appUtils.bindImageErrorFallback(icon));
 
-        Promise.all([taskOrderManager.loadAllTierData(), wiki.loadCollectionLogItems(), wiki.loadPlayerData(playerUsername)]).then(([data, _, playerSnapshot]) => {
-            if (playerSnapshot) {
-                playerProgress.applySnapshot(playerSnapshot);
-            }
+        const collectionLogPromise = wiki.loadCollectionLogItems();
+        const playerDataPromise = wiki.loadPlayerData(playerUsername);
+
+        taskOrderManager.loadAllTierData().then(data => {
 
             const currentTasks = taskManager.buildTasksFromTierData(data);
             let all = [];
@@ -4932,17 +4996,29 @@ class AppBootstrap {
                 all.unshift(INTRO_TASK);
             }
 
+            let shouldPersistStates = false;
+
             all.forEach(task => {
-                if (!taskManager.getState(task.id)) {
-                    taskManager.setState(task.id, task.id === INTRO_TASK_ID ? 'incomplete' : 'hidden');
+                const taskId = String(task.id);
+                if (!taskManager.getState(taskId)) {
+                    stateMap[taskId] = taskId === INTRO_TASK_ID ? 'incomplete' : 'hidden';
+                    shouldPersistStates = true;
                 }
             });
 
             if (freshOrder && all.length > 0) {
                 all.forEach((task, index) => {
-                    taskManager.setState(task.id, index === 0 ? 'incomplete' : 'hidden');
+                    const taskId = String(task.id);
+                    const nextState = index === 0 ? 'incomplete' : 'hidden';
+                    if (stateMap[taskId] !== nextState) {
+                        stateMap[taskId] = nextState;
+                        shouldPersistStates = true;
+                    }
                 });
-                stateMap = CoreUtils.loadStates();
+            }
+
+            if (shouldPersistStates) {
+                CoreUtils.saveStates(stateMap);
             }
 
             all = taskManager.setTasks(all);
@@ -4956,45 +5032,47 @@ class AppBootstrap {
             taskManager.normalizeUnlockStates();
             hudManager.updateUnlockHud();
 
-            const loadingIcons = Array.from(document.querySelectorAll('#loading .loading-icon'));
             loadingIcons.forEach(icon => {
+                icon.classList.add('visible');
                 const image = new Image();
                 image.src = icon.src;
             });
 
             const preloadPromise = renderWarmupManager.preloadTaskImages(all);
+            void preloadPromise.catch(() => {
+                // image preloading is best-effort; startup render should not block on it
+            });
 
-            const animateIcons = index => {
-                if (index >= loadingIcons.length) {
-                    const finish = async () => {
-                        await Promise.all([preloadPromise, appUtils.wait(500)]);
-                        gridSceneManager.render(all);
-                        await renderWarmupManager.prewarmInitialCanvasSprites();
+            const finish = async () => {
+                gridSceneManager.render(all);
+                await renderWarmupManager.prewarmInitialCanvasSprites();
 
-                        const loader = document.getElementById('loading');
-                        if (loader) {
-                            loader.style.display = 'none';
-                        }
-                    };
+                const readyLoader = document.getElementById('loading');
+                if (readyLoader) {
+                    readyLoader.style.display = 'none';
+                }
+            };
 
-                    finish().catch(() => {
-                        gridSceneManager.render(all);
-                        const fallbackLoader = document.getElementById('loading');
-                        if (fallbackLoader) {
-                            fallbackLoader.style.display = 'none';
-                        }
-                    });
+            finish().catch(() => {
+                gridSceneManager.render(all);
+                const fallbackLoader = document.getElementById('loading');
+                if (fallbackLoader) {
+                    fallbackLoader.style.display = 'none';
+                }
+            });
+
+            void collectionLogPromise.then(() => {
+                taskModal.refreshOpenModal();
+            });
+
+            void playerDataPromise.then(playerSnapshot => {
+                if (!playerSnapshot) {
                     return;
                 }
 
-                const icon = loadingIcons[index];
-                icon.classList.add('visible');
-                setTimeout(() => {
-                    animateIcons(index + 1);
-                }, 400);
-            };
-
-            animateIcons(0);
+                playerProgress.applySnapshot(playerSnapshot);
+                taskModal.refreshOpenModal();
+            });
 
             taskOrderManager.saveTaskGridOrder(all);
 
