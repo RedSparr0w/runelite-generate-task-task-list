@@ -1679,6 +1679,315 @@ class TaskOrderManager {
 
         return true;
     }
+
+    getCompletedTaskIds() {
+        return tasksGlobal
+            .filter(task => this.taskManager.getState(task.id) === 'complete')
+            .map(task => String(task.id));
+    }
+
+    getConnectedCompletedAnchorIds(options = {}) {
+        const { extraCompletedIds = [] } = options;
+        const completeIdSet = new Set(this.getCompletedTaskIds());
+        extraCompletedIds
+            .map(id => String(id))
+            .filter(Boolean)
+            .forEach(id => completeIdSet.add(id));
+
+        if (completeIdSet.size === 0) {
+            return new Set();
+        }
+
+        const centerCoord = this.gridModel.getCenterCoord(tasksGlobal);
+        const introId = String(INTRO_TASK_ID);
+        let seedIds = [];
+
+        if (completeIdSet.has(introId)) {
+            seedIds = [introId];
+        } else {
+            let minDistance = Number.POSITIVE_INFINITY;
+            completeIdSet.forEach(id => {
+                const coord = this.gridModel.getTaskCoord(id);
+                const distance = Math.abs(coord.x - centerCoord.x) + Math.abs(coord.y - centerCoord.y);
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    seedIds = [id];
+                } else if (distance === minDistance) {
+                    seedIds.push(id);
+                }
+            });
+        }
+
+        const coordToTaskId = new Map();
+        idToCoords.forEach((coord, id) => {
+            coordToTaskId.set(`${coord.x},${coord.y}`, String(id));
+        });
+
+        const connected = new Set(seedIds);
+        const queue = [...seedIds];
+        const neighborOffsets = [
+            [0, -1],
+            [1, 0],
+            [0, 1],
+            [-1, 0]
+        ];
+
+        while (queue.length > 0) {
+            const currentId = queue.shift();
+            const coord = this.gridModel.getTaskCoord(currentId);
+
+            neighborOffsets.forEach(([dx, dy]) => {
+                const neighborId = coordToTaskId.get(`${coord.x + dx},${coord.y + dy}`);
+                if (!neighborId || connected.has(neighborId) || !completeIdSet.has(neighborId)) {
+                    return;
+                }
+
+                connected.add(neighborId);
+                queue.push(neighborId);
+            });
+        }
+
+        return connected;
+    }
+
+    getAttachmentSwapCandidate(taskId, anchorIds, options = {}) {
+        const { excludedTaskIds = new Set() } = options;
+        const anchorIdList = Array.from(anchorIds || []);
+        if (anchorIdList.length === 0) {
+            return null;
+        }
+
+        const movingTaskId = String(taskId);
+        const movingTask = tasksGlobal.find(task => String(task.id) === movingTaskId);
+        if (!movingTask) {
+            return null;
+        }
+
+        const movingCoord = this.gridModel.getTaskCoord(movingTaskId);
+        const getCoordDistance = (coordA, coordB) => Math.abs(coordA.x - coordB.x) + Math.abs(coordA.y - coordB.y);
+        const statePriority = {
+            hidden: 0,
+            locked: 1,
+            incomplete: 2
+        };
+
+        const candidates = tasksGlobal
+            .filter(task => String(task.id) !== movingTaskId)
+            .filter(task => String(task.id) !== INTRO_TASK_ID)
+            .filter(task => !excludedTaskIds.has(String(task.id)))
+            .filter(task => (this.taskManager.getState(task.id) || 'hidden') !== 'complete')
+            .map(task => {
+                const candidateId = String(task.id);
+                const candidateCoord = this.gridModel.getTaskCoord(candidateId);
+                let distanceToAnchor = Number.POSITIVE_INFINITY;
+
+                anchorIdList.forEach(anchorId => {
+                    const anchorCoord = this.gridModel.getTaskCoord(anchorId);
+                    const candidateDistance = getCoordDistance(candidateCoord, anchorCoord);
+                    if (candidateDistance < distanceToAnchor) {
+                        distanceToAnchor = candidateDistance;
+                    }
+                });
+
+                const candidateState = this.taskManager.getState(candidateId) || 'hidden';
+
+                return {
+                    candidateId,
+                    sameTier: String(task.tier || '') === String(movingTask.tier || ''),
+                    distanceToAnchor,
+                    distanceFromCurrent: getCoordDistance(candidateCoord, movingCoord),
+                    statePriority: statePriority[candidateState] ?? 9
+                };
+            })
+            .sort((candidateA, candidateB) => {
+                const adjacentA = candidateA.distanceToAnchor === 1;
+                const adjacentB = candidateB.distanceToAnchor === 1;
+                if (adjacentA !== adjacentB) {
+                    return adjacentA ? -1 : 1;
+                }
+
+                if (adjacentA && adjacentB && candidateA.sameTier !== candidateB.sameTier) {
+                    return candidateA.sameTier ? -1 : 1;
+                }
+
+                if (candidateA.distanceToAnchor !== candidateB.distanceToAnchor) {
+                    return candidateA.distanceToAnchor - candidateB.distanceToAnchor;
+                }
+
+                if (!adjacentA && candidateA.sameTier !== candidateB.sameTier) {
+                    return candidateA.sameTier ? -1 : 1;
+                }
+
+                if (candidateA.statePriority !== candidateB.statePriority) {
+                    return candidateA.statePriority - candidateB.statePriority;
+                }
+
+                if (candidateA.distanceFromCurrent !== candidateB.distanceFromCurrent) {
+                    return candidateA.distanceFromCurrent - candidateB.distanceFromCurrent;
+                }
+
+                return candidateA.candidateId.localeCompare(candidateB.candidateId);
+            });
+
+        return candidates[0] || null;
+    }
+
+    attachSyncedCompletedTasks(newlyCompletedTaskIds = [], options = {}) {
+        const { includeMovedAsAnchors = true } = options;
+        const pendingIds = newlyCompletedTaskIds
+            .map(id => String(id))
+            .filter(Boolean)
+            .filter(id => id !== INTRO_TASK_ID);
+        if (pendingIds.length === 0) {
+            return 0;
+        }
+
+        const pendingIdSet = new Set(pendingIds);
+        const completedAnchorIds = this.getConnectedCompletedAnchorIds();
+        if (completedAnchorIds.size === 0) {
+            this.getCompletedTaskIds().forEach(id => completedAnchorIds.add(id));
+        }
+
+        let movedCount = 0;
+
+        pendingIds.forEach(taskId => {
+            const target = this.getAttachmentSwapCandidate(taskId, completedAnchorIds, {
+                excludedTaskIds: pendingIdSet
+            });
+            if (target) {
+                const swapped = this.swapTasksById(taskId, target.candidateId);
+                if (swapped) {
+                    movedCount += 1;
+                }
+            }
+
+            if (includeMovedAsAnchors) {
+                completedAnchorIds.add(taskId);
+            }
+        });
+
+        return movedCount;
+    }
+
+    ensureCompletedTasksConnectedFromCenter() {
+        const completeTaskIds = this.getCompletedTaskIds().filter(id => id !== String(INTRO_TASK_ID));
+        if (completeTaskIds.length === 0) {
+            return 0;
+        }
+
+        const connectedAnchorIds = this.getConnectedCompletedAnchorIds();
+        const disconnectedCompletedIds = completeTaskIds.filter(id => !connectedAnchorIds.has(id));
+        if (disconnectedCompletedIds.length === 0) {
+            return 0;
+        }
+
+        const disconnectedIdSet = new Set(disconnectedCompletedIds);
+        let movedCount = 0;
+
+        disconnectedCompletedIds.forEach(taskId => {
+            const target = this.getAttachmentSwapCandidate(taskId, connectedAnchorIds, {
+                excludedTaskIds: disconnectedIdSet
+            });
+            if (!target) {
+                disconnectedIdSet.delete(taskId);
+                return;
+            }
+
+            const swapped = this.swapTasksById(taskId, target.candidateId);
+            if (swapped) {
+                movedCount += 1;
+                connectedAnchorIds.add(taskId);
+            }
+
+            disconnectedIdSet.delete(taskId);
+        });
+
+        return movedCount;
+    }
+
+    reshuffleHiddenTasks() {
+        const hiddenTasks = tasksGlobal
+            .filter(task => String(task.id) !== INTRO_TASK_ID)
+            .filter(task => (this.taskManager.getState(task.id) || 'hidden') === 'hidden');
+        if (hiddenTasks.length < 2) {
+            return false;
+        }
+
+        const reshuffledHiddenTasks = this.buildWeightedTaskOrder(hiddenTasks.slice());
+        let hiddenIndex = 0;
+
+        tasksGlobal = tasksGlobal.map(task => {
+            const taskId = String(task.id);
+            const state = this.taskManager.getState(taskId) || 'hidden';
+            if (taskId === INTRO_TASK_ID || state !== 'hidden') {
+                return task;
+            }
+
+            const replacement = reshuffledHiddenTasks[hiddenIndex];
+            hiddenIndex += 1;
+            return replacement || task;
+        });
+
+        this.syncCellPositionsFromTaskOrder();
+        this.saveTaskGridOrder(tasksGlobal);
+        canvasInteractionManager.setHoveredCellId('');
+        renderWarmupManager.scheduleSpritePrewarm(0);
+        queueCanvasRender();
+        return true;
+    }
+
+    syncCellStatesFromCurrentStates(tasks = tasksGlobal) {
+        let updated = false;
+        let shouldClearHoveredCell = false;
+
+        tasks.forEach(task => {
+            const taskId = String(task.id);
+            const cell = CoreUtils.getCellById(taskId);
+            if (!cell) {
+                return;
+            }
+
+            const nextState = this.taskManager.getState(taskId) || 'hidden';
+            if (cell.state === nextState) {
+                return;
+            }
+
+            if (
+                hoveredCellId === cell.id
+                && nextState !== 'locked'
+                && nextState !== 'incomplete'
+                && nextState !== 'complete'
+            ) {
+                shouldClearHoveredCell = true;
+            }
+
+            cell.state = nextState;
+            cell.spriteKey = '';
+
+            if (nextState !== 'hidden') {
+                cell.edgeVisible = false;
+                cell.edgeSides = {
+                    top: false,
+                    right: false,
+                    bottom: false,
+                    left: false
+                };
+            }
+
+            updated = true;
+        });
+
+        if (shouldClearHoveredCell) {
+            canvasInteractionManager.setHoveredCellId('');
+        }
+
+        if (updated) {
+            renderWarmupManager.scheduleSpritePrewarm(0);
+            queueCanvasRender();
+        }
+
+        return updated;
+    }
 }
 
 const gridModel = new Grid();
@@ -2736,18 +3045,27 @@ class ProgressSyncManager {
 
         const previousLimit = taskManager.getUnlockLimit();
         let completedCount = 0;
-        const center = gameController.getCenterCoord(tasksGlobal);
-
-        const tasksToComplete = tasksGlobal
+        const taskIdsToComplete = tasksGlobal
             .filter(task => taskManager.getState(task.id) !== 'complete')
             .filter(task => {
                 const requiredCount = taskVerification.getTaskRequiredCount(task);
                 return requiredCount > 0 && taskVerification.getTaskObtainedCount(task) >= requiredCount;
             })
+            .map(task => String(task.id));
+
+        if (taskIdsToComplete.length > 0) {
+            taskOrderManager.attachSyncedCompletedTasks(taskIdsToComplete, { includeMovedAsAnchors: false });
+        }
+
+        const center = gameController.getCenterCoord(tasksGlobal);
+
+        const tasksToComplete = taskIdsToComplete
+            .map(taskId => tasksGlobal.find(task => String(task.id) === taskId))
+            .filter(Boolean)
             .map(task => {
                 const coord = gameController.getTaskCoord(task);
                 return {
-                    task,
+                    taskId: String(task.id),
                     distance: Math.abs(coord.x - center.x) + Math.abs(coord.y - center.y)
                 };
             })
@@ -2759,12 +3077,12 @@ class ProgressSyncManager {
             if (!previousBatch || previousBatch.distance !== entry.distance) {
                 distanceBatches.push({
                     distance: entry.distance,
-                    tasks: [entry.task]
+                    tasks: [entry.taskId]
                 });
                 return;
             }
 
-            previousBatch.tasks.push(entry.task);
+            previousBatch.tasks.push(entry.taskId);
         });
 
         const revealStagger = distanceBatches.length * batchDelay > INITIAL_REVEAL_DURATION_MS
@@ -2773,25 +3091,41 @@ class ProgressSyncManager {
 
         for (let index = 0; index < distanceBatches.length; index++) {
             const batch = distanceBatches[index].tasks;
-            batch.forEach(task => {
-                taskManager.applyTaskCompletion(task);
+            let batchCompletedCount = 0;
+            batch.forEach(taskId => {
+                const pendingTask = tasksGlobal.find(candidate => String(candidate.id) === String(taskId));
+                if (pendingTask) {
+                    taskManager.applyTaskCompletion(pendingTask);
+                    batchCompletedCount += 1;
+                }
             });
 
-            completedCount += batch.length;
-            taskManager.normalizeUnlockStates();
-            hudManager.updateUnlockHud();
-            gridSceneManager.refreshHiddenEdges({ animate: false });
+            completedCount += batchCompletedCount;
+            if (batchCompletedCount > 0) {
+                taskManager.normalizeUnlockStates();
+                hudManager.updateUnlockHud();
+                gridSceneManager.refreshHiddenEdges({ animate: false });
+            }
 
             if (index + 1 < distanceBatches.length) {
                 await appUtils.wait(revealStagger * 2);
             }
         }
 
+        const reattachedCompletedCount = taskOrderManager.ensureCompletedTasksConnectedFromCenter();
+        const shouldRecomputeGridStates = completedCount > 0 || reattachedCompletedCount > 0;
+
+        if (shouldRecomputeGridStates) {
+            taskOrderManager.reshuffleHiddenTasks();
+            taskOrderManager.rebuildHiddenAndLockedStatesFromProgress(tasksGlobal);
+            taskOrderManager.syncCellStatesFromCurrentStates(tasksGlobal);
+        }
+
         taskManager.revealFrontierFromCompletedTasks();
         taskManager.normalizeUnlockStates();
         hudManager.updateUnlockHud();
 
-        if (completedCount > 0) {
+        if (shouldRecomputeGridStates) {
             gridSceneManager.refreshHiddenEdges({ animate: false });
         }
 
@@ -2907,11 +3241,11 @@ class GridViewport {
         stage.style.height = `${grid.scrollHeight * currentScale}px`;
 
         if (deferCanvasRender) {
-            scheduleZoomRender();
+            canvasRuntimeManager.scheduleZoomRender();
             return;
         }
 
-        flushZoomRender();
+        canvasRuntimeManager.flushZoomRender();
     }
 
     bindWheelZoom(container) {
@@ -3375,7 +3709,7 @@ class GridSceneManager {
 
         const { size, coords, center } = gridModel.updateTaskCoordinates(tasks);
         gridCellCount = size;
-        const canvas = ensureGridCanvas();
+        const canvas = canvasRuntimeManager.ensureGridCanvas();
         if (!canvas || !gridContext) {
             return;
         }
@@ -3386,7 +3720,7 @@ class GridSceneManager {
 
         grid.style.width = `${gridPixelWidth}px`;
         grid.style.height = `${gridPixelHeight}px`;
-        syncCanvasResolution();
+        canvasRuntimeManager.syncCanvasResolution();
 
         const cells = [];
 
@@ -3430,645 +3764,651 @@ class GridSceneManager {
 
 const gridSceneManager = new GridSceneManager();
 
-function ensureGridCanvas() {
-    const grid = document.getElementById('grid');
-    if (!grid) {
-        return null;
-    }
-
-    let canvas = grid.querySelector('#grid-canvas');
-    if (!canvas) {
-        canvas = document.createElement('canvas');
-        canvas.id = 'grid-canvas';
-        grid.appendChild(canvas);
-    }
-
-    canvasInteractionManager.bindCanvasInteractions(canvas);
-
-    gridCanvas = canvas;
-    gridContext = canvas.getContext('2d');
-    return canvas;
-}
-
-function getCanvasPixelRatio() {
-    const rawRatio = (window.devicePixelRatio || 1) * currentScale;
-    const cappedRatio = Math.min(MAX_CANVAS_PIXEL_RATIO, rawRatio);
-    return Math.max(0.25, Math.round(cappedRatio / CANVAS_PIXEL_RATIO_STEP) * CANVAS_PIXEL_RATIO_STEP);
-}
-
-function getSpritePixelRatio() {
-    if (isZooming && lastCanvasPixelRatio > 0) {
-        return lastCanvasPixelRatio;
-    }
-
-    return getCanvasPixelRatio();
-}
-
-function syncCanvasResolution() {
-    if (!gridCanvas || !gridContext || gridPixelWidth <= 0 || gridPixelHeight <= 0) {
-        return;
-    }
-
-    const pixelRatio = getCanvasPixelRatio();
-    const canvasWidth = Math.max(1, Math.round(gridPixelWidth * pixelRatio));
-    const canvasHeight = Math.max(1, Math.round(gridPixelHeight * pixelRatio));
-
-    if (gridCanvas.width !== canvasWidth || gridCanvas.height !== canvasHeight) {
-        gridCanvas.width = canvasWidth;
-        gridCanvas.height = canvasHeight;
-    }
-
-    gridCanvas.style.width = `${gridPixelWidth}px`;
-    gridCanvas.style.height = `${gridPixelHeight}px`;
-    gridContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
-    gridContext.imageSmoothingEnabled = false;
-
-    if (Math.abs(lastCanvasPixelRatio - pixelRatio) > 0.001) {
-        backgroundSpriteCache.clear();
-        idToCell.forEach(cell => {
-            cell.spriteKey = '';
-        });
-        lastCanvasPixelRatio = pixelRatio;
-        renderWarmupManager.scheduleSpritePrewarm(60);
-    }
-}
-
-function scheduleZoomRender() {
-    isZooming = true;
-    if (zoomRenderDebounceTimer) {
-        clearTimeout(zoomRenderDebounceTimer);
-    }
-
-    zoomRenderDebounceTimer = setTimeout(() => {
-        zoomRenderDebounceTimer = null;
-        isZooming = false;
-        syncCanvasResolution();
-        queueCanvasRender();
-    }, ZOOM_RENDER_DEBOUNCE_MS);
-}
-
-function flushZoomRender() {
-    if (zoomRenderDebounceTimer) {
-        clearTimeout(zoomRenderDebounceTimer);
-        zoomRenderDebounceTimer = null;
-    }
-
-    isZooming = false;
-    syncCanvasResolution();
-    queueCanvasRender();
-}
-
-function getImageAsset(source) {
-    const src = source || QUESTION_MARK_ICON;
-    if (imageAssetCache.has(src)) {
-        return imageAssetCache.get(src);
-    }
-
-    const image = new Image();
-    const asset = {
-        image,
-        status: 'loading',
-        fallback: null
-    };
-
-    image.onload = () => {
-        asset.status = 'ready';
-        queueCanvasRender();
-    };
-
-    image.onerror = () => {
-        asset.status = 'error';
-        if (src !== QUESTION_MARK_ICON) {
-            asset.fallback = getImageAsset(QUESTION_MARK_ICON);
+class CanvasRuntimeManager {
+    ensureGridCanvas() {
+        const grid = document.getElementById('grid');
+        if (!grid) {
+            return null;
         }
+
+        let canvas = grid.querySelector('#grid-canvas');
+        if (!canvas) {
+            canvas = document.createElement('canvas');
+            canvas.id = 'grid-canvas';
+            grid.appendChild(canvas);
+        }
+
+        canvasInteractionManager.bindCanvasInteractions(canvas);
+
+        gridCanvas = canvas;
+        gridContext = canvas.getContext('2d');
+        return canvas;
+    }
+
+    getCanvasPixelRatio() {
+        const rawRatio = (window.devicePixelRatio || 1) * currentScale;
+        const cappedRatio = Math.min(MAX_CANVAS_PIXEL_RATIO, rawRatio);
+        return Math.max(0.25, Math.round(cappedRatio / CANVAS_PIXEL_RATIO_STEP) * CANVAS_PIXEL_RATIO_STEP);
+    }
+
+    getSpritePixelRatio() {
+        if (isZooming && lastCanvasPixelRatio > 0) {
+            return lastCanvasPixelRatio;
+        }
+
+        return this.getCanvasPixelRatio();
+    }
+
+    syncCanvasResolution() {
+        if (!gridCanvas || !gridContext || gridPixelWidth <= 0 || gridPixelHeight <= 0) {
+            return;
+        }
+
+        const pixelRatio = this.getCanvasPixelRatio();
+        const canvasWidth = Math.max(1, Math.round(gridPixelWidth * pixelRatio));
+        const canvasHeight = Math.max(1, Math.round(gridPixelHeight * pixelRatio));
+
+        if (gridCanvas.width !== canvasWidth || gridCanvas.height !== canvasHeight) {
+            gridCanvas.width = canvasWidth;
+            gridCanvas.height = canvasHeight;
+        }
+
+        gridCanvas.style.width = `${gridPixelWidth}px`;
+        gridCanvas.style.height = `${gridPixelHeight}px`;
+        gridContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+        gridContext.imageSmoothingEnabled = false;
+
+        if (Math.abs(lastCanvasPixelRatio - pixelRatio) > 0.001) {
+            backgroundSpriteCache.clear();
+            idToCell.forEach(cell => {
+                cell.spriteKey = '';
+            });
+            lastCanvasPixelRatio = pixelRatio;
+            renderWarmupManager.scheduleSpritePrewarm(60);
+        }
+    }
+
+    scheduleZoomRender() {
+        isZooming = true;
+        if (zoomRenderDebounceTimer) {
+            clearTimeout(zoomRenderDebounceTimer);
+        }
+
+        zoomRenderDebounceTimer = setTimeout(() => {
+            zoomRenderDebounceTimer = null;
+            isZooming = false;
+            this.syncCanvasResolution();
+            queueCanvasRender();
+        }, ZOOM_RENDER_DEBOUNCE_MS);
+    }
+
+    flushZoomRender() {
+        if (zoomRenderDebounceTimer) {
+            clearTimeout(zoomRenderDebounceTimer);
+            zoomRenderDebounceTimer = null;
+        }
+
+        isZooming = false;
+        this.syncCanvasResolution();
         queueCanvasRender();
-    };
+    }
 
-    image.src = src;
-    imageAssetCache.set(src, asset);
-    return asset;
-}
+    getImageAsset(source) {
+        const src = source || QUESTION_MARK_ICON;
+        if (imageAssetCache.has(src)) {
+            return imageAssetCache.get(src);
+        }
 
-function resolveImageForDraw(source) {
-    const asset = getImageAsset(source);
-    const fallbackAsset = getImageAsset(QUESTION_MARK_ICON);
+        const image = new Image();
+        const asset = {
+            image,
+            status: 'loading',
+            fallback: null
+        };
 
-    if (asset.status === 'loading' && asset.image.complete) {
-        if (asset.image.naturalWidth > 0) {
+        image.onload = () => {
             asset.status = 'ready';
-        } else {
+            queueCanvasRender();
+        };
+
+        image.onerror = () => {
             asset.status = 'error';
-            if (!asset.fallback && source !== QUESTION_MARK_ICON) {
-                asset.fallback = fallbackAsset;
+            if (src !== QUESTION_MARK_ICON) {
+                asset.fallback = this.getImageAsset(QUESTION_MARK_ICON);
+            }
+            queueCanvasRender();
+        };
+
+        image.src = src;
+        imageAssetCache.set(src, asset);
+        return asset;
+    }
+
+    resolveImageForDraw(source) {
+        const asset = this.getImageAsset(source);
+        const fallbackAsset = this.getImageAsset(QUESTION_MARK_ICON);
+
+        if (asset.status === 'loading' && asset.image.complete) {
+            if (asset.image.naturalWidth > 0) {
+                asset.status = 'ready';
+            } else {
+                asset.status = 'error';
+                if (!asset.fallback && source !== QUESTION_MARK_ICON) {
+                    asset.fallback = fallbackAsset;
+                }
             }
         }
-    }
 
-    if (asset.status === 'ready') {
-        return asset.image;
-    }
+        if (asset.status === 'ready') {
+            return asset.image;
+        }
 
-    if (asset.status === 'error' && source !== QUESTION_MARK_ICON && !asset.fallback) {
-        asset.fallback = fallbackAsset;
-    }
+        if (asset.status === 'error' && source !== QUESTION_MARK_ICON && !asset.fallback) {
+            asset.fallback = fallbackAsset;
+        }
 
-    if (asset.fallback?.status === 'ready') {
-        return asset.fallback.image;
-    }
+        if (asset.fallback?.status === 'ready') {
+            return asset.fallback.image;
+        }
 
-    if (fallbackAsset.status === 'ready') {
-        return fallbackAsset.image;
-    }
+        if (fallbackAsset.status === 'ready') {
+            return fallbackAsset.image;
+        }
 
-    return null;
-}
-
-function queueCanvasRender() {
-    if (!gridContext || canvasFrameId !== null) {
-        return;
-    }
-
-    canvasFrameId = requestAnimationFrame(drawCanvasFrame);
-}
-
-function drawCanvasFrame(timestamp) {
-    canvasFrameId = null;
-    const keepAnimating = renderGridCanvas(timestamp);
-    if (keepAnimating) {
-        queueCanvasRender();
+        return null;
     }
 }
 
-function drawRoundedRect(context, x, y, width, height, radius) {
-    context.beginPath();
-    context.moveTo(x + radius, y);
-    context.lineTo(x + width - radius, y);
-    context.quadraticCurveTo(x + width, y, x + width, y + radius);
-    context.lineTo(x + width, y + height - radius);
-    context.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-    context.lineTo(x + radius, y + height);
-    context.quadraticCurveTo(x, y + height, x, y + height - radius);
-    context.lineTo(x, y + radius);
-    context.quadraticCurveTo(x, y, x + radius, y);
-    context.closePath();
+const canvasRuntimeManager = new CanvasRuntimeManager();
+
+class CanvasFrameManager {
+    queueCanvasRender() {
+        if (!gridContext || canvasFrameId !== null) {
+            return;
+        }
+
+        canvasFrameId = requestAnimationFrame(timestamp => this.drawCanvasFrame(timestamp));
+    }
+
+    drawCanvasFrame(timestamp) {
+        canvasFrameId = null;
+        const keepAnimating = canvasSpriteManager.renderGridCanvas(timestamp);
+        if (keepAnimating) {
+            this.queueCanvasRender();
+        }
+    }
 }
 
-function getCellImageDrawState(imageSource) {
-    if (!imageSource) {
+const canvasFrameManager = new CanvasFrameManager();
+const queueCanvasRender = () => canvasFrameManager.queueCanvasRender();
+
+class CanvasSpriteManager {
+    drawRoundedRect(context, x, y, width, height, radius) {
+        context.beginPath();
+        context.moveTo(x + radius, y);
+        context.lineTo(x + width - radius, y);
+        context.quadraticCurveTo(x + width, y, x + width, y + radius);
+        context.lineTo(x + width, y + height - radius);
+        context.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+        context.lineTo(x + radius, y + height);
+        context.quadraticCurveTo(x, y + height, x, y + height - radius);
+        context.lineTo(x, y + radius);
+        context.quadraticCurveTo(x, y, x + radius, y);
+        context.closePath();
+    }
+
+    getCellImageDrawState(imageSource) {
+        if (!imageSource) {
+            return {
+                image: null,
+                key: 'none',
+                hasImageSource: false
+            };
+        }
+
+        const image = canvasRuntimeManager.resolveImageForDraw(imageSource);
+        const asset = imageAssetCache.get(imageSource) || canvasRuntimeManager.getImageAsset(imageSource);
+
+        let mode = 'placeholder';
+        if (asset.status === 'ready' && image) {
+            mode = 'ready';
+        } else if (image) {
+            mode = 'fallback';
+        }
+
         return {
-            image: null,
-            key: 'none',
-            hasImageSource: false
+            image,
+            key: `${mode}:${imageSource}`,
+            hasImageSource: true
         };
     }
 
-    const image = resolveImageForDraw(imageSource);
-    const asset = imageAssetCache.get(imageSource) || getImageAsset(imageSource);
+    getContainedImageRect(image, boxX, boxY, boxWidth, boxHeight) {
+        const sourceWidth = Math.max(1, image?.naturalWidth || image?.width || boxWidth);
+        const sourceHeight = Math.max(1, image?.naturalHeight || image?.height || boxHeight);
+        const scale = Math.min(boxWidth / sourceWidth, boxHeight / sourceHeight);
+        const drawWidth = Math.max(1, sourceWidth * scale);
+        const drawHeight = Math.max(1, sourceHeight * scale);
 
-    let mode = 'placeholder';
-    if (asset.status === 'ready' && image) {
-        mode = 'ready';
-    } else if (image) {
-        mode = 'fallback';
+        return {
+            x: boxX + ((boxWidth - drawWidth) / 2),
+            y: boxY + ((boxHeight - drawHeight) / 2),
+            width: drawWidth,
+            height: drawHeight
+        };
     }
 
-    return {
-        image,
-        key: `${mode}:${imageSource}`,
-        hasImageSource: true
-    };
-}
+    getCellSpriteKey(cell, imageKey) {
+        const pixelRatioKey = Math.round(canvasRuntimeManager.getSpritePixelRatio() * 1000);
+        if (cell.state === 'locked') {
+            return `locked::${activeTheme}::${pixelRatioKey}::${imageKey}`;
+        }
 
-function getContainedImageRect(image, boxX, boxY, boxWidth, boxHeight) {
-    const sourceWidth = Math.max(1, image?.naturalWidth || image?.width || boxWidth);
-    const sourceHeight = Math.max(1, image?.naturalHeight || image?.height || boxHeight);
-    const scale = Math.min(boxWidth / sourceWidth, boxHeight / sourceHeight);
-    const drawWidth = Math.max(1, sourceWidth * scale);
-    const drawHeight = Math.max(1, sourceHeight * scale);
-
-    return {
-        x: boxX + ((boxWidth - drawWidth) / 2),
-        y: boxY + ((boxHeight - drawHeight) / 2),
-        width: drawWidth,
-        height: drawHeight
-    };
-}
-
-function getCellSpriteKey(cell, imageKey) {
-    const pixelRatioKey = Math.round(getSpritePixelRatio() * 1000);
-    if (cell.state === 'locked') {
-        return `locked::${activeTheme}::${pixelRatioKey}::${imageKey}`;
+        return [
+            activeTheme,
+            cell.state,
+            cell.task?.tier || '',
+            pixelRatioKey,
+            imageKey,
+            (cell.nameLines || []).join('|')
+        ].join('::');
     }
 
-    return [
-        activeTheme,
-        cell.state,
-        cell.task?.tier || '',
-        pixelRatioKey,
-        imageKey,
-        (cell.nameLines || []).join('|')
-    ].join('::');
-}
+    getBackgroundSpriteKey(state) {
+        return `bg::${activeTheme}::${state}@${Math.round(canvasRuntimeManager.getSpritePixelRatio() * 1000)}`;
+    }
 
-function getBackgroundSpriteKey(state) {
-    return `bg::${activeTheme}::${state}@${Math.round(getSpritePixelRatio() * 1000)}`;
-}
+    drawCellBackgroundSprite(spriteContext, state, options = {}) {
+        const { skipBadge = false, borderColor = '' } = options;
+        const x = 0;
+        const y = 0;
 
-function drawCellBackgroundSprite(spriteContext, state, options = {}) {
-    const { skipBadge = false, borderColor = '' } = options;
-    const x = 0;
-    const y = 0;
+        const themePalette = uiSettings.getActiveCellPalette();
+        const palette = themePalette[state] || themePalette.hidden;
+        const borderWidth = palette.borderWidth || 1;
 
-    const themePalette = uiSettings.getActiveCellPalette();
-    const palette = themePalette[state] || themePalette.hidden;
-    const borderWidth = palette.borderWidth || 1;
-
-    drawRoundedRect(spriteContext, x, y, CELL_SIZE, CELL_SIZE, CELL_RADIUS);
-    spriteContext.fillStyle = palette.fill;
-    spriteContext.fill();
-
-    const borderInset = borderWidth / 2;
-    const borderRadius = Math.max(0, CELL_RADIUS - borderInset);
-    drawRoundedRect(
-        spriteContext,
-        x + borderInset,
-        y + borderInset,
-        CELL_SIZE - borderWidth,
-        CELL_SIZE - borderWidth,
-        borderRadius
-    );
-    spriteContext.strokeStyle = borderColor || palette.border;
-    spriteContext.lineWidth = borderWidth;
-    spriteContext.stroke();
-
-    if (state === 'locked' && !skipBadge) {
-        const label = 'LOCKED';
-        spriteContext.font = '700 8px sans-serif';
-        const badgePaddingX = 5;
-        const badgeWidth = Math.ceil(spriteContext.measureText(label).width) + (badgePaddingX * 2);
-        const badgeHeight = 14;
-        const badgeX = x + 7;
-        const badgeY = y + 7;
-
-        drawRoundedRect(spriteContext, badgeX, badgeY, badgeWidth, badgeHeight, 7);
-        spriteContext.fillStyle = themePalette.badgeFill;
+        this.drawRoundedRect(spriteContext, x, y, CELL_SIZE, CELL_SIZE, CELL_RADIUS);
+        spriteContext.fillStyle = palette.fill;
         spriteContext.fill();
-        spriteContext.strokeStyle = themePalette.badgeBorder;
-        spriteContext.lineWidth = 1;
+
+        const borderInset = borderWidth / 2;
+        const borderRadius = Math.max(0, CELL_RADIUS - borderInset);
+        this.drawRoundedRect(
+            spriteContext,
+            x + borderInset,
+            y + borderInset,
+            CELL_SIZE - borderWidth,
+            CELL_SIZE - borderWidth,
+            borderRadius
+        );
+        spriteContext.strokeStyle = borderColor || palette.border;
+        spriteContext.lineWidth = borderWidth;
         spriteContext.stroke();
 
-        spriteContext.fillStyle = themePalette.badgeText;
-        spriteContext.textAlign = 'center';
-        spriteContext.textBaseline = 'middle';
-        spriteContext.fillText(label, badgeX + (badgeWidth / 2), badgeY + (badgeHeight / 2));
-    }
-}
+        if (state === 'locked' && !skipBadge) {
+            const label = 'LOCKED';
+            spriteContext.font = '700 8px sans-serif';
+            const badgePaddingX = 5;
+            const badgeWidth = Math.ceil(spriteContext.measureText(label).width) + (badgePaddingX * 2);
+            const badgeHeight = 14;
+            const badgeX = x + 7;
+            const badgeY = y + 7;
 
-function drawCellSpriteForeground(spriteContext, cell, palette, imageState) {
-    const state = cell.state || 'hidden';
-    const x = 0;
-    const y = 0;
-    const imageSize = state === 'locked' ? 42 : 30;
-    const imageX = x + ((CELL_SIZE - imageSize) / 2);
-    const imageY = y + (state === 'locked' ? 22 : 14);
+            this.drawRoundedRect(spriteContext, badgeX, badgeY, badgeWidth, badgeHeight, 7);
+            spriteContext.fillStyle = themePalette.badgeFill;
+            spriteContext.fill();
+            spriteContext.strokeStyle = themePalette.badgeBorder;
+            spriteContext.lineWidth = 1;
+            spriteContext.stroke();
 
-    if (imageState.image) {
-        const imageRect = getContainedImageRect(imageState.image, imageX, imageY, imageSize, imageSize);
-        spriteContext.save();
-        spriteContext.shadowColor = uiSettings.getActiveCellPalette().imageShadow;
-        spriteContext.shadowBlur = 6;
-        spriteContext.shadowOffsetY = 2;
-        spriteContext.drawImage(imageState.image, imageRect.x, imageRect.y, imageRect.width, imageRect.height);
-        spriteContext.restore();
-    } else if (imageState.hasImageSource) {
-        drawRoundedRect(spriteContext, imageX + 2, imageY + 2, imageSize - 4, imageSize - 4, 8);
-        spriteContext.fillStyle = uiSettings.getActiveCellPalette().placeholderFill;
-        spriteContext.fill();
-        spriteContext.fillStyle = palette.text;
-        spriteContext.font = '700 16px sans-serif';
-        spriteContext.textAlign = 'center';
-        spriteContext.textBaseline = 'middle';
-        spriteContext.fillText('?', x + (CELL_SIZE / 2), imageY + (imageSize / 2));
+            spriteContext.fillStyle = themePalette.badgeText;
+            spriteContext.textAlign = 'center';
+            spriteContext.textBaseline = 'middle';
+            spriteContext.fillText(label, badgeX + (badgeWidth / 2), badgeY + (badgeHeight / 2));
+        }
     }
 
-    if (state === 'incomplete' || state === 'complete') {
-        spriteContext.fillStyle = palette.text;
-        spriteContext.font = '700 8.5px sans-serif';
-        spriteContext.textAlign = 'center';
-        spriteContext.textBaseline = 'alphabetic';
-        const lines = cell.nameLines || [];
-        const lineHeight = 9;
-        const startY = y + CELL_SIZE - 8 - ((lines.length - 1) * lineHeight);
-        lines.forEach((line, lineIndex) => {
-            spriteContext.fillText(line, x + (CELL_SIZE / 2), startY + (lineIndex * lineHeight));
-        });
-    }
-}
+    drawCellSpriteForeground(spriteContext, cell, palette, imageState) {
+        const state = cell.state || 'hidden';
+        const x = 0;
+        const y = 0;
+        const imageSize = state === 'locked' ? 42 : 30;
+        const imageX = x + ((CELL_SIZE - imageSize) / 2);
+        const imageY = y + (state === 'locked' ? 22 : 14);
 
-function ensureBackgroundSprite(state) {
-    if (!state || state === 'hidden') {
-        return null;
-    }
+        if (imageState.image) {
+            const imageRect = this.getContainedImageRect(imageState.image, imageX, imageY, imageSize, imageSize);
+            spriteContext.save();
+            spriteContext.shadowColor = uiSettings.getActiveCellPalette().imageShadow;
+            spriteContext.shadowBlur = 6;
+            spriteContext.shadowOffsetY = 2;
+            spriteContext.drawImage(imageState.image, imageRect.x, imageRect.y, imageRect.width, imageRect.height);
+            spriteContext.restore();
+        } else if (imageState.hasImageSource) {
+            this.drawRoundedRect(spriteContext, imageX + 2, imageY + 2, imageSize - 4, imageSize - 4, 8);
+            spriteContext.fillStyle = uiSettings.getActiveCellPalette().placeholderFill;
+            spriteContext.fill();
+            spriteContext.fillStyle = palette.text;
+            spriteContext.font = '700 16px sans-serif';
+            spriteContext.textAlign = 'center';
+            spriteContext.textBaseline = 'middle';
+            spriteContext.fillText('?', x + (CELL_SIZE / 2), imageY + (imageSize / 2));
+        }
 
-    const spriteKey = getBackgroundSpriteKey(state);
-    if (backgroundSpriteCache.has(spriteKey)) {
-        return backgroundSpriteCache.get(spriteKey);
-    }
-
-    const pixelRatio = getSpritePixelRatio();
-    const spriteCanvas = document.createElement('canvas');
-    spriteCanvas.width = Math.max(1, Math.round(CELL_SIZE * pixelRatio));
-    spriteCanvas.height = Math.max(1, Math.round(CELL_SIZE * pixelRatio));
-    const spriteContext = spriteCanvas.getContext('2d');
-    if (!spriteContext) {
-        return null;
-    }
-
-    spriteContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
-    spriteContext.imageSmoothingEnabled = false;
-    drawCellBackgroundSprite(spriteContext, state);
-
-    backgroundSpriteCache.set(spriteKey, spriteCanvas);
-    return spriteCanvas;
-}
-
-function ensureCellSprite(cell) {
-    if (!cell || cell.state === 'hidden') {
-        return null;
+        if (state === 'incomplete' || state === 'complete') {
+            spriteContext.fillStyle = palette.text;
+            spriteContext.font = '700 8.5px sans-serif';
+            spriteContext.textAlign = 'center';
+            spriteContext.textBaseline = 'alphabetic';
+            const lines = cell.nameLines || [];
+            const lineHeight = 9;
+            const startY = y + CELL_SIZE - 8 - ((lines.length - 1) * lineHeight);
+            lines.forEach((line, lineIndex) => {
+                spriteContext.fillText(line, x + (CELL_SIZE / 2), startY + (lineIndex * lineHeight));
+            });
+        }
     }
 
-    const imageSource = cell.state === 'locked'
-        ? LOCKED_TILE_IMAGE
-        : (cell.state === 'incomplete' || cell.state === 'complete' ? cell.task.imageLink : null);
-    const imageState = getCellImageDrawState(imageSource);
-    const spriteKey = getCellSpriteKey(cell, imageState.key);
+    ensureBackgroundSprite(state) {
+        if (!state || state === 'hidden') {
+            return null;
+        }
 
-    if (cell.state === 'locked' && backgroundSpriteCache.has(spriteKey)) {
-        return backgroundSpriteCache.get(spriteKey);
-    }
+        const spriteKey = this.getBackgroundSpriteKey(state);
+        if (backgroundSpriteCache.has(spriteKey)) {
+            return backgroundSpriteCache.get(spriteKey);
+        }
 
-    if (cell.spriteCanvas && cell.spriteKey === spriteKey) {
-        return cell.spriteCanvas;
-    }
+        const pixelRatio = canvasRuntimeManager.getSpritePixelRatio();
+        const spriteCanvas = document.createElement('canvas');
+        spriteCanvas.width = Math.max(1, Math.round(CELL_SIZE * pixelRatio));
+        spriteCanvas.height = Math.max(1, Math.round(CELL_SIZE * pixelRatio));
+        const spriteContext = spriteCanvas.getContext('2d');
+        if (!spriteContext) {
+            return null;
+        }
 
-    const pixelRatio = getSpritePixelRatio();
-    const spriteCanvas = cell.state === 'locked'
-        ? document.createElement('canvas')
-        : (cell.spriteCanvas || document.createElement('canvas'));
-    spriteCanvas.width = Math.max(1, Math.round(CELL_SIZE * pixelRatio));
-    spriteCanvas.height = Math.max(1, Math.round(CELL_SIZE * pixelRatio));
-    const spriteContext = spriteCanvas.getContext('2d');
-    if (!spriteContext) {
-        return null;
-    }
+        spriteContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+        spriteContext.imageSmoothingEnabled = false;
+        this.drawCellBackgroundSprite(spriteContext, state);
 
-    spriteContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
-    spriteContext.imageSmoothingEnabled = false;
-    spriteContext.clearRect(0, 0, CELL_SIZE, CELL_SIZE);
-
-    const themePalette = uiSettings.getActiveCellPalette();
-    const palette = themePalette[cell.state] || themePalette.hidden;
-
-    const borderColor = cell.state === 'incomplete'
-        ? uiSettings.getTierColor(cell.task?.tier)
-        : '';
-
-    drawCellBackgroundSprite(spriteContext, cell.state, { borderColor });
-    drawCellSpriteForeground(spriteContext, cell, palette, imageState);
-
-    if (cell.state === 'locked') {
         backgroundSpriteCache.set(spriteKey, spriteCanvas);
         return spriteCanvas;
     }
 
-    cell.spriteCanvas = spriteCanvas;
-    cell.spriteKey = spriteKey;
-
-    return spriteCanvas;
-}
-
-function getEdgeCellSpriteKey(edgeSides) {
-    const pixelRatioKey = Math.round(getSpritePixelRatio() * 1000);
-    const t = edgeSides.top ? 1 : 0;
-    const r = edgeSides.right ? 1 : 0;
-    const b = edgeSides.bottom ? 1 : 0;
-    const l = edgeSides.left ? 1 : 0;
-    return `edge::${activeTheme}::${t}${r}${b}${l}@${pixelRatioKey}`;
-}
-
-function ensureEdgeCellSprite(edgeSides) {
-    const spriteKey = getEdgeCellSpriteKey(edgeSides);
-    if (backgroundSpriteCache.has(spriteKey)) {
-        return backgroundSpriteCache.get(spriteKey);
-    }
-
-    const pixelRatio = getSpritePixelRatio();
-    const pxSize = Math.max(1, Math.round(CELL_SIZE * pixelRatio));
-
-    // 7.5% = where opacity reaches 50%; 10% = where it hits 0.
-    const fade1 = CELL_SIZE * 0.075;
-    const fade2 = CELL_SIZE * 0.10;
-    const midStop = fade1 / fade2; // 0.75
-
-    // Build a mask canvas: each active edge contributes a fade gradient.
-    // 'lighter' composite accumulates contributions so corners read full opacity.
-    const maskCanvas = document.createElement('canvas');
-    maskCanvas.width = pxSize;
-    maskCanvas.height = pxSize;
-    const maskCtx = maskCanvas.getContext('2d');
-    if (!maskCtx) {
-        return null;
-    }
-
-    maskCtx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
-    maskCtx.globalCompositeOperation = 'lighter';
-
-    const drawFade = (x0, y0, x1, y1, rX, rY, rW, rH) => {
-        const grad = maskCtx.createLinearGradient(x0, y0, x1, y1);
-        grad.addColorStop(0, 'rgba(0,0,0,1)');
-        grad.addColorStop(1, 'rgba(0,0,0,0)');
-        maskCtx.fillStyle = grad;
-        maskCtx.fillRect(rX, rY, rW, rH);
-    };
-
-    if (edgeSides.left)   drawFade(0,         0, fade2,             0, 0,                  0,                  fade2,     CELL_SIZE);
-    if (edgeSides.right)  drawFade(CELL_SIZE,  0, CELL_SIZE - fade2, 0, CELL_SIZE - fade2, 0,                  fade2,     CELL_SIZE);
-    if (edgeSides.top)    drawFade(0, 0,         0, fade2,             0,                  0,                  CELL_SIZE, fade2);
-    if (edgeSides.bottom) drawFade(0, CELL_SIZE, 0, CELL_SIZE - fade2, 0,                  CELL_SIZE - fade2, CELL_SIZE, fade2);
-
-    // Draw the full locked cell background then cut it with the mask.
-    const spriteCanvas = document.createElement('canvas');
-    spriteCanvas.width = pxSize;
-    spriteCanvas.height = pxSize;
-    const spriteContext = spriteCanvas.getContext('2d');
-    if (!spriteContext) {
-        return null;
-    }
-
-    spriteContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
-    spriteContext.imageSmoothingEnabled = false;
-    drawCellBackgroundSprite(spriteContext, 'locked', { skipBadge: true });
-
-    // destination-in preserves existing pixels scaled by the incoming alpha.
-    spriteContext.globalCompositeOperation = 'destination-in';
-    spriteContext.drawImage(maskCanvas, 0, 0, CELL_SIZE, CELL_SIZE);
-    spriteContext.globalCompositeOperation = 'source-over';
-
-    backgroundSpriteCache.set(spriteKey, spriteCanvas);
-    return spriteCanvas;
-}
-
-function drawCanvasCell(context, cell, now) {
-    const state = cell.state || 'hidden';
-    const hasEdge = state === 'hidden' && cell.edgeVisible && (cell.edgeSides.top || cell.edgeSides.right || cell.edgeSides.bottom || cell.edgeSides.left);
-    let keepAnimating = false;
-
-    if (state === 'hidden' && !hasEdge && !cell.popAnimation) {
-        return false;
-    }
-
-    let scale = 1;
-    let alpha = 1;
-
-    if (cell.popAnimation) {
-        const elapsed = now - cell.popAnimation.startTime;
-        if (elapsed < 0) {
-            return true;
+    ensureCellSprite(cell) {
+        if (!cell || cell.state === 'hidden') {
+            return null;
         }
 
-        const progress = CoreUtils.clamp(elapsed / POP_DURATION_MS, 0, 1);
-        const popEasing = cell.popAnimation.easing || 'linear';
-        if (progress >= 1) {
-            cell.popAnimation = null;
-        } else {
-            keepAnimating = true;
-            if (progress < 0.5) {
-                const upRaw = progress / 0.5;
-                const up = popEasing === 'ease-in'
-                    ? upRaw * upRaw
-                    : upRaw;
-                scale = 1.2 * up;
-                alpha = CoreUtils.clamp(up * 1.2, 0, 1);
+        const imageSource = cell.state === 'locked'
+            ? LOCKED_TILE_IMAGE
+            : (cell.state === 'incomplete' || cell.state === 'complete' ? cell.task.imageLink : null);
+        const imageState = this.getCellImageDrawState(imageSource);
+        const spriteKey = this.getCellSpriteKey(cell, imageState.key);
+
+        if (cell.state === 'locked' && backgroundSpriteCache.has(spriteKey)) {
+            return backgroundSpriteCache.get(spriteKey);
+        }
+
+        if (cell.spriteCanvas && cell.spriteKey === spriteKey) {
+            return cell.spriteCanvas;
+        }
+
+        const pixelRatio = canvasRuntimeManager.getSpritePixelRatio();
+        const spriteCanvas = cell.state === 'locked'
+            ? document.createElement('canvas')
+            : (cell.spriteCanvas || document.createElement('canvas'));
+        spriteCanvas.width = Math.max(1, Math.round(CELL_SIZE * pixelRatio));
+        spriteCanvas.height = Math.max(1, Math.round(CELL_SIZE * pixelRatio));
+        const spriteContext = spriteCanvas.getContext('2d');
+        if (!spriteContext) {
+            return null;
+        }
+
+        spriteContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+        spriteContext.imageSmoothingEnabled = false;
+        spriteContext.clearRect(0, 0, CELL_SIZE, CELL_SIZE);
+
+        const themePalette = uiSettings.getActiveCellPalette();
+        const palette = themePalette[cell.state] || themePalette.hidden;
+
+        const borderColor = cell.state === 'incomplete'
+            ? uiSettings.getTierColor(cell.task?.tier)
+            : '';
+
+        this.drawCellBackgroundSprite(spriteContext, cell.state, { borderColor });
+        this.drawCellSpriteForeground(spriteContext, cell, palette, imageState);
+
+        if (cell.state === 'locked') {
+            backgroundSpriteCache.set(spriteKey, spriteCanvas);
+            return spriteCanvas;
+        }
+
+        cell.spriteCanvas = spriteCanvas;
+        cell.spriteKey = spriteKey;
+
+        return spriteCanvas;
+    }
+
+    getEdgeCellSpriteKey(edgeSides) {
+        const pixelRatioKey = Math.round(canvasRuntimeManager.getSpritePixelRatio() * 1000);
+        const t = edgeSides.top ? 1 : 0;
+        const r = edgeSides.right ? 1 : 0;
+        const b = edgeSides.bottom ? 1 : 0;
+        const l = edgeSides.left ? 1 : 0;
+        return `edge::${activeTheme}::${t}${r}${b}${l}@${pixelRatioKey}`;
+    }
+
+    ensureEdgeCellSprite(edgeSides) {
+        const spriteKey = this.getEdgeCellSpriteKey(edgeSides);
+        if (backgroundSpriteCache.has(spriteKey)) {
+            return backgroundSpriteCache.get(spriteKey);
+        }
+
+        const pixelRatio = canvasRuntimeManager.getSpritePixelRatio();
+        const pxSize = Math.max(1, Math.round(CELL_SIZE * pixelRatio));
+
+        const fade2 = CELL_SIZE * 0.10;
+
+        const maskCanvas = document.createElement('canvas');
+        maskCanvas.width = pxSize;
+        maskCanvas.height = pxSize;
+        const maskCtx = maskCanvas.getContext('2d');
+        if (!maskCtx) {
+            return null;
+        }
+
+        maskCtx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+        maskCtx.globalCompositeOperation = 'lighter';
+
+        const drawFade = (x0, y0, x1, y1, rX, rY, rW, rH) => {
+            const grad = maskCtx.createLinearGradient(x0, y0, x1, y1);
+            grad.addColorStop(0, 'rgba(0,0,0,1)');
+            grad.addColorStop(1, 'rgba(0,0,0,0)');
+            maskCtx.fillStyle = grad;
+            maskCtx.fillRect(rX, rY, rW, rH);
+        };
+
+        if (edgeSides.left)   drawFade(0, 0, fade2, 0, 0, 0, fade2, CELL_SIZE);
+        if (edgeSides.right)  drawFade(CELL_SIZE, 0, CELL_SIZE - fade2, 0, CELL_SIZE - fade2, 0, fade2, CELL_SIZE);
+        if (edgeSides.top)    drawFade(0, 0, 0, fade2, 0, 0, CELL_SIZE, fade2);
+        if (edgeSides.bottom) drawFade(0, CELL_SIZE, 0, CELL_SIZE - fade2, 0, CELL_SIZE - fade2, CELL_SIZE, fade2);
+
+        const spriteCanvas = document.createElement('canvas');
+        spriteCanvas.width = pxSize;
+        spriteCanvas.height = pxSize;
+        const spriteContext = spriteCanvas.getContext('2d');
+        if (!spriteContext) {
+            return null;
+        }
+
+        spriteContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+        spriteContext.imageSmoothingEnabled = false;
+        this.drawCellBackgroundSprite(spriteContext, 'locked', { skipBadge: true });
+
+        spriteContext.globalCompositeOperation = 'destination-in';
+        spriteContext.drawImage(maskCanvas, 0, 0, CELL_SIZE, CELL_SIZE);
+        spriteContext.globalCompositeOperation = 'source-over';
+
+        backgroundSpriteCache.set(spriteKey, spriteCanvas);
+        return spriteCanvas;
+    }
+
+    drawCanvasCell(context, cell, now) {
+        const state = cell.state || 'hidden';
+        const hasEdge = state === 'hidden' && cell.edgeVisible && (cell.edgeSides.top || cell.edgeSides.right || cell.edgeSides.bottom || cell.edgeSides.left);
+        let keepAnimating = false;
+
+        if (state === 'hidden' && !hasEdge && !cell.popAnimation) {
+            return false;
+        }
+
+        let scale = 1;
+        let alpha = 1;
+
+        if (cell.popAnimation) {
+            const elapsed = now - cell.popAnimation.startTime;
+            if (elapsed < 0) {
+                return true;
+            }
+
+            const progress = CoreUtils.clamp(elapsed / POP_DURATION_MS, 0, 1);
+            const popEasing = cell.popAnimation.easing || 'linear';
+            if (progress >= 1) {
+                cell.popAnimation = null;
             } else {
-                const down = (progress - 0.5) / 0.5;
-                scale = 1.2 - (0.2 * down);
-                alpha = 1;
+                keepAnimating = true;
+                if (progress < 0.5) {
+                    const upRaw = progress / 0.5;
+                    const up = popEasing === 'ease-in'
+                        ? upRaw * upRaw
+                        : upRaw;
+                    scale = 1.2 * up;
+                    alpha = CoreUtils.clamp(up * 1.2, 0, 1);
+                } else {
+                    const down = (progress - 0.5) / 0.5;
+                    scale = 1.2 - (0.2 * down);
+                    alpha = 1;
+                }
             }
         }
-    }
 
-    const hoverTarget = hoveredCellId === cell.id && canvasInteractionManager.isCellHoverable(cell) ? 1 : 0;
-    let hoverProgress = cell.hoverProgress ?? 0;
-    const hoverDelta = hoverTarget - hoverProgress;
-    if (Math.abs(hoverDelta) > 0.001) {
-        hoverProgress += hoverDelta * HOVER_LERP_FACTOR;
-        if (Math.abs(hoverTarget - hoverProgress) < 0.01) {
+        const hoverTarget = hoveredCellId === cell.id && canvasInteractionManager.isCellHoverable(cell) ? 1 : 0;
+        let hoverProgress = cell.hoverProgress ?? 0;
+        const hoverDelta = hoverTarget - hoverProgress;
+        if (Math.abs(hoverDelta) > 0.001) {
+            hoverProgress += hoverDelta * HOVER_LERP_FACTOR;
+            if (Math.abs(hoverTarget - hoverProgress) < 0.01) {
+                hoverProgress = hoverTarget;
+            }
+            cell.hoverProgress = hoverProgress;
+            keepAnimating = true;
+        } else if (hoverProgress !== hoverTarget) {
             hoverProgress = hoverTarget;
+            cell.hoverProgress = hoverTarget;
         }
-        cell.hoverProgress = hoverProgress;
-        keepAnimating = true;
-    } else if (hoverProgress !== hoverTarget) {
-        hoverProgress = hoverTarget;
-        cell.hoverProgress = hoverTarget;
-    }
 
-    if (hoverProgress > 0) {
-        scale *= 1 + (HOVER_SCALE_BOOST * hoverProgress);
-    }
+        if (hoverProgress > 0) {
+            scale *= 1 + (HOVER_SCALE_BOOST * hoverProgress);
+        }
 
-    if (state === 'complete') {
-        alpha *= completeCellOpacity;
-    }
+        if (state === 'complete') {
+            alpha *= completeCellOpacity;
+        }
 
-    alpha *= uiSettings.getTierOpacityForCell(cell);
+        alpha *= uiSettings.getTierOpacityForCell(cell);
 
-    const x = cell.pixelX;
-    const y = cell.pixelY;
-    const centerX = x + (CELL_SIZE / 2);
-    const centerY = y + (CELL_SIZE / 2);
-    const hoverLift = HOVER_LIFT_PX * hoverProgress;
+        const x = cell.pixelX;
+        const y = cell.pixelY;
+        const centerX = x + (CELL_SIZE / 2);
+        const centerY = y + (CELL_SIZE / 2);
+        const hoverLift = HOVER_LIFT_PX * hoverProgress;
 
-    context.save();
-    context.globalAlpha = alpha;
-    context.translate(centerX, centerY - hoverLift);
-    context.scale(scale, scale);
-    context.translate(-centerX, -centerY);
+        context.save();
+        context.globalAlpha = alpha;
+        context.translate(centerX, centerY - hoverLift);
+        context.scale(scale, scale);
+        context.translate(-centerX, -centerY);
 
-    if (hasEdge) {
-        if (selectedTierFilters.size > 0) {
+        if (hasEdge) {
+            if (selectedTierFilters.size > 0) {
+                context.restore();
+                return keepAnimating;
+            }
+
+            const edgeSprite = this.ensureEdgeCellSprite(cell.edgeSides);
+            if (edgeSprite) {
+                context.drawImage(edgeSprite, x, y, CELL_SIZE, CELL_SIZE);
+            }
+
             context.restore();
             return keepAnimating;
         }
 
-        const edgeSprite = ensureEdgeCellSprite(cell.edgeSides);
-        if (edgeSprite) {
-            context.drawImage(edgeSprite, x, y, CELL_SIZE, CELL_SIZE);
+        const sprite = this.ensureCellSprite(cell);
+        if (sprite) {
+            context.drawImage(sprite, x, y, CELL_SIZE, CELL_SIZE);
+        }
+
+        if (!(hideTierHintOnLocked && state === 'locked')) {
+            context.beginPath();
+            context.arc(x + CELL_SIZE - 8, y + 8, 4, 0, Math.PI * 2);
+            context.fillStyle = uiSettings.getTierColor(cell.task.tier);
+            context.fill();
+        }
+
+        if (hoverProgress > 0.001) {
+            context.save();
+            this.drawRoundedRect(context, x + 0.75, y + 0.75, CELL_SIZE - 1.5, CELL_SIZE - 1.5, CELL_RADIUS - 1);
+            context.lineWidth = 1.5;
+            context.strokeStyle = `rgba(255, 207, 63, ${0.26 * hoverProgress})`;
+            context.shadowColor = `rgba(147, 96, 57, ${0.3 * hoverProgress})`;
+            context.shadowBlur = 12 * hoverProgress;
+            context.stroke();
+            context.restore();
         }
 
         context.restore();
         return keepAnimating;
     }
 
-    const sprite = ensureCellSprite(cell);
-    if (sprite) {
-        context.drawImage(sprite, x, y, CELL_SIZE, CELL_SIZE);
-    }
-
-    if (!(hideTierHintOnLocked && state === 'locked')) {
-        context.beginPath();
-        context.arc(x + CELL_SIZE - 8, y + 8, 4, 0, Math.PI * 2);
-        context.fillStyle = uiSettings.getTierColor(cell.task.tier);
-        context.fill();
-    }
-
-    if (hoverProgress > 0.001) {
-        context.save();
-        drawRoundedRect(context, x + 0.75, y + 0.75, CELL_SIZE - 1.5, CELL_SIZE - 1.5, CELL_RADIUS - 1);
-        context.lineWidth = 1.5;
-        context.strokeStyle = `rgba(255, 207, 63, ${0.26 * hoverProgress})`;
-        context.shadowColor = `rgba(147, 96, 57, ${0.3 * hoverProgress})`;
-        context.shadowBlur = 12 * hoverProgress;
-        context.stroke();
-        context.restore();
-    }
-
-    context.restore();
-    return keepAnimating;
-}
-
-function renderGridCanvas(now = performance.now()) {
-    if (!gridContext || !gridCanvas) {
-        return false;
-    }
-
-    const visibleBounds = gridViewport.getVisibleWorldBounds();
-    const clearRect = gridViewport.getVisibleClearRect(visibleBounds);
-    gridContext.clearRect(clearRect.x, clearRect.y, clearRect.width, clearRect.height);
-    const visibleCoords = gridViewport.getVisibleCoordBounds(visibleBounds);
-    if (!visibleCoords) {
-        return false;
-    }
-
-    let keepAnimating = false;
-    for (let y = visibleCoords.top; y <= visibleCoords.bottom; y++) {
-        for (let x = visibleCoords.left; x <= visibleCoords.right; x++) {
-            const taskId = coordToTaskId.get(`${x},${y}`);
-            if (!taskId) {
-                continue;
-            }
-
-            const cell = CoreUtils.getCellById(taskId);
-            if (!cell) {
-                continue;
-            }
-
-            const cellAnimating = drawCanvasCell(gridContext, cell, now);
-            keepAnimating = keepAnimating || cellAnimating;
+    renderGridCanvas(now = performance.now()) {
+        if (!gridContext || !gridCanvas) {
+            return false;
         }
-    }
 
-    return keepAnimating;
+        const visibleBounds = gridViewport.getVisibleWorldBounds();
+        const clearRect = gridViewport.getVisibleClearRect(visibleBounds);
+        gridContext.clearRect(clearRect.x, clearRect.y, clearRect.width, clearRect.height);
+        const visibleCoords = gridViewport.getVisibleCoordBounds(visibleBounds);
+        if (!visibleCoords) {
+            return false;
+        }
+
+        let keepAnimating = false;
+        for (let y = visibleCoords.top; y <= visibleCoords.bottom; y++) {
+            for (let x = visibleCoords.left; x <= visibleCoords.right; x++) {
+                const taskId = coordToTaskId.get(`${x},${y}`);
+                if (!taskId) {
+                    continue;
+                }
+
+                const cell = CoreUtils.getCellById(taskId);
+                if (!cell) {
+                    continue;
+                }
+
+                const cellAnimating = this.drawCanvasCell(gridContext, cell, now);
+                keepAnimating = keepAnimating || cellAnimating;
+            }
+        }
+
+        return keepAnimating;
+    }
 }
+
+const canvasSpriteManager = new CanvasSpriteManager();
 
 window.addEventListener('DOMContentLoaded', () => {
     const modal = document.getElementById('task-modal');
@@ -4190,10 +4530,10 @@ class RenderWarmupManager {
         idToCell.forEach(cell => {
             if (cell.state === 'hidden') {
                 if (cell.edgeVisible && (cell.edgeSides.top || cell.edgeSides.right || cell.edgeSides.bottom || cell.edgeSides.left)) {
-                    ensureEdgeCellSprite(cell.edgeSides);
+                    canvasSpriteManager.ensureEdgeCellSprite(cell.edgeSides);
                 }
             } else {
-                ensureCellSprite(cell);
+                canvasSpriteManager.ensureCellSprite(cell);
             }
         });
     }
@@ -4219,10 +4559,10 @@ class RenderWarmupManager {
 
                 if (cell.state === 'hidden') {
                     if (cell.edgeVisible && (cell.edgeSides.top || cell.edgeSides.right || cell.edgeSides.bottom || cell.edgeSides.left)) {
-                        ensureEdgeCellSprite(cell.edgeSides);
+                        canvasSpriteManager.ensureEdgeCellSprite(cell.edgeSides);
                     }
                 } else {
-                    ensureCellSprite(cell);
+                    canvasSpriteManager.ensureCellSprite(cell);
                 }
             }
         }
@@ -4251,7 +4591,7 @@ class RenderWarmupManager {
         });
 
         await Promise.all(Array.from(sources).map(source => new Promise(resolve => {
-            const asset = getImageAsset(source);
+            const asset = canvasRuntimeManager.getImageAsset(source);
             const decodeReadyImage = async () => {
                 if (asset.status === 'ready' && typeof asset.image?.decode === 'function') {
                     try {
