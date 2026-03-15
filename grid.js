@@ -1495,6 +1495,44 @@ class TaskOrderManager {
         return weightedTasks.map(entry => entry.task);
     }
 
+    buildWeightedTaskIdOrder(taskIds = []) {
+        const uniqueIds = [];
+        const seenIds = new Set();
+        taskIds.forEach(rawId => {
+            const taskId = String(rawId);
+            if (!taskId || seenIds.has(taskId)) {
+                return;
+            }
+
+            seenIds.add(taskId);
+            uniqueIds.push(taskId);
+        });
+
+        if (uniqueIds.length < 2) {
+            return uniqueIds;
+        }
+
+        const taskById = new Map(tasksGlobal.map(task => [String(task.id), task]));
+        const weightedPool = uniqueIds
+            .map(id => taskById.get(id))
+            .filter(Boolean);
+        if (weightedPool.length < 2) {
+            return uniqueIds;
+        }
+
+        const weightedIds = this.buildWeightedTaskOrder(weightedPool)
+            .map(task => String(task.id));
+        const weightedIdSet = new Set(weightedIds);
+
+        uniqueIds.forEach(id => {
+            if (!weightedIdSet.has(id)) {
+                weightedIds.push(id);
+            }
+        });
+
+        return weightedIds;
+    }
+
     mergeSavedTaskOrder(savedIds, currentTasks) {
         const taskById = new Map(currentTasks.map(task => [String(task.id), task]));
         taskById.set(String(INTRO_TASK_ID), INTRO_TASK);
@@ -1750,8 +1788,85 @@ class TaskOrderManager {
         return connected;
     }
 
-    getAttachmentSwapCandidate(taskId, anchorIds, options = {}) {
+    getNeighborAttachmentTargetIds(anchorIds, options = {}) {
         const { excludedTaskIds = new Set() } = options;
+        const anchorIdSet = new Set(Array.from(anchorIds || []).map(id => String(id)));
+        if (anchorIdSet.size === 0) {
+            return [];
+        }
+
+        const coordToTaskId = new Map();
+        idToCoords.forEach((coord, id) => {
+            coordToTaskId.set(`${coord.x},${coord.y}`, String(id));
+        });
+
+        const neighborOffsets = [
+            [0, -1],
+            [1, 0],
+            [0, 1],
+            [-1, 0]
+        ];
+
+        const neighborTargetIds = new Set();
+        anchorIdSet.forEach(anchorId => {
+            const anchorCoord = this.gridModel.getTaskCoord(anchorId);
+            neighborOffsets.forEach(([dx, dy]) => {
+                const neighborId = coordToTaskId.get(`${anchorCoord.x + dx},${anchorCoord.y + dy}`);
+                if (!neighborId) {
+                    return;
+                }
+
+                if (neighborId === String(INTRO_TASK_ID)) {
+                    return;
+                }
+
+                if (anchorIdSet.has(neighborId)) {
+                    return;
+                }
+
+                if (excludedTaskIds.has(neighborId)) {
+                    return;
+                }
+
+                if ((this.taskManager.getState(neighborId) || 'hidden') === 'complete') {
+                    return;
+                }
+
+                neighborTargetIds.add(neighborId);
+            });
+        });
+
+        return this.buildWeightedTaskIdOrder(Array.from(neighborTargetIds));
+    }
+
+    pickPendingTaskForTarget(remainingPendingIds, targetTaskId) {
+        if (!Array.isArray(remainingPendingIds) || remainingPendingIds.length === 0) {
+            return '';
+        }
+
+        const targetTask = tasksGlobal.find(task => String(task.id) === String(targetTaskId));
+        if (!targetTask) {
+            return this.buildWeightedTaskIdOrder(remainingPendingIds)[0] || remainingPendingIds[0] || '';
+        }
+
+        const targetTier = String(targetTask.tier || '');
+        const sameTierPendingIds = remainingPendingIds.filter(pendingId => {
+            const pendingTask = tasksGlobal.find(task => String(task.id) === String(pendingId));
+            return pendingTask && String(pendingTask.tier || '') === targetTier;
+        });
+
+        const preferredPool = sameTierPendingIds.length > 0
+            ? sameTierPendingIds
+            : remainingPendingIds;
+
+        return this.buildWeightedTaskIdOrder(preferredPool)[0] || preferredPool[0] || '';
+    }
+
+    getAttachmentSwapCandidate(taskId, anchorIds, options = {}) {
+        const {
+            excludedTaskIds = new Set(),
+            maxDistanceToAnchor = Number.POSITIVE_INFINITY
+        } = options;
         const anchorIdList = Array.from(anchorIds || []);
         if (anchorIdList.length === 0) {
             return null;
@@ -1793,12 +1908,14 @@ class TaskOrderManager {
 
                 return {
                     candidateId,
+                    task,
                     sameTier: String(task.tier || '') === String(movingTask.tier || ''),
                     distanceToAnchor,
                     distanceFromCurrent: getCoordDistance(candidateCoord, movingCoord),
                     statePriority: statePriority[candidateState] ?? 9
                 };
             })
+            .filter(candidate => candidate.distanceToAnchor <= maxDistanceToAnchor)
             .sort((candidateA, candidateB) => {
                 const adjacentA = candidateA.distanceToAnchor === 1;
                 const adjacentB = candidateB.distanceToAnchor === 1;
@@ -1829,15 +1946,47 @@ class TaskOrderManager {
                 return candidateA.candidateId.localeCompare(candidateB.candidateId);
             });
 
-        return candidates[0] || null;
+        if (candidates.length === 0) {
+            return null;
+        }
+
+        const bestDistance = candidates[0].distanceToAnchor;
+        const preferSameTier = candidates
+            .filter(candidate => candidate.distanceToAnchor === bestDistance)
+            .some(candidate => candidate.sameTier);
+
+        let weightedPool = candidates.filter(candidate => {
+            if (candidate.distanceToAnchor !== bestDistance) {
+                return false;
+            }
+
+            if (preferSameTier && !candidate.sameTier) {
+                return false;
+            }
+
+            return true;
+        });
+
+        const bestStatePriority = weightedPool.reduce((best, candidate) => {
+            return Math.min(best, candidate.statePriority);
+        }, Number.POSITIVE_INFINITY);
+        weightedPool = weightedPool.filter(candidate => candidate.statePriority === bestStatePriority);
+
+        if (weightedPool.length <= 1) {
+            return weightedPool[0] || candidates[0];
+        }
+
+        const weightedCandidateTasks = this.buildWeightedTaskOrder(weightedPool.map(candidate => candidate.task));
+        const selectedTaskId = String(weightedCandidateTasks[0]?.id || '');
+        return weightedPool.find(candidate => candidate.candidateId === selectedTaskId) || weightedPool[0];
     }
 
     attachSyncedCompletedTasks(newlyCompletedTaskIds = [], options = {}) {
         const { includeMovedAsAnchors = true } = options;
-        const pendingIds = newlyCompletedTaskIds
+        const pendingIds = this.buildWeightedTaskIdOrder(newlyCompletedTaskIds
             .map(id => String(id))
             .filter(Boolean)
-            .filter(id => id !== INTRO_TASK_ID);
+            .filter(id => id !== INTRO_TASK_ID));
         if (pendingIds.length === 0) {
             return 0;
         }
@@ -1849,15 +1998,74 @@ class TaskOrderManager {
         }
 
         let movedCount = 0;
+        const processedPendingIds = new Set();
+
+        while (true) {
+            const remainingPendingIds = pendingIds.filter(id => !processedPendingIds.has(id));
+            if (remainingPendingIds.length === 0) {
+                break;
+            }
+
+            const remainingPendingIdSet = new Set(remainingPendingIds);
+            const neighborTargetIds = this.getNeighborAttachmentTargetIds(completedAnchorIds, {
+                excludedTaskIds: remainingPendingIdSet
+            });
+
+            if (neighborTargetIds.length === 0) {
+                break;
+            }
+
+            let movedInPass = 0;
+            neighborTargetIds.forEach(targetTaskId => {
+                const pendingPool = pendingIds.filter(id => !processedPendingIds.has(id));
+                if (pendingPool.length === 0) {
+                    return;
+                }
+
+                const pendingTaskId = this.pickPendingTaskForTarget(pendingPool, targetTaskId);
+                if (!pendingTaskId) {
+                    return;
+                }
+
+                const swapped = this.swapTasksById(pendingTaskId, targetTaskId);
+                if (!swapped) {
+                    return;
+                }
+
+                movedCount += 1;
+                movedInPass += 1;
+                processedPendingIds.add(pendingTaskId);
+                pendingIdSet.delete(pendingTaskId);
+
+                if (includeMovedAsAnchors) {
+                    completedAnchorIds.add(pendingTaskId);
+                }
+            });
+
+            if (movedInPass === 0) {
+                break;
+            }
+        }
 
         pendingIds.forEach(taskId => {
-            const target = this.getAttachmentSwapCandidate(taskId, completedAnchorIds, {
+            if (processedPendingIds.has(taskId)) {
+                return;
+            }
+
+            const adjacentTarget = this.getAttachmentSwapCandidate(taskId, completedAnchorIds, {
+                excludedTaskIds: pendingIdSet,
+                maxDistanceToAnchor: 1
+            });
+
+            const target = adjacentTarget || this.getAttachmentSwapCandidate(taskId, completedAnchorIds, {
                 excludedTaskIds: pendingIdSet
             });
+
             if (target) {
                 const swapped = this.swapTasksById(taskId, target.candidateId);
                 if (swapped) {
                     movedCount += 1;
+                    pendingIdSet.delete(taskId);
                 }
             }
 
@@ -1876,7 +2084,9 @@ class TaskOrderManager {
         }
 
         const connectedAnchorIds = this.getConnectedCompletedAnchorIds();
-        const disconnectedCompletedIds = completeTaskIds.filter(id => !connectedAnchorIds.has(id));
+        const disconnectedCompletedIds = this.buildWeightedTaskIdOrder(
+            completeTaskIds.filter(id => !connectedAnchorIds.has(id))
+        );
         if (disconnectedCompletedIds.length === 0) {
             return 0;
         }
@@ -3036,6 +3246,34 @@ class TaskModal {
 const taskModal = new TaskModal();
 
 class ProgressSyncManager {
+    completeHowToPlayTasks() {
+        const howToPlayTasks = tasksGlobal.filter(task => {
+            const taskId = String(task.id);
+            if (taskId === String(INTRO_TASK_ID)) {
+                return true;
+            }
+
+            const taskName = String(task.name || '').trim().toLowerCase();
+            if (!taskName) {
+                return false;
+            }
+
+            return taskName === 'how to play' || taskName.startsWith('how to play ');
+        });
+
+        let completedHowToPlayCount = 0;
+        howToPlayTasks.forEach(task => {
+            if (taskManager.getState(task.id) === 'complete') {
+                return;
+            }
+
+            taskManager.applyTaskCompletion(task);
+            completedHowToPlayCount += 1;
+        });
+
+        return completedHowToPlayCount;
+    }
+
     async syncCompletedTasksFromObtained(options = {}) {
         const {
             showToast = true,
@@ -3043,8 +3281,8 @@ class ProgressSyncManager {
             batchDelay = SYNC_STAGGER_MS
         } = options;
 
+        let completedCount = this.completeHowToPlayTasks();
         const previousLimit = taskManager.getUnlockLimit();
-        let completedCount = 0;
         const taskIdsToComplete = tasksGlobal
             .filter(task => taskManager.getState(task.id) !== 'complete')
             .filter(task => {
@@ -3054,7 +3292,7 @@ class ProgressSyncManager {
             .map(task => String(task.id));
 
         if (taskIdsToComplete.length > 0) {
-            taskOrderManager.attachSyncedCompletedTasks(taskIdsToComplete, { includeMovedAsAnchors: false });
+            taskOrderManager.attachSyncedCompletedTasks(taskIdsToComplete, { includeMovedAsAnchors: true });
         }
 
         const center = gameController.getCenterCoord(tasksGlobal);
@@ -3112,8 +3350,7 @@ class ProgressSyncManager {
             }
         }
 
-        const reattachedCompletedCount = taskOrderManager.ensureCompletedTasksConnectedFromCenter();
-        const shouldRecomputeGridStates = completedCount > 0 || reattachedCompletedCount > 0;
+        const shouldRecomputeGridStates = completedCount > 0;
 
         if (shouldRecomputeGridStates) {
             taskOrderManager.reshuffleHiddenTasks();
