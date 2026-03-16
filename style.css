@@ -1323,7 +1323,8 @@ body::-webkit-scrollbar {
 /* no background colors – cells use default background regardless of tier */
 
 /* unlock toast notification */
-#unlock-toast {
+#unlock-toast,
+#sync-summary-toast {
     position: fixed;
     top: 24px;
     left: 50%;
@@ -1348,13 +1349,19 @@ body::-webkit-scrollbar {
     max-width: calc(100vw - 48px);
 }
 
-#unlock-toast.visible {
+#sync-summary-toast {
+    top: 88px;
+}
+
+#unlock-toast.visible,
+#sync-summary-toast.visible {
     transform: translateX(-50%) translateY(0);
     opacity: 1;
     pointer-events: auto;
 }
 
-#unlock-toast.leaving {
+#unlock-toast.leaving,
+#sync-summary-toast.leaving {
     transform: translateX(-50%) translateY(calc(-100% - 32px));
     opacity: 0;
     pointer-events: none;

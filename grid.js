@@ -2926,6 +2926,7 @@ class HudManager {
         this.taskManager = taskManager;
         this.taskPanels = taskPanels;
         this.unlockToastTimer = null;
+        this.syncSummaryToastTimer = null;
     }
 
     updateUnlockHud() {
@@ -2985,6 +2986,97 @@ class HudManager {
         if (this.unlockToastTimer) {
             clearTimeout(this.unlockToastTimer);
             this.unlockToastTimer = null;
+        }
+
+        toast.classList.add('leaving');
+        setTimeout(() => toast.classList.remove('visible', 'leaving'), 350);
+    }
+
+    formatSyncTierLabel(rawTier) {
+        const tier = String(rawTier || '').trim();
+        if (tier === String(INTRO_TASK_ID)) {
+            return 'How to Play';
+        }
+
+        if (!tier || tier === 'other') {
+            return 'Other';
+        }
+
+        return tierUtils.formatTierName(tier);
+    }
+
+    getSyncTierSortIndex(rawTier) {
+        const tier = String(rawTier || '').trim();
+        if (tier === String(INTRO_TASK_ID)) {
+            return -1;
+        }
+
+        const sortIndex = tierUtils.getTierSortIndex(tier);
+        return Number.isFinite(sortIndex) ? sortIndex : Number.POSITIVE_INFINITY;
+    }
+
+    showSyncSummaryToast(summary = {}) {
+        const {
+            completedCount = 0,
+            completedByTier = new Map()
+        } = summary;
+
+        const toast = document.getElementById('sync-summary-toast');
+        const title = document.getElementById('sync-summary-toast-title');
+        const sub = document.getElementById('sync-summary-toast-sub');
+        if (!toast || !title || !sub) {
+            return;
+        }
+
+        if (completedCount <= 0) {
+            title.textContent = 'Wiki sync complete';
+            sub.textContent = 'No new tasks completed.';
+        } else {
+            const tierSummary = Array.from(completedByTier.entries())
+                .filter(([, count]) => Number.isFinite(count) && count > 0)
+                .sort(([tierA], [tierB]) => {
+                    const sortA = this.getSyncTierSortIndex(tierA);
+                    const sortB = this.getSyncTierSortIndex(tierB);
+                    if (sortA !== sortB) {
+                        return sortA - sortB;
+                    }
+
+                    return this.formatSyncTierLabel(tierA).localeCompare(this.formatSyncTierLabel(tierB));
+                })
+                .map(([tier, count]) => `${this.formatSyncTierLabel(tier)} ${count}`)
+                .join(' • ');
+
+            title.textContent = completedCount === 1
+                ? 'Wiki synced 1 task'
+                : `Wiki synced ${completedCount} tasks`;
+            sub.textContent = tierSummary || 'No new tasks completed.';
+        }
+
+        if (this.syncSummaryToastTimer) {
+            clearTimeout(this.syncSummaryToastTimer);
+            this.syncSummaryToastTimer = null;
+        }
+
+        toast.classList.remove('leaving');
+        void toast.offsetWidth;
+        toast.classList.add('visible');
+
+        this.syncSummaryToastTimer = setTimeout(() => {
+            toast.classList.add('leaving');
+            setTimeout(() => toast.classList.remove('visible', 'leaving'), 350);
+            this.syncSummaryToastTimer = null;
+        }, UNLOCK_TOAST_DURATION_MS);
+    }
+
+    dismissSyncSummaryToast() {
+        const toast = document.getElementById('sync-summary-toast');
+        if (!toast) {
+            return;
+        }
+
+        if (this.syncSummaryToastTimer) {
+            clearTimeout(this.syncSummaryToastTimer);
+            this.syncSummaryToastTimer = null;
         }
 
         toast.classList.add('leaving');
@@ -3371,7 +3463,8 @@ class TaskModal {
 const taskModal = new TaskModal();
 
 class ProgressSyncManager {
-    completeHowToPlayTasks() {
+    completeHowToPlayTasks(options = {}) {
+        const { onTaskCompleted = null } = options;
         const howToPlayTask = tasksGlobal.find(task => {
             const taskId = String(task.id);
             if (taskId === String(INTRO_TASK_ID)) {
@@ -3379,11 +3472,19 @@ class ProgressSyncManager {
             }
         });
 
+        let completedCount = 0;
+
         if (howToPlayTask) {
             if (taskManager.getState(howToPlayTask.id) !== 'complete') {
                 taskManager.applyTaskCompletion(howToPlayTask, { animateNeighborReveal: false });
+                completedCount += 1;
+                if (typeof onTaskCompleted === 'function') {
+                    onTaskCompleted(howToPlayTask);
+                }
             }
         }
+
+        return completedCount;
     }
 
     async syncCompletedTasksFromObtained(options = {}) {
@@ -3396,8 +3497,21 @@ class ProgressSyncManager {
         taskManager.beginStatePersistenceBatch();
 
         try {
-            this.completeHowToPlayTasks();
-            let completedCount = 0;
+            const completedByTier = new Map();
+            const trackCompletedTask = task => {
+                if (!task) {
+                    return;
+                }
+
+                const taskId = String(task.id);
+                const tierKey = taskId === String(INTRO_TASK_ID)
+                    ? String(INTRO_TASK_ID)
+                    : String(task.tier || 'other');
+                const previous = completedByTier.get(tierKey) || 0;
+                completedByTier.set(tierKey, previous + 1);
+            };
+
+            let completedCount = this.completeHowToPlayTasks({ onTaskCompleted: trackCompletedTask });
             const previousLimit = taskManager.getUnlockLimit();
             const taskIdsToComplete = tasksGlobal
                 .filter(task => taskManager.getState(task.id) !== 'complete')
@@ -3451,6 +3565,7 @@ class ProgressSyncManager {
                     const pendingTask = taskById.get(String(taskId));
                     if (pendingTask) {
                         taskManager.applyTaskCompletion(pendingTask, { animateNeighborReveal: false });
+                        trackCompletedTask(pendingTask);
                         batchCompletedCount += 1;
                     }
                 });
@@ -3486,6 +3601,13 @@ class ProgressSyncManager {
             const nextLimit = taskManager.getUnlockLimit();
             if (showToast && nextLimit > previousLimit) {
                 hudManager.showUnlockToast(nextLimit);
+            }
+
+            if (showToast) {
+                hudManager.showSyncSummaryToast({
+                    completedCount,
+                    completedByTier
+                });
             }
 
             if (refreshModal) {
@@ -4806,10 +4928,17 @@ window.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    const toastClose = document.querySelector('.unlock-toast-close');
-    if (toastClose) {
-        toastClose.addEventListener('click', () => {
+    const unlockToastClose = document.querySelector('#unlock-toast .unlock-toast-close');
+    if (unlockToastClose) {
+        unlockToastClose.addEventListener('click', () => {
             hudManager.dismissUnlockToast();
+        });
+    }
+
+    const syncSummaryToastClose = document.querySelector('#sync-summary-toast .unlock-toast-close');
+    if (syncSummaryToastClose) {
+        syncSummaryToastClose.addEventListener('click', () => {
+            hudManager.dismissSyncSummaryToast();
         });
     }
 
