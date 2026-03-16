@@ -35,6 +35,8 @@ const HOVER_LIFT_PX = 2;
 const COMPLETE_OPACITY_KEY = 'completeCellOpacity';
 const HIDE_TIER_HINT_KEY = 'hideTierHintOnLocked';
 const TIER_FILTER_KEY = 'tierFilters';
+const AUTO_WIKI_TOAST_ENABLED_KEY = 'autoWikiToastEnabled';
+const AUTO_WIKI_TOAST_ACK_COUNT_KEY = 'autoWikiToastAcknowledgedCount';
 const LOCKED_FILTER_KEY = '__locked__';
 const DEFAULT_COMPLETE_CELL_OPACITY = 0.2;
 const MIN_COMPLETE_CELL_OPACITY = 0.2;
@@ -228,6 +230,8 @@ let activeTheme = 'osrs';
 let completeCellOpacity = DEFAULT_COMPLETE_CELL_OPACITY;
 let hideTierHintOnLocked = false;
 let selectedTierFilters = new Set();
+let autoWikiToastEnabled = true;
+let autoWikiToastAcknowledgedCount = 0;
 
 try {
     completeCellOpacity = CoreUtils.normalizeCompleteOpacity(localStorage.getItem(COMPLETE_OPACITY_KEY));
@@ -251,6 +255,25 @@ try {
     activeTheme = CoreUtils.normalizeTheme(localStorage.getItem(THEME_KEY));
 } catch {
     activeTheme = 'osrs';
+}
+
+try {
+    const rawAutoWikiToastSetting = localStorage.getItem(AUTO_WIKI_TOAST_ENABLED_KEY);
+    autoWikiToastEnabled = rawAutoWikiToastSetting === null
+        ? true
+        : CoreUtils.normalizeTierHintSetting(rawAutoWikiToastSetting);
+} catch {
+    autoWikiToastEnabled = true;
+}
+
+try {
+    const rawAcknowledgedCount = localStorage.getItem(AUTO_WIKI_TOAST_ACK_COUNT_KEY);
+    const parsedAcknowledgedCount = Number.parseInt(String(rawAcknowledgedCount ?? ''), 10);
+    autoWikiToastAcknowledgedCount = Number.isFinite(parsedAcknowledgedCount) && parsedAcknowledgedCount >= 0
+        ? parsedAcknowledgedCount
+        : 0;
+} catch {
+    autoWikiToastAcknowledgedCount = 0;
 }
 
 if (typeof document !== 'undefined' && document.body) {
@@ -2698,6 +2721,13 @@ class UiSettings {
         }
     }
 
+    updateAutoWikiToastControls() {
+        const checkbox = document.getElementById('auto-wiki-toast-input');
+        if (checkbox) {
+            checkbox.checked = autoWikiToastEnabled;
+        }
+    }
+
     updateCompleteOpacityControls() {
         const slider = document.getElementById('complete-opacity-input');
         const valueLabel = document.getElementById('complete-opacity-value');
@@ -2756,6 +2786,24 @@ class UiSettings {
         }
     }
 
+    applyAutoWikiToastSetting(value, options = {}) {
+        const { persist = true } = options;
+        autoWikiToastEnabled = Boolean(value);
+        this.updateAutoWikiToastControls();
+
+        if (persist) {
+            try {
+                localStorage.setItem(AUTO_WIKI_TOAST_ENABLED_KEY, autoWikiToastEnabled ? '1' : '0');
+            } catch {
+                // ignore localStorage failures
+            }
+        }
+
+        if (!autoWikiToastEnabled) {
+            hudManager.dismissSyncSummaryToast();
+        }
+    }
+
     setOptionsPopoverOpen(isOpen) {
         const popover = document.getElementById('options-popover');
         const button = document.getElementById('options-button');
@@ -2774,12 +2822,14 @@ class UiSettings {
     initOptionsMenu() {
         this.applyCompleteOpacity(completeCellOpacity, { persist: false, rerender: false });
         this.applyHideTierHintOnLocked(hideTierHintOnLocked, { persist: false, rerender: false });
+        this.applyAutoWikiToastSetting(autoWikiToastEnabled, { persist: false });
         this.applyTierFilters(selectedTierFilters, { persist: false, rerender: false });
 
         const optionsButton = document.getElementById('options-button');
         const optionsPopover = document.getElementById('options-popover');
         const opacityInput = document.getElementById('complete-opacity-input');
         const hideTierHintInput = document.getElementById('hide-tier-hint-input');
+        const autoWikiToastInput = document.getElementById('auto-wiki-toast-input');
         const tierFilterControls = document.getElementById('tier-filter-controls');
         const tierFilterClear = document.getElementById('tier-filter-clear');
         if (!optionsButton || !optionsPopover || !opacityInput || !hideTierHintInput || !tierFilterControls || !tierFilterClear) {
@@ -2800,6 +2850,12 @@ class UiSettings {
         hideTierHintInput.addEventListener('change', e => {
             this.applyHideTierHintOnLocked(Boolean(e.currentTarget.checked), { persist: true, rerender: true });
         });
+
+        if (autoWikiToastInput) {
+            autoWikiToastInput.addEventListener('change', e => {
+                this.applyAutoWikiToastSetting(Boolean(e.currentTarget.checked), { persist: true });
+            });
+        }
 
         tierFilterControls.addEventListener('click', e => {
             const button = e.target.closest('.tier-filter-button');
@@ -2927,6 +2983,8 @@ class HudManager {
         this.taskPanels = taskPanels;
         this.unlockToastTimer = null;
         this.syncSummaryToastTimer = null;
+        this.syncSummaryToastMode = '';
+        this.activeAutoCompletableCount = 0;
     }
 
     updateUnlockHud() {
@@ -3015,11 +3073,34 @@ class HudManager {
         return Number.isFinite(sortIndex) ? sortIndex : Number.POSITIVE_INFINITY;
     }
 
+    buildSyncTierSummaryText(tierCounts = new Map()) {
+        return Array.from((tierCounts instanceof Map ? tierCounts : new Map()).entries())
+            .filter(([, count]) => Number.isFinite(count) && count > 0)
+            .sort(([tierA], [tierB]) => {
+                const sortA = this.getSyncTierSortIndex(tierA);
+                const sortB = this.getSyncTierSortIndex(tierB);
+                if (sortA !== sortB) {
+                    return sortA - sortB;
+                }
+
+                return this.formatSyncTierLabel(tierA).localeCompare(this.formatSyncTierLabel(tierB));
+            })
+            .map(([tier, count]) => `${this.formatSyncTierLabel(tier)} ${count}`)
+            .join(' • ');
+    }
+
     showSyncSummaryToast(summary = {}) {
         const {
             completedCount = 0,
             completedByTier = new Map()
         } = summary;
+
+        if (
+            this.syncSummaryToastMode === 'auto-request'
+            && this.activeAutoCompletableCount > autoWikiToastAcknowledgedCount
+        ) {
+            return;
+        }
 
         const toast = document.getElementById('sync-summary-toast');
         const title = document.getElementById('sync-summary-toast-title');
@@ -3032,19 +3113,7 @@ class HudManager {
             title.textContent = 'Wiki sync complete';
             sub.textContent = 'No new tasks completed.';
         } else {
-            const tierSummary = Array.from(completedByTier.entries())
-                .filter(([, count]) => Number.isFinite(count) && count > 0)
-                .sort(([tierA], [tierB]) => {
-                    const sortA = this.getSyncTierSortIndex(tierA);
-                    const sortB = this.getSyncTierSortIndex(tierB);
-                    if (sortA !== sortB) {
-                        return sortA - sortB;
-                    }
-
-                    return this.formatSyncTierLabel(tierA).localeCompare(this.formatSyncTierLabel(tierB));
-                })
-                .map(([tier, count]) => `${this.formatSyncTierLabel(tier)} ${count}`)
-                .join(' • ');
+            const tierSummary = this.buildSyncTierSummaryText(completedByTier);
 
             title.textContent = completedCount === 1
                 ? 'Wiki synced 1 task'
@@ -3057,6 +3126,9 @@ class HudManager {
             this.syncSummaryToastTimer = null;
         }
 
+        this.syncSummaryToastMode = 'summary';
+        this.activeAutoCompletableCount = 0;
+
         toast.classList.remove('leaving');
         void toast.offsetWidth;
         toast.classList.add('visible');
@@ -3065,7 +3137,53 @@ class HudManager {
             toast.classList.add('leaving');
             setTimeout(() => toast.classList.remove('visible', 'leaving'), 350);
             this.syncSummaryToastTimer = null;
+            this.syncSummaryToastMode = '';
+            this.activeAutoCompletableCount = 0;
         }, UNLOCK_TOAST_DURATION_MS);
+    }
+
+    showAutoSyncRequestToast(summary = {}) {
+        const {
+            autoCompletableCount = 0,
+            autoCompletableByTier = new Map()
+        } = summary;
+
+        const toast = document.getElementById('sync-summary-toast');
+        const title = document.getElementById('sync-summary-toast-title');
+        const sub = document.getElementById('sync-summary-toast-sub');
+        if (!toast || !title || !sub) {
+            return;
+        }
+
+        if (!autoWikiToastEnabled) {
+            return;
+        }
+
+        if (!Number.isFinite(autoCompletableCount) || autoCompletableCount <= 0) {
+            return;
+        }
+
+        if (autoCompletableCount <= autoWikiToastAcknowledgedCount) {
+            return;
+        }
+
+        const tierSummary = this.buildSyncTierSummaryText(autoCompletableByTier);
+        title.textContent = autoCompletableCount === 1
+            ? 'Wiki update found 1 auto-completable task'
+            : `Wiki update found ${autoCompletableCount} auto-completable tasks`;
+        sub.textContent = tierSummary || 'No new auto-completable tasks.';
+
+        if (this.syncSummaryToastTimer) {
+            clearTimeout(this.syncSummaryToastTimer);
+            this.syncSummaryToastTimer = null;
+        }
+
+        this.syncSummaryToastMode = 'auto-request';
+        this.activeAutoCompletableCount = autoCompletableCount;
+
+        toast.classList.remove('leaving');
+        void toast.offsetWidth;
+        toast.classList.add('visible');
     }
 
     dismissSyncSummaryToast() {
@@ -3079,8 +3197,19 @@ class HudManager {
             this.syncSummaryToastTimer = null;
         }
 
+        if (this.syncSummaryToastMode === 'auto-request') {
+            autoWikiToastAcknowledgedCount = Math.max(autoWikiToastAcknowledgedCount, this.activeAutoCompletableCount);
+            try {
+                localStorage.setItem(AUTO_WIKI_TOAST_ACK_COUNT_KEY, String(autoWikiToastAcknowledgedCount));
+            } catch {
+                // ignore localStorage failures
+            }
+        }
+
         toast.classList.add('leaving');
         setTimeout(() => toast.classList.remove('visible', 'leaving'), 350);
+        this.syncSummaryToastMode = '';
+        this.activeAutoCompletableCount = 0;
     }
 }
 
@@ -3463,6 +3592,47 @@ class TaskModal {
 const taskModal = new TaskModal();
 
 class ProgressSyncManager {
+    getAutoCompletableTaskIds() {
+        return tasksGlobal
+            .filter(task => taskManager.getState(task.id) !== 'complete')
+            .filter(task => {
+                const requiredCount = taskVerification.getTaskRequiredCount(task);
+                return requiredCount > 0 && taskVerification.getTaskObtainedCount(task) >= requiredCount;
+            })
+            .map(task => String(task.id));
+    }
+
+    getTaskCountByTier(taskIds = []) {
+        const taskById = new Map(tasksGlobal.map(task => [String(task.id), task]));
+        const completedByTier = new Map();
+
+        taskIds
+            .map(taskId => String(taskId))
+            .filter(Boolean)
+            .forEach(taskId => {
+                const task = taskById.get(taskId);
+                if (!task) {
+                    return;
+                }
+
+                const tierKey = taskId === String(INTRO_TASK_ID)
+                    ? String(INTRO_TASK_ID)
+                    : String(task.tier || 'other');
+                const previousCount = completedByTier.get(tierKey) || 0;
+                completedByTier.set(tierKey, previousCount + 1);
+            });
+
+        return completedByTier;
+    }
+
+    notifyAutoWikiLoadAutoCompletableTasks() {
+        const autoCompletableTaskIds = this.getAutoCompletableTaskIds();
+        hudManager.showAutoSyncRequestToast({
+            autoCompletableCount: autoCompletableTaskIds.length,
+            autoCompletableByTier: this.getTaskCountByTier(autoCompletableTaskIds)
+        });
+    }
+
     completeHowToPlayTasks(options = {}) {
         const { onTaskCompleted = null } = options;
         const howToPlayTask = tasksGlobal.find(task => {
@@ -3491,7 +3661,8 @@ class ProgressSyncManager {
         const {
             showToast = true,
             refreshModal = true,
-            batchDelay = SYNC_STAGGER_MS
+            batchDelay = SYNC_STAGGER_MS,
+            taskIdsToCompleteOverride = null
         } = options;
 
         taskManager.beginStatePersistenceBatch();
@@ -3513,13 +3684,9 @@ class ProgressSyncManager {
 
             let completedCount = this.completeHowToPlayTasks({ onTaskCompleted: trackCompletedTask });
             const previousLimit = taskManager.getUnlockLimit();
-            const taskIdsToComplete = tasksGlobal
-                .filter(task => taskManager.getState(task.id) !== 'complete')
-                .filter(task => {
-                    const requiredCount = taskVerification.getTaskRequiredCount(task);
-                    return requiredCount > 0 && taskVerification.getTaskObtainedCount(task) >= requiredCount;
-                })
-                .map(task => String(task.id));
+            const taskIdsToComplete = Array.isArray(taskIdsToCompleteOverride)
+                ? Array.from(new Set(taskIdsToCompleteOverride.map(taskId => String(taskId)).filter(Boolean)))
+                : this.getAutoCompletableTaskIds();
 
             if (taskIdsToComplete.length > 0) {
                 taskOrderManager.attachSyncedCompletedTasks(taskIdsToComplete, { includeMovedAsAnchors: true });
@@ -5263,6 +5430,7 @@ class AppBootstrap {
                 }
 
                 playerProgress.applySnapshot(playerSnapshot);
+                progressSyncManager.notifyAutoWikiLoadAutoCompletableTasks();
                 taskModal.refreshOpenModal();
             });
 
