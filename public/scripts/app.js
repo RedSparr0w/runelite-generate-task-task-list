@@ -475,13 +475,13 @@ class TaskManager {
 
     revealTaskNeighbors(taskId, options = {}) {
         const { animateNeighborReveal = true } = options;
-        const coords = gridModel.getTaskCoord(taskId) || gridModel.getTaskCoord(String(taskId));
+        const coords = gridManager.getTaskCoord(taskId) || gridManager.getTaskCoord(String(taskId));
         if (!coords) {
             return;
         }
 
         const { x, y } = coords;
-        gridModel.idToCoords.forEach((coord, id) => {
+        gridManager.idToCoords.forEach((coord, id) => {
             const isNeighbor =
                 (coord.x === x && (coord.y === y - 1 || coord.y === y + 1)) ||
                 (coord.y === y && (coord.x === x - 1 || coord.x === x + 1));
@@ -1638,7 +1638,7 @@ class TaskOrderManager {
             [-1, 0]
         ];
 
-        gridModel.idToCoords.forEach((coord, id) => {
+        gridManager.idToCoords.forEach((coord, id) => {
             nextCoordToTaskId.set(`${coord.x},${coord.y}`, String(id));
         });
 
@@ -1665,7 +1665,7 @@ class TaskOrderManager {
                 return;
             }
 
-            const coords = gridModel.getTaskCoord(task.id) || gridModel.getTaskCoord(id);
+            const coords = gridManager.getTaskCoord(task.id) || gridManager.getTaskCoord(id);
             if (!coords) {
                 return;
             }
@@ -1696,7 +1696,7 @@ class TaskOrderManager {
 
         tasksGlobal.forEach(task => {
             const taskId = String(task.id);
-            const coord = gridModel.getTaskCoord(task.id);
+            const coord = gridManager.getTaskCoord(task.id);
             if (!coord) {
                 return;
             }
@@ -1727,8 +1727,8 @@ class TaskOrderManager {
 
     swapTaskCoordinatesInPlace(taskA, taskB, options = {}) {
         const { refreshPopover = true } = options;
-        const coordA = gridModel.getTaskCoord(taskA.id) || gridModel.getTaskCoord(String(taskA.id));
-        const coordB = gridModel.getTaskCoord(taskB.id) || gridModel.getTaskCoord(String(taskB.id));
+        const coordA = gridManager.getTaskCoord(taskA.id) || gridManager.getTaskCoord(String(taskA.id));
+        const coordB = gridManager.getTaskCoord(taskB.id) || gridManager.getTaskCoord(String(taskB.id));
         if (!coordA || !coordB) {
             this.syncCellPositionsFromTaskOrder();
             return false;
@@ -1737,8 +1737,8 @@ class TaskOrderManager {
         const nextCoordA = { x: coordB.x, y: coordB.y };
         const nextCoordB = { x: coordA.x, y: coordA.y };
 
-        gridModel.setTaskCoord(taskA.id, nextCoordA);
-        gridModel.setTaskCoord(taskB.id, nextCoordB);
+        gridManager.setTaskCoord(taskA.id, nextCoordA);
+        gridManager.setTaskCoord(taskB.id, nextCoordB);
 
         coordToTaskId.set(`${nextCoordA.x},${nextCoordA.y}`, String(taskA.id));
         coordToTaskId.set(`${nextCoordB.x},${nextCoordB.y}`, String(taskB.id));
@@ -1862,7 +1862,7 @@ class TaskOrderManager {
         }
 
         const coordToTaskId = new Map();
-        gridModel.idToCoords.forEach((coord, id) => {
+        gridManager.idToCoords.forEach((coord, id) => {
             coordToTaskId.set(`${coord.x},${coord.y}`, String(id));
         });
 
@@ -1901,7 +1901,7 @@ class TaskOrderManager {
         }
 
         const coordToTaskId = new Map();
-        gridModel.idToCoords.forEach((coord, id) => {
+        gridManager.idToCoords.forEach((coord, id) => {
             coordToTaskId.set(`${coord.x},${coord.y}`, String(id));
         });
 
@@ -4160,11 +4160,11 @@ class GridSceneManager {
         const isFrontierState = state => state === 'incomplete' || state === 'locked';
         const newlyVisibleEdges = [];
 
-        gridModel.idToCoords.forEach((coord, id) => {
+        gridManager.idToCoords.forEach((coord, id) => {
             stateByCoord.set(`${coord.x},${coord.y}`, taskManager.getState(id));
         });
 
-        gridModel.idToCoords.forEach((coord, id) => {
+        gridManager.idToCoords.forEach((coord, id) => {
             const cell = CoreUtils.getCellById(id);
             if (!cell) {
                 return;
@@ -4297,7 +4297,7 @@ class GridSceneManager {
         idToCell.clear();
         coordToTaskId.clear();
 
-        const { size, coords, center } = gridModel.updateTaskCoordinates(tasks);
+        const { size, coords, center } = gridManager.updateTaskCoordinates(tasks);
         gridCellCount = size;
         const canvas = canvasRuntimeManager.ensureGridCanvas();
         if (!canvas || !gridContext) {
@@ -5308,7 +5308,7 @@ class AppBootstrap {
 
             all = taskManager.setTasks(all);
             uiSettings.applyTierFilters(selectedTierFilters, { persist: false, rerender: false });
-            gridModel.updateTaskCoordinates(all);
+            gridManager.updateTaskCoordinates(all);
 
             if (!freshOrder && taskListChanged) {
                 taskOrderManager.rebuildHiddenAndLockedStatesFromProgress(all);
@@ -5495,11 +5495,11 @@ class AppBootstrap {
 }
 
 const wiki = new Wiki();
-import gridModel from './Grid.js';
+import gridManager from './GridManager.js';
 const taskManager = new TaskManager();
-const gameController = new GameController(gridModel, taskManager);
+const gameController = new GameController(gridManager, taskManager);
 const playerProgress = new PlayerProgress();
-const taskOrderManager = new TaskOrderManager(taskManager, gridModel);
+const taskOrderManager = new TaskOrderManager(taskManager, gridManager);
 const taskVerification = new TaskVerification(taskManager, playerProgress, taskOrderManager);
 const taskPanels = new TaskPanels(taskManager);
 const gameDataUtils = new GameDataUtils();

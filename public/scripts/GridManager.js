@@ -1,5 +1,5 @@
 
-class Grid {
+class GridManager {
     idToCoords = new Map();
 
     computeGridSize(count) {
@@ -82,4 +82,4 @@ class Grid {
     }
 }
 
-export default new Grid();
+export default new GridManager();
