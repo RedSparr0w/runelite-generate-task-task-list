@@ -3372,31 +3372,18 @@ const taskModal = new TaskModal();
 
 class ProgressSyncManager {
     completeHowToPlayTasks() {
-        const howToPlayTasks = tasksGlobal.filter(task => {
+        const howToPlayTask = tasksGlobal.find(task => {
             const taskId = String(task.id);
             if (taskId === String(INTRO_TASK_ID)) {
                 return true;
             }
-
-            const taskName = String(task.name || '').trim().toLowerCase();
-            if (!taskName) {
-                return false;
-            }
-
-            return taskName === 'how to play' || taskName.startsWith('how to play ');
         });
 
-        let completedHowToPlayCount = 0;
-        howToPlayTasks.forEach(task => {
-            if (taskManager.getState(task.id) === 'complete') {
-                return;
+        if (howToPlayTask) {
+            if (taskManager.getState(howToPlayTask.id) !== 'complete') {
+                taskManager.applyTaskCompletion(howToPlayTask, { animateNeighborReveal: false });
             }
-
-            taskManager.applyTaskCompletion(task, { animateNeighborReveal: false });
-            completedHowToPlayCount += 1;
-        });
-
-        return completedHowToPlayCount;
+        }
     }
 
     async syncCompletedTasksFromObtained(options = {}) {
@@ -3409,7 +3396,8 @@ class ProgressSyncManager {
         taskManager.beginStatePersistenceBatch();
 
         try {
-            let completedCount = this.completeHowToPlayTasks();
+            this.completeHowToPlayTasks();
+            let completedCount = 0;
             const previousLimit = taskManager.getUnlockLimit();
             const taskIdsToComplete = tasksGlobal
                 .filter(task => taskManager.getState(task.id) !== 'complete')
