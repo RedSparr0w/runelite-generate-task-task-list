@@ -354,6 +354,8 @@ class Grid {
 class TaskManager {
     constructor() {
         this.tasks = [];
+        this.statePersistenceBatchDepth = 0;
+        this.hasPendingStatePersist = false;
     }
 
     toTask(taskData) {
@@ -388,9 +390,46 @@ class TaskManager {
         return stateMap[id];
     }
 
-    setState(id, state) {
-        stateMap[id] = state;
+    beginStatePersistenceBatch() {
+        this.statePersistenceBatchDepth += 1;
+    }
+
+    endStatePersistenceBatch() {
+        if (this.statePersistenceBatchDepth > 0) {
+            this.statePersistenceBatchDepth -= 1;
+        }
+
+        if (this.statePersistenceBatchDepth === 0) {
+            this.flushStatePersistence();
+        }
+    }
+
+    flushStatePersistence() {
+        if (!this.hasPendingStatePersist) {
+            return;
+        }
+
         CoreUtils.saveStates(stateMap);
+        this.hasPendingStatePersist = false;
+    }
+
+    setState(id, state, options = {}) {
+        const { persist = true } = options;
+        const taskId = String(id);
+
+        if (stateMap[taskId] === state) {
+            return false;
+        }
+
+        stateMap[taskId] = state;
+
+        if (!persist || this.statePersistenceBatchDepth > 0) {
+            this.hasPendingStatePersist = true;
+            return true;
+        }
+
+        CoreUtils.saveStates(stateMap);
+        return true;
     }
 
     getCompletedCount() {
@@ -427,7 +466,8 @@ class TaskManager {
         });
     }
 
-    revealTaskNeighbors(taskId) {
+    revealTaskNeighbors(taskId, options = {}) {
+        const { animateNeighborReveal = true } = options;
         const coords = idToCoords.get(taskId) || idToCoords.get(String(taskId));
         if (!coords) {
             return;
@@ -439,24 +479,26 @@ class TaskManager {
                 (coord.x === x && (coord.y === y - 1 || coord.y === y + 1)) ||
                 (coord.y === y && (coord.x === x - 1 || coord.x === x + 1));
             if (isNeighbor && this.getState(id) === 'hidden') {
-                gridSceneManager.revealNeighborAsLocked(id);
+                gridSceneManager.revealNeighborAsLocked(id, { animate: animateNeighborReveal });
             }
         });
     }
 
-    applyTaskCompletion(task) {
+    applyTaskCompletion(task, options = {}) {
+        const { animateNeighborReveal = true } = options;
         this.setState(task.id, 'complete');
         const cell = CoreUtils.getCellById(task.id);
         if (cell) {
             gridSceneManager.setCellState(cell, 'complete');
         }
-        this.revealTaskNeighbors(task.id);
+        this.revealTaskNeighbors(task.id, { animateNeighborReveal });
     }
 
-    revealFrontierFromCompletedTasks() {
+    revealFrontierFromCompletedTasks(options = {}) {
+        const { animateNeighborReveal = true } = options;
         this.getTaskList().forEach(task => {
             if (this.getState(task.id) === 'complete') {
-                this.revealTaskNeighbors(task.id);
+                this.revealTaskNeighbors(task.id, { animateNeighborReveal });
             }
         });
     }
@@ -1895,19 +1937,29 @@ class TaskOrderManager {
         return this.buildWeightedTaskIdOrder(Array.from(neighborTargetIds));
     }
 
-    pickPendingTaskForTarget(remainingPendingIds, targetTaskId) {
+    pickPendingTaskForTarget(remainingPendingIds, targetTaskId, options = {}) {
+        const { taskById = null } = options;
         if (!Array.isArray(remainingPendingIds) || remainingPendingIds.length === 0) {
             return '';
         }
 
-        const targetTask = tasksGlobal.find(task => String(task.id) === String(targetTaskId));
+        const getTaskById = taskId => {
+            const normalizedId = String(taskId);
+            if (taskById) {
+                return taskById.get(normalizedId) || null;
+            }
+
+            return tasksGlobal.find(task => String(task.id) === normalizedId) || null;
+        };
+
+        const targetTask = getTaskById(targetTaskId);
         if (!targetTask) {
             return this.buildWeightedTaskIdOrder(remainingPendingIds)[0] || remainingPendingIds[0] || '';
         }
 
         const targetTier = String(targetTask.tier || '');
         const sameTierPendingIds = remainingPendingIds.filter(pendingId => {
-            const pendingTask = tasksGlobal.find(task => String(task.id) === String(pendingId));
+            const pendingTask = getTaskById(pendingId);
             return pendingTask && String(pendingTask.tier || '') === targetTier;
         });
 
@@ -1921,7 +1973,8 @@ class TaskOrderManager {
     getAttachmentSwapCandidate(taskId, anchorIds, options = {}) {
         const {
             excludedTaskIds = new Set(),
-            maxDistanceToAnchor = Number.POSITIVE_INFINITY
+            maxDistanceToAnchor = Number.POSITIVE_INFINITY,
+            taskById = null
         } = options;
         const anchorIdList = Array.from(anchorIds || []);
         if (anchorIdList.length === 0) {
@@ -1929,7 +1982,9 @@ class TaskOrderManager {
         }
 
         const movingTaskId = String(taskId);
-        const movingTask = tasksGlobal.find(task => String(task.id) === movingTaskId);
+        const movingTask = taskById
+            ? taskById.get(movingTaskId)
+            : tasksGlobal.find(task => String(task.id) === movingTaskId);
         if (!movingTask) {
             return null;
         }
@@ -2053,6 +2108,8 @@ class TaskOrderManager {
             this.getCompletedTaskIds().forEach(id => completedAnchorIds.add(id));
         }
 
+        const taskById = new Map(tasksGlobal.map(task => [String(task.id), task]));
+
         let movedCount = 0;
         const processedPendingIds = new Set();
 
@@ -2078,7 +2135,9 @@ class TaskOrderManager {
                     return;
                 }
 
-                const pendingTaskId = this.pickPendingTaskForTarget(pendingPool, targetTaskId);
+                const pendingTaskId = this.pickPendingTaskForTarget(pendingPool, targetTaskId, {
+                    taskById
+                });
                 if (!pendingTaskId) {
                     return;
                 }
@@ -2112,11 +2171,13 @@ class TaskOrderManager {
 
             const adjacentTarget = this.getAttachmentSwapCandidate(taskId, completedAnchorIds, {
                 excludedTaskIds: pendingIdSet,
-                maxDistanceToAnchor: 1
+                maxDistanceToAnchor: 1,
+                taskById
             });
 
             const target = adjacentTarget || this.getAttachmentSwapCandidate(taskId, completedAnchorIds, {
-                excludedTaskIds: pendingIdSet
+                excludedTaskIds: pendingIdSet,
+                taskById
             });
 
             if (target) {
@@ -3331,7 +3392,7 @@ class ProgressSyncManager {
                 return;
             }
 
-            taskManager.applyTaskCompletion(task);
+            taskManager.applyTaskCompletion(task, { animateNeighborReveal: false });
             completedHowToPlayCount += 1;
         });
 
@@ -3345,101 +3406,108 @@ class ProgressSyncManager {
             batchDelay = SYNC_STAGGER_MS
         } = options;
 
-        let completedCount = this.completeHowToPlayTasks();
-        const previousLimit = taskManager.getUnlockLimit();
-        const taskIdsToComplete = tasksGlobal
-            .filter(task => taskManager.getState(task.id) !== 'complete')
-            .filter(task => {
-                const requiredCount = taskVerification.getTaskRequiredCount(task);
-                return requiredCount > 0 && taskVerification.getTaskObtainedCount(task) >= requiredCount;
-            })
-            .map(task => String(task.id));
+        taskManager.beginStatePersistenceBatch();
 
-        if (taskIdsToComplete.length > 0) {
-            taskOrderManager.attachSyncedCompletedTasks(taskIdsToComplete, { includeMovedAsAnchors: true });
-        }
+        try {
+            let completedCount = this.completeHowToPlayTasks();
+            const previousLimit = taskManager.getUnlockLimit();
+            const taskIdsToComplete = tasksGlobal
+                .filter(task => taskManager.getState(task.id) !== 'complete')
+                .filter(task => {
+                    const requiredCount = taskVerification.getTaskRequiredCount(task);
+                    return requiredCount > 0 && taskVerification.getTaskObtainedCount(task) >= requiredCount;
+                })
+                .map(task => String(task.id));
 
-        const center = gameController.getCenterCoord(tasksGlobal);
-
-        const tasksToComplete = taskIdsToComplete
-            .map(taskId => tasksGlobal.find(task => String(task.id) === taskId))
-            .filter(Boolean)
-            .map(task => {
-                const coord = gameController.getTaskCoord(task);
-                return {
-                    taskId: String(task.id),
-                    distance: Math.abs(coord.x - center.x) + Math.abs(coord.y - center.y)
-                };
-            })
-            .sort((a, b) => a.distance - b.distance);
-
-        const distanceBatches = [];
-        tasksToComplete.forEach(entry => {
-            const previousBatch = distanceBatches[distanceBatches.length - 1];
-            if (!previousBatch || previousBatch.distance !== entry.distance) {
-                distanceBatches.push({
-                    distance: entry.distance,
-                    tasks: [entry.taskId]
-                });
-                return;
+            if (taskIdsToComplete.length > 0) {
+                taskOrderManager.attachSyncedCompletedTasks(taskIdsToComplete, { includeMovedAsAnchors: true });
             }
 
-            previousBatch.tasks.push(entry.taskId);
-        });
+            const taskById = new Map(tasksGlobal.map(task => [String(task.id), task]));
+            const center = gameController.getCenterCoord(tasksGlobal);
 
-        const revealStagger = distanceBatches.length * batchDelay > INITIAL_REVEAL_DURATION_MS
-            ? INITIAL_REVEAL_DURATION_MS / Math.max(1, distanceBatches.length - 1)
-            : batchDelay;
+            const tasksToComplete = taskIdsToComplete
+                .map(taskId => taskById.get(taskId))
+                .filter(Boolean)
+                .map(task => {
+                    const coord = gameController.getTaskCoord(task);
+                    return {
+                        taskId: String(task.id),
+                        distance: Math.abs(coord.x - center.x) + Math.abs(coord.y - center.y)
+                    };
+                })
+                .sort((a, b) => a.distance - b.distance);
 
-        for (let index = 0; index < distanceBatches.length; index++) {
-            const batch = distanceBatches[index].tasks;
-            let batchCompletedCount = 0;
-            batch.forEach(taskId => {
-                const pendingTask = tasksGlobal.find(candidate => String(candidate.id) === String(taskId));
-                if (pendingTask) {
-                    taskManager.applyTaskCompletion(pendingTask);
-                    batchCompletedCount += 1;
+            const distanceBatches = [];
+            tasksToComplete.forEach(entry => {
+                const previousBatch = distanceBatches[distanceBatches.length - 1];
+                if (!previousBatch || previousBatch.distance !== entry.distance) {
+                    distanceBatches.push({
+                        distance: entry.distance,
+                        tasks: [entry.taskId]
+                    });
+                    return;
                 }
+
+                previousBatch.tasks.push(entry.taskId);
             });
 
-            completedCount += batchCompletedCount;
-            if (batchCompletedCount > 0) {
-                taskManager.normalizeUnlockStates();
-                hudManager.updateUnlockHud();
+            const revealStagger = distanceBatches.length * batchDelay > INITIAL_REVEAL_DURATION_MS
+                ? INITIAL_REVEAL_DURATION_MS / Math.max(1, distanceBatches.length - 1)
+                : batchDelay;
+
+            for (let index = 0; index < distanceBatches.length; index++) {
+                const batch = distanceBatches[index].tasks;
+                let batchCompletedCount = 0;
+                batch.forEach(taskId => {
+                    const pendingTask = taskById.get(String(taskId));
+                    if (pendingTask) {
+                        taskManager.applyTaskCompletion(pendingTask, { animateNeighborReveal: false });
+                        batchCompletedCount += 1;
+                    }
+                });
+
+                completedCount += batchCompletedCount;
+                if (batchCompletedCount > 0) {
+                    taskManager.normalizeUnlockStates();
+                    hudManager.updateUnlockHud();
+                    gridSceneManager.refreshHiddenEdges({ animate: false });
+                }
+
+                if (index + 1 < distanceBatches.length) {
+                    await appUtils.wait(revealStagger * 2);
+                }
+            }
+
+            const shouldRecomputeGridStates = completedCount > 0;
+
+            if (shouldRecomputeGridStates) {
+                taskOrderManager.reshuffleHiddenTasks();
+                taskOrderManager.rebuildHiddenAndLockedStatesFromProgress(tasksGlobal);
+                taskOrderManager.syncCellStatesFromCurrentStates(tasksGlobal);
+            }
+
+            taskManager.revealFrontierFromCompletedTasks({ animateNeighborReveal: false });
+            taskManager.normalizeUnlockStates();
+            hudManager.updateUnlockHud();
+
+            if (shouldRecomputeGridStates) {
                 gridSceneManager.refreshHiddenEdges({ animate: false });
             }
 
-            if (index + 1 < distanceBatches.length) {
-                await appUtils.wait(revealStagger * 2);
+            const nextLimit = taskManager.getUnlockLimit();
+            if (showToast && nextLimit > previousLimit) {
+                hudManager.showUnlockToast(nextLimit);
             }
+
+            if (refreshModal) {
+                taskModal.refreshOpenModal();
+            }
+
+            return completedCount;
+        } finally {
+            taskManager.endStatePersistenceBatch();
         }
-
-        const shouldRecomputeGridStates = completedCount > 0;
-
-        if (shouldRecomputeGridStates) {
-            taskOrderManager.reshuffleHiddenTasks();
-            taskOrderManager.rebuildHiddenAndLockedStatesFromProgress(tasksGlobal);
-            taskOrderManager.syncCellStatesFromCurrentStates(tasksGlobal);
-        }
-
-        taskManager.revealFrontierFromCompletedTasks();
-        taskManager.normalizeUnlockStates();
-        hudManager.updateUnlockHud();
-
-        if (shouldRecomputeGridStates) {
-            gridSceneManager.refreshHiddenEdges({ animate: false });
-        }
-
-        const nextLimit = taskManager.getUnlockLimit();
-        if (showToast && nextLimit > previousLimit) {
-            hudManager.showUnlockToast(nextLimit);
-        }
-
-        if (refreshModal) {
-            taskModal.refreshOpenModal();
-        }
-
-        return completedCount;
     }
 
     async syncPlayerProgress() {
@@ -3728,6 +3796,10 @@ class GridSceneManager {
             return;
         }
 
+        if (cell.state === nextState) {
+            return;
+        }
+
         cell.state = nextState;
         cell.spriteKey = '';
         if (hoveredCellId === cell.id && !canvasInteractionManager.isCellHoverable(cell)) {
@@ -3834,7 +3906,8 @@ class GridSceneManager {
         };
     }
 
-    revealNeighborAsLocked(id) {
+    revealNeighborAsLocked(id, options = {}) {
+        const { animate = true } = options;
         taskManager.setState(id, 'locked');
         const cell = CoreUtils.getCellById(id);
         if (!cell) {
@@ -3842,7 +3915,9 @@ class GridSceneManager {
         }
 
         this.setCellState(cell, 'locked');
-        this.playPopReveal(cell);
+        if (animate) {
+            this.playPopReveal(cell);
+        }
     }
 
     playPopReveal(cell, options = {}) {
