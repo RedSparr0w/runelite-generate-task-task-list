@@ -32,6 +32,7 @@ const CANVAS_PIXEL_RATIO_STEP = 0.25;
 const HOVER_LERP_FACTOR = 0.25;
 const HOVER_SCALE_BOOST = 0.04;
 const HOVER_LIFT_PX = 2;
+const APP_SETTINGS_STORAGE_KEY = 'appSettings';
 const COMPLETE_OPACITY_KEY = 'completeCellOpacity';
 const HIDE_TIER_HINT_KEY = 'hideTierHintOnLocked';
 const TIER_FILTER_KEY = 'tierFilters';
@@ -204,6 +205,32 @@ class CoreUtils {
             // ignore localStorage failures
         }
     }
+
+    static loadAppSettings() {
+        try {
+            const raw = localStorage.getItem(APP_SETTINGS_STORAGE_KEY);
+            if (!raw) {
+                return {};
+            }
+
+            const parsed = JSON.parse(raw);
+            if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+                return {};
+            }
+
+            return parsed;
+        } catch {
+            return {};
+        }
+    }
+
+    static saveAppSettings(settings) {
+        try {
+            localStorage.setItem(APP_SETTINGS_STORAGE_KEY, JSON.stringify(settings || {}));
+        } catch {
+            // ignore localStorage failures
+        }
+    }
 }
 
 let suppressTaskClick = false;
@@ -233,41 +260,68 @@ let selectedTierFilters = new Set();
 let autoWikiToastEnabled = true;
 let autoWikiToastAcknowledgedCount = 0;
 
+let appSettings = CoreUtils.loadAppSettings();
+const hasAppSetting = key => Object.prototype.hasOwnProperty.call(appSettings, key);
+const persistAppSettings = () => {
+    CoreUtils.saveAppSettings(appSettings);
+};
+
 try {
-    completeCellOpacity = CoreUtils.normalizeCompleteOpacity(localStorage.getItem(COMPLETE_OPACITY_KEY));
+    const rawCompleteOpacity = hasAppSetting(COMPLETE_OPACITY_KEY)
+        ? appSettings[COMPLETE_OPACITY_KEY]
+        : localStorage.getItem(COMPLETE_OPACITY_KEY);
+    completeCellOpacity = CoreUtils.normalizeCompleteOpacity(rawCompleteOpacity);
 } catch {
     completeCellOpacity = DEFAULT_COMPLETE_CELL_OPACITY;
 }
+appSettings[COMPLETE_OPACITY_KEY] = completeCellOpacity;
 
 try {
-    hideTierHintOnLocked = CoreUtils.normalizeTierHintSetting(localStorage.getItem(HIDE_TIER_HINT_KEY));
+    const rawHideTierHint = hasAppSetting(HIDE_TIER_HINT_KEY)
+        ? appSettings[HIDE_TIER_HINT_KEY]
+        : localStorage.getItem(HIDE_TIER_HINT_KEY);
+    hideTierHintOnLocked = CoreUtils.normalizeTierHintSetting(rawHideTierHint);
 } catch {
     hideTierHintOnLocked = false;
 }
+appSettings[HIDE_TIER_HINT_KEY] = hideTierHintOnLocked;
 
 try {
-    selectedTierFilters = CoreUtils.normalizeTierFilterSelection(localStorage.getItem(TIER_FILTER_KEY));
+    const rawTierFilters = hasAppSetting(TIER_FILTER_KEY)
+        ? appSettings[TIER_FILTER_KEY]
+        : localStorage.getItem(TIER_FILTER_KEY);
+    selectedTierFilters = CoreUtils.normalizeTierFilterSelection(rawTierFilters);
 } catch {
     selectedTierFilters = new Set();
 }
+appSettings[TIER_FILTER_KEY] = Array.from(selectedTierFilters);
 
 try {
-    activeTheme = CoreUtils.normalizeTheme(localStorage.getItem(THEME_KEY));
+    const rawTheme = hasAppSetting(THEME_KEY)
+        ? appSettings[THEME_KEY]
+        : localStorage.getItem(THEME_KEY);
+    activeTheme = CoreUtils.normalizeTheme(rawTheme);
 } catch {
     activeTheme = 'osrs';
 }
+appSettings[THEME_KEY] = activeTheme;
 
 try {
-    const rawAutoWikiToastSetting = localStorage.getItem(AUTO_WIKI_TOAST_ENABLED_KEY);
+    const rawAutoWikiToastSetting = hasAppSetting(AUTO_WIKI_TOAST_ENABLED_KEY)
+        ? appSettings[AUTO_WIKI_TOAST_ENABLED_KEY]
+        : localStorage.getItem(AUTO_WIKI_TOAST_ENABLED_KEY);
     autoWikiToastEnabled = rawAutoWikiToastSetting === null
         ? true
         : CoreUtils.normalizeTierHintSetting(rawAutoWikiToastSetting);
 } catch {
     autoWikiToastEnabled = true;
 }
+appSettings[AUTO_WIKI_TOAST_ENABLED_KEY] = autoWikiToastEnabled;
 
 try {
-    const rawAcknowledgedCount = localStorage.getItem(AUTO_WIKI_TOAST_ACK_COUNT_KEY);
+    const rawAcknowledgedCount = hasAppSetting(AUTO_WIKI_TOAST_ACK_COUNT_KEY)
+        ? appSettings[AUTO_WIKI_TOAST_ACK_COUNT_KEY]
+        : localStorage.getItem(AUTO_WIKI_TOAST_ACK_COUNT_KEY);
     const parsedAcknowledgedCount = Number.parseInt(String(rawAcknowledgedCount ?? ''), 10);
     autoWikiToastAcknowledgedCount = Number.isFinite(parsedAcknowledgedCount) && parsedAcknowledgedCount >= 0
         ? parsedAcknowledgedCount
@@ -275,6 +329,9 @@ try {
 } catch {
     autoWikiToastAcknowledgedCount = 0;
 }
+appSettings[AUTO_WIKI_TOAST_ACK_COUNT_KEY] = autoWikiToastAcknowledgedCount;
+
+persistAppSettings();
 
 if (typeof document !== 'undefined' && document.body) {
     document.body.dataset.theme = activeTheme;
@@ -2669,11 +2726,8 @@ class UiSettings {
         this.updateTierFilterControls();
 
         if (persist) {
-            try {
-                localStorage.setItem(TIER_FILTER_KEY, JSON.stringify(Array.from(selectedTierFilters)));
-            } catch {
-                // ignore localStorage failures
-            }
+            appSettings[TIER_FILTER_KEY] = Array.from(selectedTierFilters);
+            persistAppSettings();
         }
 
         if (rerender) {
@@ -2755,11 +2809,8 @@ class UiSettings {
         this.updateCompleteOpacityControls();
 
         if (persist) {
-            try {
-                localStorage.setItem(COMPLETE_OPACITY_KEY, String(nextOpacity));
-            } catch {
-                // ignore localStorage failures
-            }
+            appSettings[COMPLETE_OPACITY_KEY] = nextOpacity;
+            persistAppSettings();
         }
 
         if (rerender) {
@@ -2773,11 +2824,8 @@ class UiSettings {
         this.updateTierHintControls();
 
         if (persist) {
-            try {
-                localStorage.setItem(HIDE_TIER_HINT_KEY, hideTierHintOnLocked ? '1' : '0');
-            } catch {
-                // ignore localStorage failures
-            }
+            appSettings[HIDE_TIER_HINT_KEY] = hideTierHintOnLocked;
+            persistAppSettings();
         }
 
         if (rerender) {
@@ -2792,11 +2840,8 @@ class UiSettings {
         this.updateAutoWikiToastControls();
 
         if (persist) {
-            try {
-                localStorage.setItem(AUTO_WIKI_TOAST_ENABLED_KEY, autoWikiToastEnabled ? '1' : '0');
-            } catch {
-                // ignore localStorage failures
-            }
+            appSettings[AUTO_WIKI_TOAST_ENABLED_KEY] = autoWikiToastEnabled;
+            persistAppSettings();
         }
 
         if (!autoWikiToastEnabled) {
@@ -2926,11 +2971,8 @@ class UiSettings {
         }
 
         if (persist) {
-            try {
-                localStorage.setItem(THEME_KEY, nextTheme);
-            } catch {
-                // ignore localStorage failures
-            }
+            appSettings[THEME_KEY] = nextTheme;
+            persistAppSettings();
         }
 
         this.updateThemeToggleButtons();
@@ -3199,11 +3241,8 @@ class HudManager {
 
         if (this.syncSummaryToastMode === 'auto-request') {
             autoWikiToastAcknowledgedCount = Math.max(autoWikiToastAcknowledgedCount, this.activeAutoCompletableCount);
-            try {
-                localStorage.setItem(AUTO_WIKI_TOAST_ACK_COUNT_KEY, String(autoWikiToastAcknowledgedCount));
-            } catch {
-                // ignore localStorage failures
-            }
+            appSettings[AUTO_WIKI_TOAST_ACK_COUNT_KEY] = autoWikiToastAcknowledgedCount;
+            persistAppSettings();
         }
 
         toast.classList.add('leaving');
@@ -5517,11 +5556,8 @@ class AppBootstrap {
 
         const startWithUsername = username => {
             playerUsername = wiki.normalizeUsername(username);
-            try {
-                localStorage.setItem(USERNAME_KEY, playerUsername);
-            } catch {
-                // ignore localStorage failures
-            }
+            appSettings[USERNAME_KEY] = playerUsername;
+            persistAppSettings();
 
             if (gate) {
                 gate.style.display = 'none';
@@ -5533,8 +5569,14 @@ class AppBootstrap {
             }
         };
 
-        const savedUsername = wiki.normalizeUsername(localStorage.getItem(USERNAME_KEY));
+        const savedUsername = wiki.normalizeUsername(
+            appSettings[USERNAME_KEY] ?? localStorage.getItem(USERNAME_KEY)
+        );
         if (savedUsername) {
+            if (appSettings[USERNAME_KEY] !== savedUsername) {
+                appSettings[USERNAME_KEY] = savedUsername;
+                persistAppSettings();
+            }
             startWithUsername(savedUsername);
             return;
         }
