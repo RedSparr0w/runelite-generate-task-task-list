@@ -1,6 +1,7 @@
 
 class GridManager {
     idToCoords = new Map();
+    coordsToId = [];
 
     computeGridSize(count) {
         let size = Math.ceil(Math.sqrt(count));
@@ -10,6 +11,7 @@ class GridManager {
         return size;
     }
 
+    // Create our empty spiral grid coordinates
     generateSpiral(count, size) {
         const centerX = Math.floor(size / 2);
         const centerY = Math.floor(size / 2);
@@ -48,7 +50,6 @@ class GridManager {
             ? taskOrId.id
             : taskOrId;
         return this.idToCoords.get(rawId)
-            || this.idToCoords.get(String(rawId))
             || { x: 0, y: 0 };
     }
 
@@ -56,12 +57,13 @@ class GridManager {
         const rawId = typeof taskOrId === 'object' && taskOrId !== null
             ? taskOrId.id
             : taskOrId;
-        return this.idToCoords.set(rawId, coord)
-            || this.idToCoords.set(String(rawId), coord);
+        this.idToCoords.set(rawId, coord);
+        this.coordsToId[coord.x] = this.coordsToId[coord.x] || [];
+        this.coordsToId[coord.x][coord.y] = rawId;
     }
 
-    getCenterCoord(tasks = tasksGlobal) {
-        return this.getTaskCoord(tasks[0]);
+    getCenterCoord() {
+        return this.centerCoord;
     }
 
     updateTaskCoordinates(tasks) {
@@ -69,15 +71,19 @@ class GridManager {
         const coords = this.generateSpiral(tasks.length, size);
 
         this.idToCoords.clear();
+        this.coordsToId = [];
         tasks.forEach((task, index) => {
             const [x, y] = coords[index];
+            this.coordsToId[x] = this.coordsToId[x] || [];
+            this.coordsToId[x][y] = task.id;
             this.idToCoords.set(task.id, { x, y });
         });
+        this.centerCoord = coords.length > 0 ? { x: coords[0][0], y: coords[0][1] } : { x: 0, y: 0 }
 
         return {
             size,
             coords,
-            center: coords.length > 0 ? { x: coords[0][0], y: coords[0][1] } : { x: 0, y: 0 }
+            center: this.centerCoord,
         };
     }
 }
