@@ -126,7 +126,6 @@ const CELL_PALETTES_BY_THEME = {
 };
 
 const idToCell = new Map();
-const coordToTaskId = new Map();
 
 class CoreUtils {
     static getCellById(id) {
@@ -475,17 +474,10 @@ class TaskManager {
 
     revealTaskNeighbors(taskId, options = {}) {
         const { animateNeighborReveal = true } = options;
-        const coords = gridManager.getTaskCoord(taskId) || gridManager.getTaskCoord(String(taskId));
-        if (!coords) {
-            return;
-        }
+        const neighbors = gridManager.getTaskNeighbors(taskId);
 
-        const { x, y } = coords;
-        gridManager.idToCoords.forEach((coord, id) => {
-            const isNeighbor =
-                (coord.x === x && (coord.y === y - 1 || coord.y === y + 1)) ||
-                (coord.y === y && (coord.x === x - 1 || coord.x === x + 1));
-            if (isNeighbor && this.getState(id) === 'hidden') {
+        neighbors.forEach((id) => {
+            if (this.getState(id) === 'hidden') {
                 gridSceneManager.revealNeighborAsLocked(id, { animate: animateNeighborReveal });
             }
         });
@@ -1525,20 +1517,12 @@ class TaskOrderManager {
         return Promise.all(promises);
     }
 
-    shuffle(array) {
-        for (let i = array.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [array[i], array[j]] = [array[j], array[i]];
-        }
-    }
-
     buildWeightedTaskOrder(tasks) {
         const weightedTasks = tasks.map(task => ({
             task,
             priority: Math.random() / (tierWeights[task.tier] || 1)
         }));
 
-        this.shuffle(weightedTasks);
         weightedTasks.sort((a, b) => a.priority - b.priority);
 
         return weightedTasks.map(entry => entry.task);
@@ -1692,7 +1676,6 @@ class TaskOrderManager {
 
     syncCellPositionsFromTaskOrder() {
         this.gridModel.updateTaskCoordinates(tasksGlobal);
-        coordToTaskId.clear();
 
         tasksGlobal.forEach(task => {
             const taskId = String(task.id);
@@ -1701,7 +1684,7 @@ class TaskOrderManager {
                 return;
             }
 
-            coordToTaskId.set(`${coord.x},${coord.y}`, taskId);
+            gridManager.setTaskByCoord(coord.x, coord.y, taskId);
 
             const cell = CoreUtils.getCellById(taskId);
             if (!cell) {
@@ -1740,8 +1723,8 @@ class TaskOrderManager {
         gridManager.setTaskCoord(taskA.id, nextCoordA);
         gridManager.setTaskCoord(taskB.id, nextCoordB);
 
-        coordToTaskId.set(`${nextCoordA.x},${nextCoordA.y}`, String(taskA.id));
-        coordToTaskId.set(`${nextCoordB.x},${nextCoordB.y}`, String(taskB.id));
+        gridManager.setTaskByCoord(nextCoordA.x, nextCoordA.y, taskA.id);
+        gridManager.setTaskByCoord(nextCoordB.x, nextCoordB.y, taskB.id);
 
         this.syncSingleCellPosition(taskA.id, nextCoordA);
         this.syncSingleCellPosition(taskB.id, nextCoordB);
@@ -1861,26 +1844,13 @@ class TaskOrderManager {
             });
         }
 
-        const coordToTaskId = new Map();
-        gridManager.idToCoords.forEach((coord, id) => {
-            coordToTaskId.set(`${coord.x},${coord.y}`, String(id));
-        });
-
         const connected = new Set(seedIds);
         const queue = [...seedIds];
-        const neighborOffsets = [
-            [0, -1],
-            [1, 0],
-            [0, 1],
-            [-1, 0]
-        ];
 
         while (queue.length > 0) {
             const currentId = queue.shift();
-            const coord = this.gridModel.getTaskCoord(currentId);
 
-            neighborOffsets.forEach(([dx, dy]) => {
-                const neighborId = coordToTaskId.get(`${coord.x + dx},${coord.y + dy}`);
+            this.gridModel.getTaskNeighbors(currentId).forEach((neighborId) => {
                 if (!neighborId || connected.has(neighborId) || !completeIdSet.has(neighborId)) {
                     return;
                 }
@@ -1900,23 +1870,9 @@ class TaskOrderManager {
             return [];
         }
 
-        const coordToTaskId = new Map();
-        gridManager.idToCoords.forEach((coord, id) => {
-            coordToTaskId.set(`${coord.x},${coord.y}`, String(id));
-        });
-
-        const neighborOffsets = [
-            [0, -1],
-            [1, 0],
-            [0, 1],
-            [-1, 0]
-        ];
-
         const neighborTargetIds = new Set();
         anchorIdSet.forEach(anchorId => {
-            const anchorCoord = this.gridModel.getTaskCoord(anchorId);
-            neighborOffsets.forEach(([dx, dy]) => {
-                const neighborId = coordToTaskId.get(`${anchorCoord.x + dx},${anchorCoord.y + dy}`);
+            this.gridModel.getTaskNeighbors(anchorId).forEach((neighborId) => {
                 if (!neighborId) {
                     return;
                 }
@@ -3912,7 +3868,7 @@ class CanvasInteractionManager {
             return null;
         }
 
-        const taskId = coordToTaskId.get(`${coordX},${coordY}`);
+        const taskId = gridManager.getTaskByCoord(coordX, coordY);
         return taskId ? CoreUtils.getCellById(taskId) : null;
     }
 
@@ -4295,7 +4251,6 @@ class GridSceneManager {
         }
         grid.innerHTML = '';
         idToCell.clear();
-        coordToTaskId.clear();
 
         const { size, coords, center } = gridManager.updateTaskCoordinates(tasks);
         gridCellCount = size;
@@ -4318,7 +4273,7 @@ class GridSceneManager {
             const [x, y] = coords[index];
             const cell = this.createCell(task, { x, y });
             idToCell.set(String(task.id), cell);
-            coordToTaskId.set(`${x},${y}`, String(task.id));
+            gridManager.setTaskByCoord(x, y, String(task.id));
             cells.push({ cell, x, y });
         });
 
@@ -4972,7 +4927,7 @@ class CanvasSpriteManager {
         let keepAnimating = false;
         for (let y = visibleCoords.top; y <= visibleCoords.bottom; y++) {
             for (let x = visibleCoords.left; x <= visibleCoords.right; x++) {
-                const taskId = coordToTaskId.get(`${x},${y}`);
+                const taskId = gridManager.getTaskByCoord(x, y);
                 if (!taskId) {
                     continue;
                 }
@@ -5090,7 +5045,8 @@ window.addEventListener('DOMContentLoaded', () => {
                     syncButton.textContent = 'Wiki Sync';
                     syncButtonStatusTimer = null;
                 }, SYNC_DURATION_MS);
-            } catch {
+            } catch (e) {
+                console.error(e);
                 syncButton.disabled = false;
                 syncButton.textContent = 'Wiki sync failed';
                 syncButtonStatusTimer = setTimeout(() => {
@@ -5135,7 +5091,7 @@ class RenderWarmupManager {
 
         for (let y = visibleCoords.top; y <= visibleCoords.bottom; y++) {
             for (let x = visibleCoords.left; x <= visibleCoords.right; x++) {
-                const taskId = coordToTaskId.get(`${x},${y}`);
+                const taskId = gridManager.getTaskByCoord(x, y);
                 if (!taskId) {
                     continue;
                 }

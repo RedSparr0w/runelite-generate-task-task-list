@@ -62,6 +62,37 @@ class GridManager {
         this.coordsToId[coord.x][coord.y] = rawId;
     }
 
+    getTaskByCoord(x, y){
+        return this.coordsToId?.[x]?.[y] || null;
+    }
+
+    setTaskByCoord(x, y, taskOrId){
+        const rawId = typeof taskOrId === 'object' && taskOrId !== null
+            ? taskOrId.id
+            : taskOrId;
+        this.idToCoords.set(rawId, { x, y });
+        this.coordsToId[x] = this.coordsToId[x] || [];
+        this.coordsToId[x][y] = rawId;
+    }
+
+    getTaskNeighbors(taskOrId) {
+        const coord = this.getTaskCoord(taskOrId);
+        const neighbors = [];
+        if (this.coordsToId[coord.x - 1]?.[coord.y]) {
+            neighbors.push(this.coordsToId[coord.x - 1][coord.y]);
+        }
+        if (this.coordsToId[coord.x + 1]?.[coord.y]) {
+            neighbors.push(this.coordsToId[coord.x + 1][coord.y]);
+        }
+        if (this.coordsToId[coord.x]?.[coord.y - 1]) {
+            neighbors.push(this.coordsToId[coord.x][coord.y - 1]);
+        }
+        if (this.coordsToId[coord.x]?.[coord.y + 1]) {
+            neighbors.push(this.coordsToId[coord.x][coord.y + 1]);
+        }
+        return neighbors;
+    }
+
     getCenterCoord() {
         return this.centerCoord;
     }
@@ -78,7 +109,7 @@ class GridManager {
             this.coordsToId[x][y] = task.id;
             this.idToCoords.set(task.id, { x, y });
         });
-        this.centerCoord = coords.length > 0 ? { x: coords[0][0], y: coords[0][1] } : { x: 0, y: 0 }
+        this.centerCoord = coords.length > 0 ? { x: coords[0][0], y: coords[0][1] } : { x: 0, y: 0 };
 
         return {
             size,
