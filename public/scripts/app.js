@@ -5196,8 +5196,12 @@ class AppBootstrap {
         }
 
         const loadingIcons = Array.from(document.querySelectorAll('#loading .loading-icon'));
-        loadingIcons.forEach(icon => icon.classList.remove('visible'));
         loadingIcons.forEach(icon => appUtils.bindImageErrorFallback(icon));
+        loadingIcons.forEach((icon, index) => {
+            const image = new Image();
+            image.src = icon.src;
+            setTimeout(() => icon.classList.add('visible'), index * 250);
+        });
 
         const collectionLogPromise = wiki.loadCollectionLogItems();
         const playerDataPromise = wiki.loadPlayerData(playerUsername);
@@ -5273,25 +5277,21 @@ class AppBootstrap {
             taskManager.normalizeUnlockStates();
             hudManager.updateUnlockHud();
 
-            loadingIcons.forEach(icon => {
-                icon.classList.add('visible');
-                const image = new Image();
-                image.src = icon.src;
-            });
-
             const preloadPromise = renderWarmupManager.preloadTaskImages(all);
             void preloadPromise.catch(() => {
                 // image preloading is best-effort; startup render should not block on it
             });
 
             const finish = async () => {
-                gridSceneManager.render(all);
                 await renderWarmupManager.prewarmInitialCanvasSprites();
+                setTimeout(async () => {
+                    const readyLoader = document.getElementById('loading');
+                    if (readyLoader) {
+                        readyLoader.style.display = 'none';
+                    }
 
-                const readyLoader = document.getElementById('loading');
-                if (readyLoader) {
-                    readyLoader.style.display = 'none';
-                }
+                    gridSceneManager.render(all);
+                }, 2e3);
             };
 
             finish().catch(() => {
@@ -5422,6 +5422,8 @@ class AppBootstrap {
             }
             startWithUsername(savedUsername);
             return;
+        } else {
+            form.style.display = 'block';
         }
 
         if (!gate || !form || !input || !submit || !error) {
