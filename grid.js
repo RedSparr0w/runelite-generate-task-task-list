@@ -2405,18 +2405,6 @@ class TaskOrderManager {
     }
 }
 
-const gridModel = new Grid();
-const taskManager = new TaskManager();
-const gameController = new GameController(gridModel, taskManager);
-const playerProgress = new PlayerProgress();
-const wiki = new Wiki();
-const taskOrderManager = new TaskOrderManager(taskManager, gridModel);
-const taskVerification = new TaskVerification(taskManager, playerProgress, taskOrderManager);
-const taskPanels = new TaskPanels(taskManager);
-
-// collection log item map: id -> { name, category, wikiLink, imageUrl }
-const collectionLogMap = wiki.collectionLogMap;
-
 class GameDataUtils {
     normalizeAchievementDiaryRegion(value) {
         const raw = String(value || '').trim().toLowerCase();
@@ -2592,8 +2580,6 @@ class GameDataUtils {
     }
 }
 
-const gameDataUtils = new GameDataUtils();
-
 class TierUtils {
     formatTierName(tier) {
         return String(tier || '')
@@ -2608,8 +2594,6 @@ class TierUtils {
         return index === -1 ? Number.POSITIVE_INFINITY : index;
     }
 }
-
-const tierUtils = new TierUtils();
 
 class AppUtils {
     bindImageErrorFallback(image) {
@@ -2646,8 +2630,6 @@ class AppUtils {
         });
     }
 }
-
-const appUtils = new AppUtils();
 
 class UiSettings {
     constructor(taskManager) {
@@ -3252,9 +3234,6 @@ class HudManager {
     }
 }
 
-const uiSettings = new UiSettings(taskManager);
-const hudManager = new HudManager(taskManager, taskPanels);
-
 class TaskModal {
     isAnchorConnected(anchor) {
         if (!anchor) {
@@ -3371,7 +3350,7 @@ class TaskModal {
         const title = document.getElementById('modal-title');
         const image = document.getElementById('modal-image');
         const tip = document.getElementById('modal-tip');
-        const wiki = document.getElementById('modal-wiki');
+        const wikiButton = document.getElementById('modal-wiki');
         const button = document.getElementById('modal-complete');
         const tierBadge = document.getElementById('modal-tier-badge');
         const cell = CoreUtils.getCellById(task.id);
@@ -3387,7 +3366,7 @@ class TaskModal {
                 '<strong>Wiki Sync:</strong> In RuneLite, enable the <em>Wiki Sync</em> plugin. ' +
                 'Open your Collection Log in-game and click the Wiki Sync button. ' +
                 'Then use the Wiki Sync button here to automatically mark completed tasks.';
-            wiki.style.display = 'none';
+            wikiButton.style.display = 'none';
             if (tierBadge) {
                 tierBadge.style.display = 'none';
             }
@@ -3431,13 +3410,13 @@ class TaskModal {
             title.textContent = 'Locked Task';
             appUtils.setImageWithFallback(image, LOCKED_TILE_IMAGE, 'Locked task');
             tip.textContent = 'Unlock this tile to reveal what task is here.';
-            wiki.style.display = 'none';
+            wikiButton.style.display = 'none';
         } else {
             title.textContent = task.name;
             appUtils.setImageWithFallback(image, task.imageLink, task.name);
             tip.textContent = task.tip || '';
-            wiki.href = task.wikiLink || '#';
-            wiki.style.display = 'inline-block';
+            wikiButton.href = task.wikiLink || '#';
+            wikiButton.style.display = 'inline-block';
         }
 
         if (state === 'incomplete') {
@@ -3533,7 +3512,7 @@ class TaskModal {
                 itemIds.forEach(id => {
                     const numericId = Number(id);
                     const isObtained = playerProgress.hasObtainedItem(numericId);
-                    const info = collectionLogMap.get(numericId);
+                    const info = wiki.collectionLogMap.get(numericId);
                     const link = document.createElement('a');
                     link.href = info ? info.wikiLink : '#';
                     link.target = '_blank';
@@ -3627,8 +3606,6 @@ class TaskModal {
         });
     }
 }
-
-const taskModal = new TaskModal();
 
 class ProgressSyncManager {
     getAutoCompletableTaskIds() {
@@ -3840,8 +3817,6 @@ class ProgressSyncManager {
     }
 }
 
-const progressSyncManager = new ProgressSyncManager();
-
 class GridViewport {
     getMinScale() {
         const grid = document.getElementById('grid');
@@ -3977,8 +3952,6 @@ class GridViewport {
     }
 }
 
-const gridViewport = new GridViewport();
-
 class CanvasInteractionManager {
     getCellAtClientPoint(clientX, clientY) {
         if (!gridCanvas) {
@@ -4103,8 +4076,6 @@ class CanvasInteractionManager {
         });
     }
 }
-
-const canvasInteractionManager = new CanvasInteractionManager();
 
 class GridSceneManager {
     setCellState(cell, nextState) {
@@ -4454,8 +4425,6 @@ class GridSceneManager {
     }
 }
 
-const gridSceneManager = new GridSceneManager();
-
 class CanvasRuntimeManager {
     ensureGridCanvas() {
         const grid = document.getElementById('grid');
@@ -4611,8 +4580,6 @@ class CanvasRuntimeManager {
     }
 }
 
-const canvasRuntimeManager = new CanvasRuntimeManager();
-
 class CanvasFrameManager {
     queueCanvasRender() {
         if (!gridContext || canvasFrameId !== null) {
@@ -4630,9 +4597,6 @@ class CanvasFrameManager {
         }
     }
 }
-
-const canvasFrameManager = new CanvasFrameManager();
-const queueCanvasRender = () => canvasFrameManager.queueCanvasRender();
 
 class CanvasSpriteManager {
     drawRoundedRect(context, x, y, width, height, radius) {
@@ -5100,8 +5064,6 @@ class CanvasSpriteManager {
     }
 }
 
-const canvasSpriteManager = new CanvasSpriteManager();
-
 window.addEventListener('DOMContentLoaded', () => {
     const modal = document.getElementById('task-modal');
     const tierTasksModal = document.getElementById('tier-tasks-modal');
@@ -5342,8 +5304,6 @@ class RenderWarmupManager {
         await this.waitForAnimationFrames(2);
     }
 }
-
-const renderWarmupManager = new RenderWarmupManager();
 
 class AppBootstrap {
     startApp() {
@@ -5607,5 +5567,29 @@ class AppBootstrap {
     }
 }
 
+const wiki = new Wiki();
+window.wiki = wiki;
+const gridModel = new Grid();
+const taskManager = new TaskManager();
+const gameController = new GameController(gridModel, taskManager);
+const playerProgress = new PlayerProgress();
+const taskOrderManager = new TaskOrderManager(taskManager, gridModel);
+const taskVerification = new TaskVerification(taskManager, playerProgress, taskOrderManager);
+const taskPanels = new TaskPanels(taskManager);
+const gameDataUtils = new GameDataUtils();
+const tierUtils = new TierUtils();
+const appUtils = new AppUtils();
+const uiSettings = new UiSettings(taskManager);
+const hudManager = new HudManager(taskManager, taskPanels);
+const taskModal = new TaskModal();
+const progressSyncManager = new ProgressSyncManager();
+const gridViewport = new GridViewport();
+const canvasInteractionManager = new CanvasInteractionManager();
+const gridSceneManager = new GridSceneManager();
+const canvasRuntimeManager = new CanvasRuntimeManager();
+const canvasFrameManager = new CanvasFrameManager();
+const queueCanvasRender = () => canvasFrameManager.queueCanvasRender();
+const canvasSpriteManager = new CanvasSpriteManager();
+const renderWarmupManager = new RenderWarmupManager();
 const appBootstrap = new AppBootstrap();
 appBootstrap.initUsernameGate();
