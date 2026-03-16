@@ -1594,7 +1594,7 @@ class TaskOrderManager {
     }
 
     async loadAllTierData() {
-        const promises = tiers.map(name => fetch(`./tiers/${name}.json`).then(r => r.json()));
+        const promises = tiers.map(name => fetch(`https://raw.githubusercontent.com/OSRS-Taskman/task-list/refs/heads/main/tiers/${name}.json`).then(r => r.json()));
         return Promise.all(promises);
     }
 
