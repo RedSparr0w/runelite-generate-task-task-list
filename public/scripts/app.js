@@ -877,13 +877,13 @@ class Wiki {
         return completedKeys;
     }
 
-    buildCollectionLogEntry(name, category) {
+    buildCollectionLogEntry(name, category, imageUrl) {
         const encoded = encodeURIComponent(name.replace(/ /g, '_'));
         return {
             name,
             category,
             wikiLink: `https://oldschool.runescape.wiki/w/${encoded}`,
-            imageUrl: `https://oldschool.runescape.wiki/w/Special:Redirect/file/${encoded}.png`
+            imageUrl,
         };
     }
 
@@ -892,7 +892,7 @@ class Wiki {
         items.forEach(item => {
             const numericId = Number(item.id);
             const itemId = Number.isFinite(numericId) ? numericId : item.id;
-            this.collectionLogMap.set(itemId, this.buildCollectionLogEntry(item.name, item.category));
+            this.collectionLogMap.set(itemId, this.buildCollectionLogEntry(item.name, item.category, item.image));
         });
     }
 
@@ -911,18 +911,48 @@ class Wiki {
         }
 
         try {
-            const url = 'https://oldschool.runescape.wiki/api.php?action=query&titles=Module:Collection_log%2Fdata.json&prop=revisions&rvprop=content&rvslots=main&format=json&formatversion=2&origin=*';
+            const url = 'https://oldschool.runescape.wiki/api.php?action=parse&page=Collection_log/Table&prop=text&format=json&origin=*';
+
             const resp = await fetch(url);
             const json = await resp.json();
-            const content = json.query.pages[0].revisions[0].slots.main.content;
-            const items = JSON.parse(content);
+            const html = json.parse.text['*'];
+
+            // Parse HTML string into a DOM
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+
+            // Find the collection log table
+            const table = doc.querySelector('table.wikitable');
+            if (!table) {
+                console.warn('No collection log table found');
+                return;
+            }
 
             const cacheData = [];
-            items.forEach(item => {
+
+            const rows = table.querySelectorAll('tr');
+            rows.forEach((row, i) => {
+                if (i === 0) return; // skip header
+
+                const cells = row.querySelectorAll('td');
+                if (cells.length < 2) return;
+
+                const nameLink = cells[0].querySelector('a[title]');
+                const name = nameLink ? nameLink.getAttribute('title').trim() : cells[0].textContent.trim();
+
+                const id = row.getAttribute('data-item-id');
+                if (!id) return;
+
+                const category = cells[1].textContent.trim();
+
+                const img = cells[0].querySelector('img');
+                const image = img ? `https://oldschool.runescape.wiki${img.getAttribute('src')}` : null;
+
                 cacheData.push({
-                    id: item.id,
-                    name: item.name,
-                    category: item.tabs?.[0] || ''
+                    id: parseInt(id, 10),
+                    name,
+                    category,
+                    image
                 });
             });
 
